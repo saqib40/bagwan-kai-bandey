@@ -12,109 +12,62 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <!-- Header / Navigation Bar -->
+  <!-- Minimalist Unified Header -->
   <header class="navbar">
     <div class="nav-brand">
       <div class="logo-mark">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="#5E6AD2"/>
         </svg>
       </div>
       <div class="brand-text">
-        <div class="brand-title">SHIFT <span class="badge-falkor">FalkorDB</span></div>
-        <div class="brand-subtitle">Graph-Governed Migration Engine • Track 01</div>
+        <span class="brand-title">SHIFT</span>
+        <span class="badge-falkor">FalkorDB</span>
       </div>
     </div>
 
-    <!-- Live Status Pill HUD -->
-    <div class="status-hud">
-      <div class="hud-item hud-clean" title="Framework-free utility files"><span class="hud-dot"></span> CLEAN <span id="count-clean" class="hud-val">2</span></div>
-      <div class="hud-item hud-pending" title="Modules awaiting migration"><span class="hud-dot"></span> PENDING <span id="count-pending" class="hud-val">7</span></div>
-      <div class="hud-item hud-shimmed" title="Dual-compatible shims active"><span class="hud-dot"></span> SHIMMED <span id="count-shimmed" class="hud-val">0</span></div>
-      <div class="hud-item hud-verified" title="Pure Fastify modules verified"><span class="hud-dot"></span> VERIFIED <span id="count-verified" class="hud-val">0</span></div>
+    <!-- Center Inline Progress Telemetry -->
+    <div class="header-progress">
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+      </div>
+      <div class="progress-labels">
+        <span id="step-badge" class="step-badge">Step 0 / 11</span>
+        <span id="progress-percent" class="percent-badge">0%</span>
+        <span id="flight-milestone" class="flight-badge">Baseline Express</span>
+      </div>
     </div>
 
     <!-- Action Controls -->
     <div class="nav-actions">
-      <button id="btn-reset" class="btn btn-secondary" title="Reset codebase to original Express baseline">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        Reset Baseline
+      <button id="btn-reset" class="btn btn-ghost" title="Reset codebase to original Express baseline">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Reset
       </button>
-      <button id="btn-step" class="btn btn-primary" title="Execute next topological migration step">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-        Step Forward
+      <button id="btn-step" class="btn btn-secondary" title="Execute next topological migration step">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+        Step
       </button>
-      <button id="btn-auto" class="btn btn-accent" title="Auto-migrate the entire codebase step-by-step">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <button id="btn-auto" class="btn btn-primary" title="Auto-migrate the entire codebase step-by-step">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         <span id="btn-auto-label">Auto-Play</span>
       </button>
     </div>
   </header>
 
-  <!-- Top Telemetry & Precision Progress Bar -->
-  <section class="telemetry-bar">
-    <div class="telemetry-left">
-      <div class="pulse-indicator">
-        <span class="pulse-core"></span>
-      </div>
-      <div class="flight-status-box">
-        <span class="telemetry-kicker">MIGRATION STAGE</span>
-        <span id="flight-milestone" class="flight-title">Baseline Express</span>
-      </div>
-      <div class="telemetry-step-badge" id="step-badge">Step 0 / 11</div>
-    </div>
-
-    <div class="telemetry-center">
-      <div class="progress-meta">
-        <span class="progress-label">Graph Coverage</span>
-        <span id="progress-percent" class="progress-val">0%</span>
-      </div>
-      <div class="progress-track">
-        <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
-      </div>
-    </div>
-
-    <div class="telemetry-right">
-      <div class="metric-pill" title="Lines of temporary dual-compatible shims in repo">
-        <svg class="metric-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        <span class="metric-label">Shims</span>
-        <span id="metric-shims" class="metric-val">0 lines</span>
-      </div>
-      <div class="metric-pill" title="Strongly connected component cycles isolated & resolved">
-        <svg class="metric-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-        <span class="metric-label">SCC</span>
-        <span id="metric-scc" class="metric-val">1 Cycle</span>
-      </div>
-      <div class="metric-pill" title="Verification gate status">
-        <svg class="metric-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span class="metric-label">Invariants</span>
-        <span id="metric-invariants" class="metric-val">100% Pass</span>
-      </div>
-      <div class="metric-pill" title="FalkorDB query roundtrip latency">
-        <svg class="metric-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span class="metric-label">Query SLA</span>
-        <span id="metric-sla" class="metric-val">&lt; 2.0 ms</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- Main Grid Workspace -->
+  <!-- Main Minimalist Workspace -->
   <main class="cockpit-grid">
-    <!-- Left: Topology Graph Visualizer -->
+    <!-- Left Column: Dependency Graph (Maximized) -->
     <section class="card graph-pane">
       <div class="pane-header">
         <div class="pane-title">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          Dependency Graph Topology
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Dependency Graph
         </div>
         <div class="graph-badges">
-          <span class="badge badge-hint" title="Click or hover any node in the graph to inspect blast radius">
-            Inspect Blast Radius
-          </span>
-          <span class="badge badge-scc" title="Strongly Connected Component cycle detected">
-            <span class="pulse-scc"></span> 2-Node SCC Detected
-          </span>
-          <span class="badge badge-latency" id="graph-latency">FalkorDB: 1.5 ms</span>
+          <span class="meta-label">Click node to inspect blast radius</span>
+          <span class="meta-divider">·</span>
+          <span class="meta-latency" id="graph-latency">FalkorDB: 1.5 ms</span>
         </div>
       </div>
 
@@ -125,7 +78,7 @@
         <!-- Floating Blast Radius HUD Tooltip -->
         <div id="blast-radius-hud" class="blast-hud" style="display: none;">
           <div class="blast-hud-header">
-            <div class="blast-hud-file" id="hud-path">services/auditA.ts</div>
+            <span class="blast-hud-file" id="hud-path">services/auditA.ts</span>
             <span class="phase-pill" id="hud-status">PENDING</span>
           </div>
           <div class="blast-hud-stats">
@@ -135,14 +88,14 @@
             </div>
             <div class="hud-stat-box">
               <span class="stat-label">Blast Radius</span>
-              <span class="stat-value blast-highlight" id="hud-blast">3 Callers</span>
+              <span class="stat-value text-amber" id="hud-blast">3 Callers</span>
             </div>
             <div class="hud-stat-box">
               <span class="stat-label">In-Degree</span>
               <span class="stat-value" id="hud-indegree">2</span>
             </div>
             <div class="hud-stat-box">
-              <span class="stat-label">SCC Size</span>
+              <span class="stat-label">SCC</span>
               <span class="stat-value" id="hud-scc">2 Nodes</span>
             </div>
           </div>
@@ -152,24 +105,25 @@
         </div>
       </div>
 
-      <!-- Graph Footer Legend -->
-      <div class="graph-legend">
-        <div class="legend-item"><span class="leg-pill pill-pending"></span> Pending (Express)</div>
-        <div class="legend-item"><span class="leg-pill pill-shimmed"></span> Shimmed (Dual-Compat)</div>
-        <div class="legend-item"><span class="leg-pill pill-verified"></span> Verified (Fastify)</div>
-        <div class="legend-item"><span class="leg-pill pill-clean"></span> Clean (Framework-Free)</div>
-        <div class="legend-item"><span class="leg-pill pill-scc"></span> Circular SCC Cycle</div>
-        <div class="legend-item"><span class="leg-pill pill-active-halo"></span> Active Target</div>
+      <!-- Graph Footer: Legend & Cypher Drawer Toggle -->
+      <div class="graph-footer-bar">
+        <div class="graph-legend">
+          <span class="leg-item"><span class="leg-dot dot-pending"></span> Pending (<span id="count-pending">7</span>)</span>
+          <span class="leg-item"><span class="leg-dot dot-shimmed"></span> Shimmed (<span id="count-shimmed">0</span>)</span>
+          <span class="leg-item"><span class="leg-dot dot-verified"></span> Verified (<span id="count-verified">0</span>)</span>
+          <span class="leg-item"><span class="leg-dot dot-clean"></span> Clean (<span id="count-clean">2</span>)</span>
+          <span class="leg-item"><span class="leg-dot dot-scc"></span> 2-Node Cycle</span>
+        </div>
+        <button id="btn-toggle-cypher" class="btn-cypher-toggle" title="Toggle openCypher Query Console">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>openCypher</span>
+          <span class="toggle-arrow" id="cypher-arrow">▾</span>
+        </button>
       </div>
 
-      <!-- Live openCypher Terminal Drawer -->
-      <div class="cypher-drawer">
-        <div class="cypher-drawer-header">
-          <div class="cypher-title-group">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-            <span class="cypher-title">openCypher Query Execution</span>
-            <span id="cypher-latency-badge" class="badge-cypher-latency">1.2 ms</span>
-          </div>
+      <!-- Collapsible openCypher Tray -->
+      <div id="cypher-drawer" class="cypher-tray" style="display: none;">
+        <div class="cypher-tray-header">
           <div class="cypher-presets">
             <button class="btn-preset active" data-preset="claim">Leaf Claim (Pass B)</button>
             <button class="btn-preset" data-preset="deshim">De-shim (Pass A)</button>
@@ -177,6 +131,7 @@
             <button class="btn-preset" data-preset="pagerank">PageRank</button>
             <button class="btn-preset" data-preset="blast">Blast Radius</button>
           </div>
+          <span id="cypher-latency-badge" class="badge-cypher-latency">1.2 ms</span>
         </div>
         <div class="cypher-terminal-body">
           <pre id="cypher-query-display" class="cypher-code"><code><span class="cypher-kw">MATCH</span> (m:<span class="cypher-lbl">Module</span> {status: <span class="cypher-str">'PENDING'</span>})
@@ -193,82 +148,69 @@
       </div>
     </section>
 
-    <!-- Right: Active Flight Deck / Inspector -->
+    <!-- Right Column: 2 Consolidated Cards -->
     <aside class="sidebar-pane">
-      <!-- Active Claim Panel -->
-      <div class="card active-card">
+      <!-- Card 1: Active Migration Target & Code Diff -->
+      <div class="card active-diff-card">
         <div class="pane-header">
-          <div class="pane-title">Active Migration Target</div>
+          <div class="target-header-left">
+            <span class="pane-title" id="target-title">Active Migration Target</span>
+            <span id="diff-file-label" class="diff-file-badge" style="display: none;"></span>
+          </div>
           <span id="phase-badge" class="phase-pill phase-idle">READY</span>
         </div>
 
-        <div id="target-details" class="target-body">
-          <div class="target-empty">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-            <p>Click <strong>Step Forward</strong> or <strong>Auto-Play</strong> to initiate graph-governed migration.</p>
-          </div>
-        </div>
-
-        <!-- Dependency Proof Card -->
-        <div id="proof-container" class="proof-box" style="display: none;">
-          <div class="proof-title">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-            Topological Proof (shortestPath)
-          </div>
-          <div id="proof-text" class="proof-content"></div>
-        </div>
-      </div>
-
-      <!-- Verification Gates HUD -->
-      <div class="card gates-card">
-        <div class="pane-header">
-          <div class="pane-title">Verification Gates</div>
-          <span class="gate-overall" id="gate-overall-badge">GATES INTACT</span>
-        </div>
-        <div class="gates-grid">
-          <div class="gate-tile">
-            <div class="gate-status" id="gate-tsc">PASS</div>
-            <div class="gate-label">Typecheck (tsc --noEmit)</div>
-          </div>
-          <div class="gate-tile">
-            <div class="gate-status" id="gate-test">6/6 PASS</div>
-            <div class="gate-label">Integration Tests</div>
-          </div>
-          <div class="gate-tile">
-            <div class="gate-status" id="gate-routes">100% MATCH</div>
-            <div class="gate-label">Route Invariant Parity</div>
-          </div>
-          <div class="gate-tile">
-            <div class="gate-status" id="gate-falkor">&lt; 5 ms</div>
-            <div class="gate-label">FalkorDB Query SLA</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Real-Time Code Diff Inspector -->
-      <div class="card diff-card">
-        <div class="pane-header">
-          <div class="pane-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-            Code Diff &amp; Shim Inspector
-          </div>
-          <span id="diff-file-label" class="diff-file-badge">No changes</span>
-        </div>
+        <!-- Target details summary (only shown if needed, e.g. SCC notice or proof) -->
+        <div id="target-meta" class="target-meta-box" style="display: none;"></div>
 
         <!-- Multi-File Tabs Container for SCC cycles -->
         <div id="diff-tabs" class="diff-tabs-bar" style="display: none;"></div>
 
+        <!-- Code Diff Viewer -->
         <div id="diff-viewer" class="diff-body">
-          <pre class="diff-placeholder">Code modifications and dual-signature shims will stream here in real time...</pre>
+          <div class="target-empty">
+            <p>Ready to start. Click <strong>Step</strong> or <strong>Auto-Play</strong> to begin migration.</p>
+          </div>
+        </div>
+
+        <!-- Proof footer (compact) -->
+        <div id="proof-container" class="proof-footer" style="display: none;">
+          <span class="proof-label">Shortest Path:</span>
+          <span id="proof-text" class="proof-text"></span>
         </div>
       </div>
 
-      <!-- Migration Audit Trail Stream -->
-      <div class="card audit-card">
+      <!-- Card 2: Verification Gates & Episode Audit -->
+      <div class="card verify-audit-card">
         <div class="pane-header">
-          <div class="pane-title">Episode Audit Stream</div>
-          <span id="episode-count-badge" class="badge-mini">0 Steps</span>
+          <div class="pane-title">Verification &amp; Audit</div>
+          <span class="gate-overall" id="gate-overall-badge">GATES INTACT</span>
         </div>
+
+        <!-- Compact Single-Line Gates HUD -->
+        <div class="gates-inline-strip">
+          <div class="gate-inline-item">
+            <span class="gate-name">Typecheck</span>
+            <span class="gate-val" id="gate-tsc">PASS</span>
+          </div>
+          <span class="gate-sep">·</span>
+          <div class="gate-inline-item">
+            <span class="gate-name">Tests</span>
+            <span class="gate-val" id="gate-test">6/6</span>
+          </div>
+          <span class="gate-sep">·</span>
+          <div class="gate-inline-item">
+            <span class="gate-name">Routes</span>
+            <span class="gate-val" id="gate-routes">100%</span>
+          </div>
+          <span class="gate-sep">·</span>
+          <div class="gate-inline-item">
+            <span class="gate-name">Latency</span>
+            <span class="gate-val" id="gate-falkor">&lt; 2 ms</span>
+          </div>
+        </div>
+
+        <!-- Chronological Episode Audit Stream -->
         <div id="audit-feed" class="audit-feed-list">
           <div class="audit-empty">No episodes recorded yet.</div>
         </div>
@@ -278,10 +220,9 @@
 
   <!-- Step 11 Production Sign-off & Audit Verification Modal -->
   <div id="victory-modal" class="modal-overlay" style="display: none;">
-    <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
     <div class="modal-card">
       <div class="modal-header-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
           <polyline points="22 4 12 14.01 9 11.01"/>
         </svg>
@@ -351,7 +292,7 @@
       <!-- Modal Actions -->
       <div class="modal-actions">
         <button id="btn-download-audit" class="btn btn-secondary">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export Audit Trail (JSON)
         </button>
         <button id="btn-modal-replay" class="btn btn-secondary">

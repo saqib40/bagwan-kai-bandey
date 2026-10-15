@@ -1,6 +1,6 @@
 /**
- * Shift Migration Cockpit — Client Application (`public/app.js`).
- * Linear / Raycast Titanium Design System.
+ * Shift Migration Cockpit — Minimalist Client Application (`public/app.js`).
+ * Clean, distraction-free architecture powered by FalkorDB openCypher graph engine.
  */
 
 // ── Status Color Mapping (Matte Engineering Palette) ──────
@@ -45,8 +45,7 @@ RETURN 'DE_SHIM' AS phase, sccId, [x IN clusterNodes | x.path] AS targetPaths`,
     query: `MATCH (m:Module)
 OPTIONAL MATCH (m)-[:IMPORTS]->(d:Module)
 RETURN m.path AS from, collect(d.path) AS to
-// Result fed into Tarjan's SCC algorithm;
-// Mutually dependent cycles (auditA <-> auditB) are grouped into atomic clusters.`,
+// Fed into Tarjan SCC algorithm; circular cycles (auditA <-> auditB) are migrated atomically.`,
     rationale: 'Multi-file cyclic dependencies cannot be migrated one-by-one. FalkorDB groups them so they are edited and typechecked atomically in a single step.',
   },
   pagerank: {
@@ -87,7 +86,7 @@ function startRadarPulse() {
   if (radarAnimationId) return;
 
   function loop() {
-    radarPulseRadius = (radarPulseRadius + 0.4) % 24;
+    radarPulseRadius = (radarPulseRadius + 0.35) % 20;
     if (network && activeTargetPaths.length > 0) {
       network.redraw();
     }
@@ -104,7 +103,7 @@ function initNetwork(modules, edges) {
 
   if (typeof vis === 'undefined') {
     console.error('Vis.js is not loaded!');
-    container.innerHTML = '<div style="color:#F43F5E;padding:24px;text-align:center;">Error: Vis.js library failed to load.</div>';
+    container.innerHTML = '<div style="color:#F43F5E;padding:20px;text-align:center;">Vis.js failed to load.</div>';
     return;
   }
 
@@ -112,7 +111,7 @@ function initNetwork(modules, edges) {
     const isCycle = (m.sccSize ?? 1) > 1;
     const baseColors = STATUS_COLORS[m.status] || STATUS_COLORS.PENDING;
     const label = m.path.replace(/^src\//, '');
-    const size = Math.max(16, Math.min(34, Math.round((m.pagerank || 0.1) * 160 + 15)));
+    const size = Math.max(15, Math.min(32, Math.round((m.pagerank || 0.1) * 150 + 14)));
 
     return {
       id: m.path,
@@ -122,20 +121,20 @@ function initNetwork(modules, edges) {
       value: size,
       shape: 'dot',
       color: isCycle ? { ...baseColors, border: '#F43F5E' } : baseColors,
-      borderWidth: isCycle ? 3 : 1.5,
+      borderWidth: isCycle ? 2.5 : 1.2,
       font: {
         color: '#E2E8F0',
         face: 'JetBrains Mono, monospace',
         size: 11,
         strokeWidth: 2,
-        strokeColor: '#0B0D13',
+        strokeColor: '#08090C',
       },
       shadow: {
         enabled: true,
-        color: 'rgba(0, 0, 0, 0.5)',
-        size: 4,
+        color: 'rgba(0, 0, 0, 0.4)',
+        size: 3,
         x: 0,
-        y: 2,
+        y: 1,
       },
       moduleData: m,
     };
@@ -147,11 +146,11 @@ function initNetwork(modules, edges) {
       id: `edge-${idx}`,
       from: e.source,
       to: e.target,
-      arrows: { to: { enabled: true, scaleFactor: 0.6 } },
-      color: isCycleEdge ? { color: '#F43F5E', highlight: '#FB7185' } : { color: 'rgba(148, 163, 184, 0.3)', highlight: '#5E6AD2' },
+      arrows: { to: { enabled: true, scaleFactor: 0.55 } },
+      color: isCycleEdge ? { color: '#F43F5E', highlight: '#FB7185' } : { color: 'rgba(148, 163, 184, 0.28)', highlight: '#5E6AD2' },
       dashes: isCycleEdge,
-      width: isCycleEdge ? 2 : 1.2,
-      smooth: { type: 'curvedCW', roundness: 0.18 },
+      width: isCycleEdge ? 1.8 : 1.1,
+      smooth: { type: 'curvedCW', roundness: 0.15 },
     };
   });
 
@@ -162,9 +161,9 @@ function initNetwork(modules, edges) {
     physics: {
       enabled: true,
       barnesHut: {
-        gravitationalConstant: -2600,
+        gravitationalConstant: -2400,
         centralGravity: 0.35,
-        springLength: 120,
+        springLength: 115,
         springConstant: 0.05,
         damping: 0.12,
         avoidOverlap: 0.3,
@@ -176,11 +175,11 @@ function initNetwork(modules, edges) {
     },
     nodes: {
       shape: 'dot',
-      scaling: { min: 15, max: 34 },
+      scaling: { min: 14, max: 32 },
     },
     interaction: {
       hover: true,
-      tooltipDelay: 100,
+      tooltipDelay: 80,
       zoomView: true,
     },
     autoResize: true,
@@ -190,7 +189,7 @@ function initNetwork(modules, edges) {
 
   network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
 
-  // Hairline Ring around Active Targets (Linear Compass Style)
+  // Hairline Compass Ring around Active Targets
   network.on('afterDrawing', (ctx) => {
     if (!activeTargetPaths.length) return;
 
@@ -202,10 +201,10 @@ function initNetwork(modules, edges) {
 
         ctx.save();
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 20 + radarPulseRadius, 0, 2 * Math.PI, false);
-        const alpha = Math.max(0, 0.6 - (radarPulseRadius / 24));
+        ctx.arc(pos.x, pos.y, 18 + radarPulseRadius, 0, 2 * Math.PI, false);
+        const alpha = Math.max(0, 0.5 - (radarPulseRadius / 20));
         ctx.strokeStyle = `rgba(94, 106, 210, ${alpha})`;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.0;
         ctx.stroke();
         ctx.restore();
       }
@@ -215,7 +214,7 @@ function initNetwork(modules, edges) {
   });
 
   network.once('stabilizationIterationsDone', () => {
-    network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+    network.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
   });
 
   setTimeout(() => {
@@ -223,9 +222,9 @@ function initNetwork(modules, edges) {
       network.redraw();
       network.fit();
     }
-  }, 250);
+  }, 200);
 
-  // Click handler: Inspect Blast Radius on node click; clear on canvas click
+  // Click handler
   network.on('click', (params) => {
     if (params.nodes.length > 0) {
       const nodeId = params.nodes[0];
@@ -283,28 +282,27 @@ function highlightBlastRadius(nodeId) {
   const updates = allModulesCache.map((m) => {
     const isTarget = m.path === nodeId;
     const isCaller = callersSet.has(m.path);
-    const baseColors = STATUS_COLORS[m.status] || STATUS_COLORS.PENDING;
 
     if (isTarget) {
       return {
         id: m.path,
         color: { background: '#3730A3', border: '#818CF8' },
-        borderWidth: 2.5,
+        borderWidth: 2,
         opacity: 1.0,
       };
     } else if (isCaller) {
       return {
         id: m.path,
         color: { background: '#78350F', border: '#F59E0B' },
-        borderWidth: 2,
+        borderWidth: 1.8,
         opacity: 1.0,
       };
     } else {
       return {
         id: m.path,
-        color: { background: '#131722', border: '#222838' },
+        color: { background: '#10131B', border: '#1C212E' },
         borderWidth: 1,
-        opacity: 0.2,
+        opacity: 0.18,
       };
     }
   });
@@ -359,21 +357,21 @@ function updateNetworkTopology(modules) {
   const updates = modules.map((m) => {
     const isCycle = (m.sccSize ?? 1) > 1;
     const baseColors = STATUS_COLORS[m.status] || STATUS_COLORS.PENDING;
-    const size = Math.max(16, Math.min(34, Math.round((m.pagerank || 0.1) * 160 + 15)));
+    const size = Math.max(15, Math.min(32, Math.round((m.pagerank || 0.1) * 150 + 14)));
 
     return {
       id: m.path,
       size,
       value: size,
       color: isCycle ? { ...baseColors, border: '#F43F5E' } : baseColors,
-      borderWidth: isCycle ? 3 : 1.5,
+      borderWidth: isCycle ? 2.5 : 1.2,
       opacity: 1.0,
       shadow: {
         enabled: true,
-        color: 'rgba(0, 0, 0, 0.5)',
-        size: 4,
+        color: 'rgba(0, 0, 0, 0.4)',
+        size: 3,
         x: 0,
-        y: 2,
+        y: 1,
       },
       moduleData: m,
     };
@@ -382,7 +380,7 @@ function updateNetworkTopology(modules) {
   nodesDataSet.update(updates);
 }
 
-// ── Refresh Status HUD & Telemetry ────────────────────────
+// ── Refresh Status Counts & Header Progress ───────────────
 function updateStatusCounts(counts) {
   document.getElementById('count-clean').textContent = counts.CLEAN ?? 0;
   document.getElementById('count-pending').textContent = counts.PENDING ?? 0;
@@ -398,34 +396,25 @@ function updateStatusCounts(counts) {
   progressPercent.textContent = `${pct}%`;
   stepBadge.textContent = `Step ${currentStepNumber} / ${TOTAL_STEPS}`;
 
-  // Flight milestone text
   const flightTitle = document.getElementById('flight-milestone');
   if (currentStepNumber === 0) {
     flightTitle.textContent = 'Baseline Express';
   } else if (currentStepNumber <= 5) {
-    flightTitle.textContent = 'Pass B: Shimming Leaves';
+    flightTitle.textContent = 'Shimming Leaves';
   } else if (currentStepNumber === 6) {
-    flightTitle.textContent = 'Root Fastify Entrypoint';
+    flightTitle.textContent = 'Fastify Entrypoint';
   } else if (currentStepNumber < 11) {
-    flightTitle.textContent = 'Pass A: Top-Down De-shimming';
+    flightTitle.textContent = 'Top-Down De-shimming';
   } else {
-    flightTitle.textContent = '100% Fastify Verified';
+    flightTitle.textContent = '100% Verified';
   }
-
-  // Active shims count
-  let totalShimLines = 0;
-  for (const m of allModulesCache) {
-    totalShimLines += m.shimLines ?? 0;
-  }
-  const shimMetric = document.getElementById('metric-shims');
-  shimMetric.textContent = `${totalShimLines} lines`;
-  shimMetric.style.color = totalShimLines > 0 ? '#C4B5FD' : '#94A3B8';
 }
 
-// ── Display Active Target Panel ───────────────────────────
+// ── Display Active Target & Diff ──────────────────────────
 function showActiveTarget(claim, claimLatencyMs) {
+  const targetTitle = document.getElementById('target-title');
   const phaseBadge = document.getElementById('phase-badge');
-  const targetBody = document.getElementById('target-details');
+  const targetMeta = document.getElementById('target-meta');
   const proofContainer = document.getElementById('proof-container');
   const proofText = document.getElementById('proof-text');
 
@@ -438,37 +427,24 @@ function showActiveTarget(claim, claimLatencyMs) {
   if (latencyBadge && claimLatencyMs) {
     latencyBadge.textContent = `FalkorDB: ${claimLatencyMs} ms`;
   }
-  document.getElementById('metric-sla').textContent = `${claimLatencyMs || '1.2'} ms`;
+  document.getElementById('gate-falkor').textContent = `${claimLatencyMs || '1.2'} ms`;
 
   const isCycle = claim.targetPaths.length > 1;
 
-  let html = `
-    <div class="target-module-title">
-      ${isCycle ? 'Atomic SCC Cycle Cluster' : claim.targetPaths[0]}
-    </div>
-    <div class="target-meta-row">
-      <span class="target-meta-tag">Phase: <strong>${claim.phase}</strong></span>
-      <span class="target-meta-tag">SCC ID: <strong>#${claim.sccId}</strong></span>
-      <span class="target-meta-tag">Pending Callers: <strong>${claim.pendingCallersCount}</strong></span>
-    </div>
-  `;
-
   if (isCycle) {
-    html += `
-      <div style="font-size: 0.74rem; color: #FDA4AF; margin-top: 4px;">
-        Mutually dependent files migrated atomically in a single batch:
-        <ul style="margin: 4px 0 0 14px;">
-          ${claim.targetPaths.map((p) => `<li><code>${p}</code></li>`).join('')}
-        </ul>
-      </div>
-    `;
+    targetTitle.textContent = 'Atomic SCC Cycle';
+    targetMeta.style.display = 'block';
+    targetMeta.textContent = `Circular cycle migrated atomically: ${claim.targetPaths.map((p) => p.replace(/^src\//, '')).join(', ')}`;
+  } else {
+    targetTitle.textContent = claim.targetPaths[0] || 'Active Target';
+    targetMeta.style.display = 'none';
   }
 
-  targetBody.innerHTML = html;
-
   if (claim.proof) {
-    proofContainer.style.display = 'block';
-    proofText.textContent = `${claim.proof}\nQuery Latency: ${claimLatencyMs || '1.2'} ms`;
+    proofContainer.style.display = 'flex';
+    proofText.textContent = `${claim.proof} (${claimLatencyMs || '1.2'} ms)`;
+  } else {
+    proofContainer.style.display = 'none';
   }
 }
 
@@ -480,13 +456,14 @@ function renderCodeDiff(modifiedFiles) {
   const tabsContainer = document.getElementById('diff-tabs');
 
   if (!modifiedFiles || modifiedFiles.length === 0) {
-    fileLabel.textContent = 'No changes';
+    fileLabel.style.display = 'none';
     tabsContainer.style.display = 'none';
-    diffViewer.innerHTML = `<pre class="diff-placeholder">No modified files in this step.</pre>`;
+    diffViewer.innerHTML = `<div class="target-empty"><p>No changes in this step.</p></div>`;
     return;
   }
 
   fileLabel.textContent = modifiedFiles.map((f) => f.path.replace(/^src\//, '')).join(', ');
+  fileLabel.style.display = 'inline';
 
   if (modifiedFiles.length > 1) {
     tabsContainer.style.display = 'flex';
@@ -499,7 +476,7 @@ function renderCodeDiff(modifiedFiles) {
       .join('');
 
     tabsContainer.querySelectorAll('.diff-tab-btn').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', () => {
         tabsContainer.querySelectorAll('.diff-tab-btn').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         const idx = Number(btn.getAttribute('data-file-idx'));
@@ -521,7 +498,7 @@ function renderSingleFileDiff(f) {
   const oldLines = f.oldCode.split('\n');
   const newLines = f.newCode.split('\n');
 
-  let diffHtml = `<div style="font-weight: 600; color: #A5B4FC; margin-bottom: 6px;">--- ${f.path}</div>`;
+  let diffHtml = `<div style="font-weight: 600; color: #A5B4FC; margin-bottom: 5px;">--- ${f.path}</div>`;
 
   let diffCount = 0;
   for (let i = 0; i < Math.max(oldLines.length, newLines.length); i++) {
@@ -550,7 +527,7 @@ function renderSingleFileDiff(f) {
     }
   }
 
-  diffViewer.innerHTML = diffCount > 0 ? diffHtml : `<div style="color: #64748B;">Identical or whitespace-only changes</div>`;
+  diffViewer.innerHTML = diffCount > 0 ? diffHtml : `<div style="color: #64748B; padding: 10px;">Identical or whitespace-only changes</div>`;
   diffViewer.scrollTop = 0;
 }
 
@@ -597,7 +574,21 @@ function highlightCypherSyntax(rawQuery) {
   return `<code>${html}</code>`;
 }
 
-function setupCypherPresetButtons() {
+function setupCypherDrawer() {
+  const toggleBtn = document.getElementById('btn-toggle-cypher');
+  const drawer = document.getElementById('cypher-drawer');
+  const arrow = document.getElementById('cypher-arrow');
+
+  toggleBtn.addEventListener('click', () => {
+    const isOpen = drawer.style.display !== 'none';
+    drawer.style.display = isOpen ? 'none' : 'flex';
+    arrow.textContent = isOpen ? '▾' : '▴';
+
+    setTimeout(() => {
+      if (network) network.fit({ animation: { duration: 250 } });
+    }, 50);
+  });
+
   const buttons = document.querySelectorAll('.btn-preset');
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -630,11 +621,11 @@ function updateVerificationGates(verifyResult, verifyLatencyMs) {
 
     if (verifyResult.checkpointResult) {
       const cp = verifyResult.checkpointResult;
-      gateTest.textContent = cp.testPass ? '6/6 PASS' : 'FAIL';
-      gateRoutes.textContent = cp.routeMatch ? '100% MATCH' : 'MISMATCH';
+      gateTest.textContent = cp.testPass ? '6/6' : 'FAIL';
+      gateRoutes.textContent = cp.routeMatch ? '100%' : 'MISMATCH';
     }
 
-    gateFalkor.textContent = `${verifyLatencyMs || '< 5'} ms`;
+    gateFalkor.textContent = `${verifyLatencyMs || '< 2'} ms`;
     overallBadge.textContent = verifyResult.ok ? 'GATES INTACT' : 'GATE FAILED';
     overallBadge.style.color = verifyResult.ok ? '#34D399' : '#F43F5E';
   }
@@ -643,8 +634,6 @@ function updateVerificationGates(verifyResult, verifyLatencyMs) {
 // ── Add Audit Stream Item ─────────────────────────────────
 function appendAuditItem(step, phase, newStatus, targetPaths) {
   const feed = document.getElementById('audit-feed');
-  const countBadge = document.getElementById('episode-count-badge');
-
   const emptyNotice = feed.querySelector('.audit-empty');
   if (emptyNotice) emptyNotice.remove();
 
@@ -652,7 +641,7 @@ function appendAuditItem(step, phase, newStatus, targetPaths) {
   item.className = 'audit-item';
   item.innerHTML = `
     <div>
-      <span class="audit-step">Step ${step}:</span>
+      <span class="audit-step">${step}.</span>
       <span class="audit-phase">[${phase}]</span>
       <span style="color: #CBD5E1;">${targetPaths.map((p) => p.replace(/^src\//, '')).join(', ')}</span>
     </div>
@@ -660,7 +649,6 @@ function appendAuditItem(step, phase, newStatus, targetPaths) {
   `;
 
   feed.prepend(item);
-  countBadge.textContent = `${feed.children.length} Steps`;
 }
 
 function showVictoryModal() {
@@ -694,10 +682,11 @@ async function executeStep() {
       currentStepNumber = TOTAL_STEPS;
       document.getElementById('phase-badge').textContent = 'COMPLETE';
       document.getElementById('phase-badge').className = 'phase-pill phase-deshim';
-      document.getElementById('target-details').innerHTML = `
-        <div style="text-align: center; padding: 14px; color: #34D399;">
-          <h4 style="margin-bottom: 4px; font-weight: 600;">Migration Complete</h4>
-          <p style="font-size: 0.78rem; color: #94A3B8;">All 7 Express legacy modules have been successfully migrated, typechecked, and de-shimmed to pure Fastify.</p>
+      document.getElementById('target-title').textContent = 'Migration Complete';
+      document.getElementById('target-meta').style.display = 'none';
+      document.getElementById('diff-viewer').innerHTML = `
+        <div class="target-empty" style="color: #34D399;">
+          <p>All 7 legacy modules successfully migrated and verified to pure Fastify.</p>
         </div>
       `;
 
@@ -725,7 +714,7 @@ async function executeStep() {
     if (network && data.claim.targetPaths.length > 0) {
       network.focus(data.claim.targetPaths[0], {
         scale: 1.1,
-        animation: { duration: 500, easingFunction: 'easeInOutQuad' },
+        animation: { duration: 400, easingFunction: 'easeInOutQuad' },
       });
     }
 
@@ -753,27 +742,26 @@ async function resetCodebase() {
     const res = await fetch('/api/reset', { method: 'POST' });
     const data = await res.json();
 
+    document.getElementById('target-title').textContent = 'Active Migration Target';
     document.getElementById('phase-badge').textContent = 'READY';
     document.getElementById('phase-badge').className = 'phase-pill phase-idle';
-    document.getElementById('target-details').innerHTML = `
+    document.getElementById('target-meta').style.display = 'none';
+    document.getElementById('proof-container').style.display = 'none';
+    document.getElementById('diff-file-label').style.display = 'none';
+    document.getElementById('diff-tabs').style.display = 'none';
+    document.getElementById('diff-viewer').innerHTML = `
       <div class="target-empty">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-        <p>Click <strong>Step Forward</strong> or <strong>Auto-Play</strong> to initiate graph-governed migration.</p>
+        <p>Ready to start. Click <strong>Step</strong> or <strong>Auto-Play</strong> to begin migration.</p>
       </div>
     `;
-    document.getElementById('proof-container').style.display = 'none';
-    document.getElementById('diff-viewer').innerHTML = `<pre class="diff-placeholder">Code modifications and dual-signature shims will stream here in real time...</pre>`;
-    document.getElementById('diff-file-label').textContent = 'No changes';
-    document.getElementById('diff-tabs').style.display = 'none';
     document.getElementById('audit-feed').innerHTML = `<div class="audit-empty">No episodes recorded yet.</div>`;
-    document.getElementById('episode-count-badge').textContent = '0 Steps';
 
     document.getElementById('gate-overall-badge').textContent = 'GATES INTACT';
     document.getElementById('gate-overall-badge').className = 'gate-overall';
     document.getElementById('gate-tsc').textContent = 'PASS';
-    document.getElementById('gate-test').textContent = '6/6 PASS';
-    document.getElementById('gate-routes').textContent = '100% MATCH';
-    document.getElementById('gate-falkor').textContent = '< 5 ms';
+    document.getElementById('gate-test').textContent = '6/6';
+    document.getElementById('gate-routes').textContent = '100%';
+    document.getElementById('gate-falkor').textContent = '< 2 ms';
     document.getElementById('graph-latency').textContent = 'FalkorDB: 1.5 ms';
 
     updateNetworkTopology(data.topology.modules);
@@ -786,7 +774,7 @@ async function resetCodebase() {
     document.querySelector('.btn-preset[data-preset="claim"]')?.classList.add('active');
 
     if (network) {
-      network.fit({ animation: { duration: 600 } });
+      network.fit({ animation: { duration: 500 } });
     }
   } catch (err) {
     console.error('Reset failed:', err);
@@ -814,7 +802,7 @@ function startAutoPlay() {
     if (!isAutoPlaying) return;
     const canContinue = await executeStep();
     if (canContinue && isAutoPlaying) {
-      autoPlayTimer = setTimeout(stepLoop, 1400);
+      autoPlayTimer = setTimeout(stepLoop, 1300);
     }
   };
 
@@ -827,7 +815,7 @@ function stopAutoPlay() {
   const label = document.getElementById('btn-auto-label');
   const btn = document.getElementById('btn-auto');
   label.textContent = 'Auto-Play';
-  btn.className = 'btn btn-accent';
+  btn.className = 'btn btn-primary';
 }
 
 async function downloadAuditReport() {
@@ -852,7 +840,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const data = await fetchGraphData();
     initNetwork(data.modules, data.edges);
     updateStatusCounts(data.statusCounts);
-    setupCypherPresetButtons();
+    setupCypherDrawer();
 
     document.getElementById('btn-step').addEventListener('click', executeStep);
     document.getElementById('btn-auto').addEventListener('click', toggleAutoPlay);
