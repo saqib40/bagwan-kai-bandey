@@ -243,53 +243,241 @@ Evaluated on a synthetic enterprise graph with 150 modules, 320 edges, and 3 mul
 
 ---
 
-## Quickstart
+---
 
-### Prerequisites
-* Node.js $\ge 20$
-* Docker (for FalkorDB container)
+## How to Use Shift for Your Codebase (User Guide)
+
+Whether you are migrating an existing Express repository to Fastify or building a custom migration for your team's internal framework, Shift operates in two primary modes:
+1. **Autonomous AI Agent via Model Context Protocol (MCP)** *(Recommended)*
+2. **Interactive CLI / Scripted Workflow**
+
+---
+
+### Step 1: Start FalkorDB
+
+Shift requires a running FalkorDB graph instance. Start it via Docker:
+```bash
+docker run -p 6379:6379 -p 3000:3000 -d --name falkordb-shift falkordb/falkordb:latest
+```
+*(Shift will also automatically attempt to start the container if Docker is running on your machine).*
+
+---
+
+### Step 2: Ingest & Initialize Your Codebase
+
+Point Shift at your repository root to scan source files, compute baseline route invariants, detect legacy API usages, and condense circular dependencies:
+
+```bash
+# Using local CLI:
+npm start -- init --repo /path/to/your-repo --pack express-to-fastify
+
+# Or link globally:
+npm link
+shift init --repo /path/to/your-repo --pack express-to-fastify
+```
+
+Output:
+```
+--- Graph Initialization Complete ---
+Repository:       /path/to/your-repo
+Migration Pack:   express-to-fastify
+Total Modules:    42
+  - Clean:        10
+  - Pending:      32
+Baseline Routes:  24
+Tarjan SCCs:      31
+FalkorDB UI:      http://localhost:3000
+```
+
+---
+
+### Step 3: Run the Migration
+
+#### Option A: Autonomous AI Agent via MCP (Recommended)
+
+Shift turns any LLM into a graph-governed migration engineer with zero chance of breaking intermediate builds or deadlocking on circular imports.
+
+##### 1. Add Shift to your MCP Client Configuration:
+
+**For Claude Desktop (`claude_desktop_config.json`):**
+```json
+{
+  "mcpServers": {
+    "shift": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "tsx",
+        "/absolute/path/to/shift/bin/cli.ts",
+        "serve",
+        "--repo",
+        "/absolute/path/to/your-repo",
+        "--pack",
+        "express-to-fastify"
+      ]
+    }
+  }
+}
+```
+
+**For Cursor (`.cursor/mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "shift": {
+      "command": "tsx",
+      "args": ["/absolute/path/to/shift/bin/cli.ts", "serve", "--repo", "/absolute/path/to/your-repo", "--pack", "express-to-fastify"]
+    }
+  }
+}
+```
+
+##### 2. Instruct Your AI Agent:
+Prompt your agent in chat:
+> *"Migrate this repository from Express to Fastify using the Shift MCP tools. Follow this loop: call `claim_next_leaf` to get the next unblocked module(s) and phase (`SHIM`, `MIGRATE`, or `DE_SHIM`), inspect context with `get_migration_slice`, apply the changes to disk, and call `verify_and_commit_node`. Repeat until all modules reach `VERIFIED`."*
+
+The agent will execute the topological plan automatically:
+1. Claims foundational leaves (highest PageRank helpers) first.
+2. Migrates circular dependencies ($A \leftrightarrow B$) atomically in a single batch.
+3. Automatically generates dual-signature shims (`// @shift-shim`) for modules with pending callers.
+4. Cascades de-shimming top-down once all upstream callers are verified.
+
+---
+
+#### Option B: Step-by-Step CLI Workflow
+
+You can also drive the migration manually or via scripts using the Shift CLI:
+
+```bash
+# 1. Claim next unblocked leaf or atomic SCC
+shift claim --repo ./my-app --pack express-to-fastify
+# Output: Returns JSON with targetPaths: ["src/utils/response.ts"], phase: "SHIM"
+
+# 2. Inspect 1-hop contextual slice and guidance
+shift slice --repo ./my-app --pack express-to-fastify --module src/utils/response.ts --phase SHIM
+
+# 3. Edit your file(s) on disk (e.g., adding Fastify types and dual-signature wrappers)
+
+# 4. Gate-check, typecheck, and commit the node in FalkorDB
+shift verify --repo ./my-app --pack express-to-fastify --module src/utils/response.ts --summary "Dual-compat response shim"
+
+# 5. Check audit trail and trigger test checkpoint
+shift audit --repo ./my-app --pack express-to-fastify --checkpoint
+```
+
+Repeat steps 1–4 until `shift claim` reports:
+`[shift] No unblocked modules to claim. Migration complete.`
+
+---
+
+### Step 4: Live Visual Cockpit & FalkorDB Browser
+
+#### 1. Interactive Migration Cockpit (`http://localhost:4200`)
+Launch Shift's real-time visual cockpit:
+```bash
+npm run demo
+```
+- **Live Dependency Topology:** Vis.js canvas showing PageRank-scaled glowing nodes and Tarjan circular cycles.
+- **Controls:** Click **"Step Forward"** to execute one topological step, or **"Auto-Play ▶"** to watch the entire codebase migrate with real-time code diffs, FalkorDB sub-millisecond query latency, and green verification gates (`tsc`, integration tests, route parity).
+
+#### 2. FalkorDB Browser (`http://localhost:3000`)
+Query the graph directly with openCypher:
+```cypher
+// View all unblocked modules ready for migration
+MATCH (m:Module)
+WHERE m.status IN ['PENDING', 'SHIMMED']
+  AND NOT (m)-[:IMPORTS]->(:Module {status: 'PENDING'})
+RETURN m.path, m.status, m.pagerank
+ORDER BY m.pagerank DESC
+```
+
+---
+
+## How to Build a Custom Migration (Your Own Framework / Language)
+
+Shift is completely language- and framework-agnostic. To migrate a different library (e.g. Flask $\rightarrow$ FastAPI, React Router 5 $\rightarrow$ 6, Jest $\rightarrow$ Vitest, or internal company SDKs):
+
+### Step 1: Scaffold a Migration Pack
+```bash
+shift pack init flask-to-fastapi --lang python
+```
+This generates a starter pack at `packs/flask-to-fastapi.json`.
+
+### Step 2: Configure Detection Rules & Verification Gates
+Edit `packs/flask-to-fastapi.json`:
+1. **`packages`**: Set legacy and target package names (`flask` $\rightarrow$ `fastapi`).
+2. **`detectionRules`**: Define Tree-sitter AST queries matching legacy API calls or decorator patterns.
+3. **`verification`**: Set your project's validation commands:
+   ```json
+   "verification": {
+     "perStepTypecheckCmd": "mypy src/",
+     "checkpointTestCmd": "pytest test/",
+     "routeSnapshotCmd": "python scripts/dump_routes.py"
+   }
+   ```
+
+### Step 3: Validate Your Pack Schema
+```bash
+shift pack validate ./packs/flask-to-fastapi.json
+```
+Output: `[shift] ✅ Pack "flask-to-fastapi" is structurally valid and ready for use!`
+
+### Step 4 (If New Language): Scaffold a Language Adapter
+For languages other than TypeScript, scaffold an adapter:
+```bash
+shift adapter init python
+```
+This creates `adapters/pythonAdapter.ts` extending `BaseLanguageAdapter`. Implement `parseModule()` to extract imports and symbol signatures.
+
+### Step 5: Run Your Custom Migration
+```bash
+shift init --repo /path/to/python-app --pack flask-to-fastapi --adapter ./adapters/pythonAdapter.ts
+```
+
+---
+
+## CLI Command Reference
+
+| Command | Arguments / Flags | Description |
+|---|---|---|
+| `shift init` | `--repo <path> --pack <id> [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
+| `shift claim` | `--repo <path> --pack <id>` | Computes transitive callee graph and claims the next unblocked leaf or circular SCC cluster. |
+| `shift slice` | `--repo <path> --pack <id> --module <path> --phase <phase>` | Returns 1-hop contextual slice (target files, callee signatures, caller snippets, phase guidance). |
+| `shift blast-radius` | `--repo <path> --pack <id> --module <path>` | Evaluates reverse multi-hop dependencies (`[:IMPORTS*1..6]`) before editing. |
+| `shift verify` | `--repo <path> --pack <id> --module <path> [--summary <text>]` | Re-parses AST, checks invariants, runs `tsc --noEmit`, and commits state in FalkorDB. |
+| `shift audit` | `--repo <path> --pack <id> [--checkpoint]` | Streams cryptographic episode audit log; runs full checkpoint gates (tests + route diffs). |
+| `shift serve` | `[--repo <path>] [--pack <id>]` | Starts the Shift Model Context Protocol (MCP) server over standard I/O (stdio). |
+| `shift pack init` | `<pack-id> [--lang <language>]` | Scaffolds a new validated Migration Pack starter template. |
+| `shift pack validate`| `<path-to-pack>` | Validates Migration Pack structure, AST queries, and verification commands. |
+| `shift adapter init` | `<language>` | Scaffolds a new Language Adapter starter template extending `BaseLanguageAdapter`. |
+
+---
+
+## Developer & Contributor Quickstart
 
 ### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-### 2. Run Test Suite (28 tests)
+### 2. Run Full Test Suite (28 tests)
 ```bash
 npm test
 ```
 
-### 3. Run Validators & Scale Benchmark
+### 3. Run Scale Benchmark & AST Validators
 ```bash
 npm run validate:queries  # Validates Tree-sitter AST queries
-npm run validate:cypher   # Validates openCypher against FalkorDB
-npm run benchmark         # 150-module synthetic latency benchmark
+npm run validate:cypher   # Validates openCypher queries against live FalkorDB
+npm run benchmark         # 150-module synthetic P95 latency benchmark
 npm run typecheck         # tsc --noEmit
 ```
 
-### 4. Interactive Visual Cockpit
-Launch the real-time visual migration flight deck:
+### 4. Run the Visual Flight Deck
 ```bash
 npm run demo
 ```
-Open **[http://localhost:4200](http://localhost:4200)** to view live PageRank topologies, Tarjan cycles, code diffs, and verification gates.
-
-### 5. Start MCP Server
-```bash
-# stdio transport for Claude Desktop, Antigravity, or any MCP client
-npm start -- serve --repo ./demo-repo --pack express-to-fastify
-```
-
-### 6. Inspect Graph in FalkorDB Browser
-Open **[http://localhost:3000](http://localhost:3000)** in your browser:
-* Graph: `shift`
-* Host: `localhost`, Port: `6379`
-* Query:
-```cypher
-MATCH (m:Module)
-OPTIONAL MATCH (m)-[r:IMPORTS]->(callee:Module)
-RETURN m, r, callee
-```
+Open **[http://localhost:4200](http://localhost:4200)** in your browser.
 
 ---
 
