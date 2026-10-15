@@ -1,0 +1,70 @@
+{
+  "$schema": "./PACK_SPEC.schema.json",
+  "id": "express-to-fastify",
+  "name": "Express.js to Fastify Migration Pack",
+  "language": "typescript",
+  "trustedExecutionNote": "Packs execute shell commands (typecheckCmd, testCmd, routeSnapshotCmd). Only load trusted packs.",
+  "knownLimitations": [
+    "AST route extraction matches receiver identifiers named app, router, fastify, or server. Full prefixed route verification relies on the runtime routeSnapshotCmd."
+  ],
+  "sourceGlobs": {
+    "include": ["src/**/*.ts"],
+    "exclude": ["**/*.d.ts", "**/node_modules/**"]
+  },
+  "packages": {
+    "legacy": ["express", "@types/express"],
+    "target": ["fastify"]
+  },
+  "detectionRules": [
+    {
+      "id": "express-import-esm",
+      "description": "ESM import from express",
+      "astQuery": "(import_statement source: (string (string_fragment) @pkg (#eq? @pkg \"express\")))"
+    },
+    {
+      "id": "express-import-cjs",
+      "description": "CommonJS require('express')",
+      "astQuery": "(call_expression function: (identifier) @fn (#eq? @fn \"require\") arguments: (arguments (string (string_fragment) @pkg (#eq? @pkg \"express\"))))"
+    },
+    {
+      "id": "express-res-methods",
+      "description": "Express response methods: res.json(), res.send(), res.status(), res.sendStatus()",
+      "astQuery": "(call_expression function: (member_expression object: (identifier) @obj (#match? @obj \"^(res|response|replyOrRes)$\") property: (property_identifier) @prop (#match? @prop \"^(json|sendStatus|status)$\")))"
+    },
+    {
+      "id": "express-router-mount",
+      "description": "Express router creation or mounting: express.Router(), Router(), app.use()",
+      "astQuery": "(call_expression function: (member_expression object: (identifier) @obj (#match? @obj \"^(express|app|router)$\") property: (property_identifier) @prop (#match? @prop \"^(Router|use)$\")))"
+    },
+    {
+      "id": "express-middleware-arrow",
+      "description": "3-argument arrow middleware (req, res, next) => ...",
+      "astQuery": "(arrow_function parameters: (formal_parameters (required_parameter) (required_parameter) (required_parameter pattern: (identifier) @next (#eq? @next \"next\"))))"
+    },
+    {
+      "id": "express-middleware-fn",
+      "description": "3-argument function middleware function(req, res, next)",
+      "astQuery": "(function_declaration parameters: (formal_parameters (required_parameter) (required_parameter) (required_parameter pattern: (identifier) @next (#eq? @next \"next\"))))"
+    }
+  ],
+  "agentGuidance": {
+    "MIGRATE": "Convert Express imports, routers, and handlers to Fastify (`FastifyPluginAsync`, `request`, `reply.code(c).send(d)`). Name the plugin instance parameter `fastify` so route invariants can be extracted. Do NOT include any `// @shift-shim` comments.",
+    "SHIM": "This module has unmigrated upstream callers (`pendingCallersCount > 0`). Write a dual-compatible shim so untouched Express callers still compile and pass tests. For response helpers, check `typeof reply.code === 'function'`. For middleware/hooks, declare `(req: any, reply: any, ...legacyRest: any[])` so `fn.length === 2` for Fastify while calling `legacyRest[0]?.()` for Express. For routers, export BOTH a Fastify plugin (param named `fastify`) and the legacy Express router under its original export name. Tag ONLY the legacy fallback lines with `// @shift-shim`.",
+    "DE_SHIM": "All upstream callers of this module are now fully migrated (`pendingCallersCount == 0`). Remove all Express fallback branches and remove all `// @shift-shim` comments so the module uses pure Fastify types."
+  },
+  "invariants": [
+    {
+      "id": "module-route-surface-preserved",
+      "scope": "per-step",
+      "type": "extracted-set-equality",
+      "description": "Every (HTTP_METHOD, PATH) registered on app/router/fastify/server in this file must match baseline_sets.",
+      "astExtractor": "(call_expression function: (member_expression object: (identifier) @obj (#match? @obj \"^(app|router|fastify|server)$\") property: (property_identifier) @method (#match? @method \"^(get|post|put|delete|patch)$\")) arguments: (arguments . (string (string_fragment) @path)))",
+      "format": "{method|upper} {path}"
+    }
+  ],
+  "verification": {
+    "perStepTypecheckCmd": "npx tsc --noEmit",
+    "checkpointTestCmd": "npm test",
+    "routeSnapshotCmd": "node scripts/dump-routes.mjs"
+  }
+}

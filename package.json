@@ -1,0 +1,30 @@
+{
+  "name": "shift-migration-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shift: graph-governed codebase migration engine powered by FalkorDB.",
+  "bin": {
+    "shift": "./bin/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/**/*.test.ts",
+    "validate:queries": "tsx scripts/validate-queries.ts",
+    "validate:cypher": "tsx scripts/validate-cypher.ts",
+    "benchmark": "tsx scripts/benchmark-scale.ts",
+    "start": "tsx bin/cli.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "falkordb": "^6.0.0",
+    "tree-sitter-typescript": "^0.23.2",
+    "web-tree-sitter": "^0.25.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

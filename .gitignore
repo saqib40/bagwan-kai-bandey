@@ -1,0 +1,6 @@
+node_modules/
+demo-repo/node_modules/
+.shift/
+*.log
+.DS_Store
+scratch/
