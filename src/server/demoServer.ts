@@ -2,44 +2,58 @@
  * Bagwan Kai Bandey (BKB) Migration Cockpit — Backend Server (`src/server/demoServer.ts`).
  *
  * Drives the live BKB migration engine and FalkorDB graph in real time:
- *  - GET /api/graph -> Current nodes, edges, SCC clusters, PageRank, status counts
- *  - POST /api/reset -> Resets scratch demo-repo to original Express and re-inits FalkorDB
- *  - POST /api/step  -> Executes the next topological claim + edit + verify + checkpoint gate
- *  - GET /api/audit  -> Full chronological audit trail of MigrationEpisodes
+ *  - GET /api/info        -> Current repo, pack, mode, available packs, checkpoints
+ *  - GET /api/graph       -> Current nodes, edges, SCC clusters, PageRank, status counts
+ *  - POST /api/target     -> Dynamically switch target repo, pack, mode, or LLM provider
+ *  - POST /api/reset      -> Resets target repo (demo or custom) and re-inits FalkorDB
+ *  - POST /api/step       -> Executes next topological step (canned, LLM, or observer)
+ *  - GET /api/file        -> Fetches raw file contents on disk for inspection
+ *  - GET /api/node-detail -> Detailed callers, callees, symbols, and blast radius for a node
+ *  - GET /api/audit       -> Full chronological audit trail of MigrationEpisodes
+ *  - GET /api/checkpoints -> Available step snapshots in .bkb/checkpoints/
+ *  - POST /api/rollback   -> Instant 1-click disk and graph rollback to a previous checkpoint
  *
- * Serves the modern Vis.js dark-mode visualizer from `public/`.
+ * Serves the modern Vis.js visualizer from `public/`.
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
-import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync } from 'node:fs';
-import { resolve, extname } from 'node:path';
-import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, readdirSync } from 'node:fs';
+import { resolve, join, extname } from 'node:path';
 import { ensureFalkorDB } from '../engine/docker';
 import { FalkorClient } from '../engine/falkorClient';
 import { MigrationGraphManager } from '../engine/graphManager';
 import { MigrationOps, type Phase } from '../engine/operations';
+import { LlmClient } from '../runner/llmClient';
+import { saveCheckpoint, listCheckpoints, rollbackToCheckpoint } from '../runner/rollback';
 import * as Q from '../engine/queries';
 
 const PORT = Number(process.env.PORT ?? 4200);
 const WORKSPACE = resolve(import.meta.dirname, '../..');
 const SOURCE_REPO = resolve(WORKSPACE, 'demo-repo');
-const TARGET_REPO = resolve(WORKSPACE, 'scratch/cockpit-demo-repo');
+const DEFAULT_TARGET_REPO = resolve(WORKSPACE, 'scratch/cockpit-demo-repo');
 const GRAPH_NAME = process.env.BKB_GRAPH ?? 'bkb_cockpit';
-const PACK_ID = 'express-to-fastify';
+const DEFAULT_PACK_ID = 'express-to-fastify';
+
+// ── Dynamic Server State ─────────────────────────────────
+let activeRepo = DEFAULT_TARGET_REPO;
+let activePackId = DEFAULT_PACK_ID;
+let activeMode: 'canned' | 'llm' | 'observer' = 'canned';
+let activeProvider: 'mock' | 'ollama' | 'openai' | 'anthropic' = 'mock';
+let activeModel = 'qwen2.5-coder:latest';
 
 // Pre-defined code states for the 11 migration steps (exact code verified in Milestone 3)
 const STEP_CODE_STATES: Record<string, Record<string, string>> = {
   // Step 1: response.ts -> SHIM
   'src/utils/response.ts:SHIM': {
     'src/utils/response.ts': `import type { FastifyReply } from 'fastify';
-import type { Response } from 'express'; // @shift-shim
+import type { Response } from 'express'; // @bkb-shim
 
 /** Standard success envelope (dual-compatible shim). */
 export function sendSuccess(replyOrRes: any, data: unknown, statusCode = 200) {
   if (typeof replyOrRes?.code === 'function') {
     return replyOrRes.code(statusCode).send({ ok: true, data });
   }
-  return replyOrRes.status(statusCode).json({ ok: true, data }); // @shift-shim
+  return replyOrRes.status(statusCode).json({ ok: true, data }); // @bkb-shim
 }
 
 /** Standard error envelope (dual-compatible shim). */
@@ -47,14 +61,14 @@ export function sendError(replyOrRes: any, message: string, statusCode = 400) {
   if (typeof replyOrRes?.code === 'function') {
     return replyOrRes.code(statusCode).send({ ok: false, error: message });
   }
-  return replyOrRes.status(statusCode).json({ ok: false, error: message }); // @shift-shim
+  return replyOrRes.status(statusCode).json({ ok: false, error: message }); // @bkb-shim
 }
 `,
   },
 
   // Step 2: auth.ts -> SHIM
   'src/middleware/auth.ts:SHIM': {
-    'src/middleware/auth.ts': `import type { Request, Response, NextFunction } from 'express'; // @shift-shim
+    'src/middleware/auth.ts': `import type { Request, Response, NextFunction } from 'express'; // @bkb-shim
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { sendError } from '../utils/response';
 
@@ -64,15 +78,15 @@ export async function requireAuth(req: any, replyOrRes: any, ...legacyRest: any[
   if (apiKey !== 'secret-token') {
     return sendError(replyOrRes, 'Unauthorized', 401);
   }
-  const next = legacyRest[0]; // @shift-shim
-  if (typeof next === 'function') next(); // @shift-shim
+  const next = legacyRest[0]; // @bkb-shim
+  if (typeof next === 'function') next(); // @bkb-shim
 }
 `,
   },
 
   // Step 3: auditA + auditB -> SHIM (Atomic Cycle)
   'src/services/auditA.ts,src/services/auditB.ts:SHIM': {
-    'src/services/auditA.ts': `import type { Request } from 'express'; // @shift-shim
+    'src/services/auditA.ts': `import type { Request } from 'express'; // @bkb-shim
 import { shortHash } from '../utils/hash';
 import { formatAuditLine } from './auditB';
 
@@ -90,7 +104,7 @@ export function auditTag(req: AuditableRequest): string {
   return formatAuditLine(describeRequest(req));
 }
 `,
-    'src/services/auditB.ts': `import type { Request } from 'express'; // @shift-shim
+    'src/services/auditB.ts': `import type { Request } from 'express'; // @bkb-shim
 import { describeRequest, type AuditableRequest } from './auditA';
 
 export function formatAuditLine(parts: string[]): string {
@@ -98,14 +112,15 @@ export function formatAuditLine(parts: string[]): string {
 }
 
 export function auditRequest(req: AuditableRequest): string {
-  return \`audit:\${formatAuditLine(describeRequest(req))}\`;
+  const [method, hash] = describeRequest(req);
+  return formatAuditLine([method, hash]);
 }
 `,
   },
 
   // Step 4: orders.ts -> SHIM
   'src/routes/orders.ts:SHIM': {
-    'src/routes/orders.ts': `import express from 'express'; // @shift-shim
+    'src/routes/orders.ts': `import express from 'express'; // @bkb-shim
 import type { FastifyPluginAsync } from 'fastify';
 import { requireAuth } from '../middleware/auth';
 import { sendSuccess, sendError } from '../utils/response';
@@ -133,23 +148,23 @@ export const ordersRoutes: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-const router = express.Router(); // @shift-shim
-router.get('/', requireAuth, (req, res) => { // @shift-shim
-  return sendSuccess(res, { items: orders, audit: auditRequest(req) }); // @shift-shim
-}); // @shift-shim
-router.get('/:id', requireAuth, (req, res) => { // @shift-shim
-  const order = orders.find((o) => o.id === Number(req.params.id)); // @shift-shim
-  if (!order) return sendError(res, 'Order not found', 404); // @shift-shim
-  return sendSuccess(res, order); // @shift-shim
-}); // @shift-shim
+const router = express.Router(); // @bkb-shim
+router.get('/', requireAuth, (req, res) => { // @bkb-shim
+  return sendSuccess(res, { items: orders, audit: auditRequest(req) }); // @bkb-shim
+}); // @bkb-shim
+router.get('/:id', requireAuth, (req, res) => { // @bkb-shim
+  const order = orders.find((o) => o.id === Number(req.params.id)); // @bkb-shim
+  if (!order) return sendError(res, 'Order not found', 404); // @bkb-shim
+  return sendSuccess(res, order); // @bkb-shim
+}); // @bkb-shim
 
-export const ordersRouter = router; // @shift-shim
+export const ordersRouter = router; // @bkb-shim
 `,
   },
 
   // Step 5: users.ts -> SHIM
   'src/routes/users.ts:SHIM': {
-    'src/routes/users.ts': `import express from 'express'; // @shift-shim
+    'src/routes/users.ts': `import express from 'express'; // @bkb-shim
 import type { FastifyPluginAsync } from 'fastify';
 import { requireAuth } from '../middleware/auth';
 import { sendSuccess, sendError } from '../utils/response';
@@ -183,24 +198,24 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-const router = express.Router(); // @shift-shim
-router.get('/', requireAuth, (req, res) => { // @shift-shim
-  return sendSuccess(res, { items: users, audit: auditRequest(req) }); // @shift-shim
-}); // @shift-shim
-router.get('/:id', requireAuth, (req, res) => { // @shift-shim
-  const user = users.find((u) => u.id === Number(req.params.id)); // @shift-shim
-  if (!user) return sendError(res, 'User not found', 404); // @shift-shim
-  return sendSuccess(res, user); // @shift-shim
-}); // @shift-shim
-router.post('/', requireAuth, (req, res) => { // @shift-shim
-  const name = typeof req.body?.name === 'string' ? req.body.name : ''; // @shift-shim
-  if (!name) return sendError(res, 'name is required', 400); // @shift-shim
-  const user: User = { id: users.length + 1, name }; // @shift-shim
-  users.push(user); // @shift-shim
-  return sendSuccess(res, user, 201); // @shift-shim
-}); // @shift-shim
+const router = express.Router(); // @bkb-shim
+router.get('/', requireAuth, (req, res) => { // @bkb-shim
+  return sendSuccess(res, { items: users, audit: auditRequest(req) }); // @bkb-shim
+}); // @bkb-shim
+router.get('/:id', requireAuth, (req, res) => { // @bkb-shim
+  const user = users.find((u) => u.id === Number(req.params.id)); // @bkb-shim
+  if (!user) return sendError(res, 'User not found', 404); // @bkb-shim
+  return sendSuccess(res, user); // @bkb-shim
+}); // @bkb-shim
+router.post('/', requireAuth, (req, res) => { // @bkb-shim
+  const name = typeof req.body?.name === 'string' ? req.body.name : ''; // @bkb-shim
+  if (!name) return sendError(res, 'name is required', 400); // @bkb-shim
+  const user: User = { id: users.length + 1, name }; // @bkb-shim
+  users.push(user); // @bkb-shim
+  return sendSuccess(res, user, 201); // @bkb-shim
+}); // @bkb-shim
 
-export const usersRouter = router; // @shift-shim
+export const usersRouter = router; // @bkb-shim
 `,
   },
 
@@ -321,7 +336,8 @@ export function formatAuditLine(parts: string[]): string {
 }
 
 export function auditRequest(req: AuditableRequest): string {
-  return \`audit:\${formatAuditLine(describeRequest(req))}\`;
+  const [method, hash] = describeRequest(req);
+  return formatAuditLine([method, hash]);
 }
 `,
   },
@@ -331,6 +347,7 @@ export function auditRequest(req: AuditableRequest): string {
     'src/middleware/auth.ts': `import type { FastifyRequest, FastifyReply } from 'fastify';
 import { sendError } from '../utils/response';
 
+/** Require auth preHandler (pure Fastify). */
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   const apiKey = request.headers['x-api-key'];
   if (apiKey !== 'secret-token') {
@@ -371,7 +388,7 @@ async function getClient(): Promise<FalkorClient> {
 async function getOps(): Promise<MigrationOps> {
   if (!currentOps) {
     const client = await getClient();
-    const mgr = await MigrationGraphManager.create(TARGET_REPO, PACK_ID, {
+    const mgr = await MigrationGraphManager.create(activeRepo, activePackId, {
       graphName: GRAPH_NAME,
       client,
     });
@@ -382,20 +399,23 @@ async function getOps(): Promise<MigrationOps> {
 
 async function resetDemoState() {
   console.error('[cockpit] Resetting scratch target repo...');
-  rmSync(TARGET_REPO, { recursive: true, force: true });
-  mkdirSync(TARGET_REPO, { recursive: true });
+  rmSync(DEFAULT_TARGET_REPO, { recursive: true, force: true });
+  mkdirSync(DEFAULT_TARGET_REPO, { recursive: true });
 
-  cpSync(resolve(SOURCE_REPO, 'src'), resolve(TARGET_REPO, 'src'), { recursive: true });
-  cpSync(resolve(SOURCE_REPO, 'scripts'), resolve(TARGET_REPO, 'scripts'), { recursive: true });
-  cpSync(resolve(SOURCE_REPO, 'test'), resolve(TARGET_REPO, 'test'), { recursive: true });
-  cpSync(resolve(SOURCE_REPO, 'package.json'), resolve(TARGET_REPO, 'package.json'));
-  cpSync(resolve(SOURCE_REPO, 'tsconfig.json'), resolve(TARGET_REPO, 'tsconfig.json'));
-  symlinkSync(resolve(SOURCE_REPO, 'node_modules'), resolve(TARGET_REPO, 'node_modules'), 'junction');
+  cpSync(resolve(SOURCE_REPO, 'src'), resolve(DEFAULT_TARGET_REPO, 'src'), { recursive: true });
+  cpSync(resolve(SOURCE_REPO, 'scripts'), resolve(DEFAULT_TARGET_REPO, 'scripts'), { recursive: true });
+  cpSync(resolve(SOURCE_REPO, 'test'), resolve(DEFAULT_TARGET_REPO, 'test'), { recursive: true });
+  cpSync(resolve(SOURCE_REPO, 'package.json'), resolve(DEFAULT_TARGET_REPO, 'package.json'));
+  cpSync(resolve(SOURCE_REPO, 'tsconfig.json'), resolve(DEFAULT_TARGET_REPO, 'tsconfig.json'));
+  symlinkSync(resolve(SOURCE_REPO, 'node_modules'), resolve(DEFAULT_TARGET_REPO, 'node_modules'), 'junction');
+
+  activeRepo = DEFAULT_TARGET_REPO;
+  activePackId = DEFAULT_PACK_ID;
 
   const client = await getClient();
   await MigrationGraphManager.initMigrationGraph({
-    repoPath: TARGET_REPO,
-    packId: PACK_ID,
+    repoPath: DEFAULT_TARGET_REPO,
+    packId: DEFAULT_PACK_ID,
     graphName: GRAPH_NAME,
     client,
     reset: true,
@@ -439,10 +459,17 @@ async function getGraphTopology() {
     edges,
     statusCounts: countMap,
     episodeCount,
+    currentRepo: activeRepo,
+    displayRepo: activeRepo === DEFAULT_TARGET_REPO ? 'demo-repo (Sandbox)' : activeRepo,
+    isDemoRepo: activeRepo === DEFAULT_TARGET_REPO,
+    currentPackId: activePackId,
+    mode: activeMode,
+    provider: activeProvider,
+    model: activeModel,
   };
 }
 
-// ── HTTP Request Router ──────────────────────────────────
+// ── HTTP Helpers ─────────────────────────────────────────
 
 function sendJson(res: ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, {
@@ -465,6 +492,21 @@ function sendFile(res: ServerResponse, filePath: string, contentType: string) {
   }
 }
 
+function parseJsonBody(req: IncomingMessage): Promise<any> {
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', (chunk) => { data += chunk; });
+    req.on('end', () => {
+      try {
+        resolve(data ? JSON.parse(data) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
 export function startDemoServer(port = PORT) {
   const publicDir = resolve(WORKSPACE, 'public');
 
@@ -485,6 +527,40 @@ export function startDemoServer(port = PORT) {
 
     // ── API Endpoints ──
 
+    // 1. System Info & Configuration Status
+    if (pathname === '/api/info' && req.method === 'GET') {
+      try {
+        const packsDir = resolve(WORKSPACE, 'packs');
+        const availablePacks = existsSync(packsDir)
+          ? readdirSync(packsDir)
+              .filter((f) => f.endsWith('.json') || f.endsWith('.ts'))
+              .map((f) => f.replace(/\.(json|ts)$/, ''))
+          : ['express-to-fastify'];
+
+        if (!availablePacks.includes('express-to-fastify')) {
+          availablePacks.unshift('express-to-fastify');
+        }
+
+        const checkpoints = listCheckpoints(activeRepo);
+
+        sendJson(res, {
+          currentRepo: activeRepo,
+          displayRepo: activeRepo === DEFAULT_TARGET_REPO ? 'demo-repo (Sandbox)' : activeRepo,
+          isDemoRepo: activeRepo === DEFAULT_TARGET_REPO,
+          currentPackId: activePackId,
+          mode: activeMode,
+          provider: activeProvider,
+          model: activeModel,
+          availablePacks,
+          checkpoints,
+        });
+      } catch (err: any) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    // 2. Graph Topology & Live Stats
     if (pathname === '/api/graph' && req.method === 'GET') {
       try {
         const topology = await getGraphTopology();
@@ -495,9 +571,74 @@ export function startDemoServer(port = PORT) {
       return;
     }
 
+    // 3. Dynamic Target Repository & Mode Switching
+    if (pathname === '/api/target' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        if (body.repoPath !== undefined) {
+          if (body.repoPath === 'demo' || body.repoPath === '' || body.repoPath === './demo-repo') {
+            activeRepo = DEFAULT_TARGET_REPO;
+          } else {
+            activeRepo = resolve(WORKSPACE, body.repoPath);
+          }
+        }
+        if (body.packId) activePackId = body.packId;
+        if (body.mode) activeMode = body.mode;
+        if (body.provider) activeProvider = body.provider;
+        if (body.model) activeModel = body.model;
+
+        currentOps = null;
+        const client = await getClient();
+
+        if (body.reset || !existsSync(activeRepo)) {
+          if (activeRepo === DEFAULT_TARGET_REPO) {
+            await resetDemoState();
+          } else {
+            await MigrationGraphManager.initMigrationGraph({
+              repoPath: activeRepo,
+              packId: activePackId,
+              graphName: GRAPH_NAME,
+              client,
+              reset: true,
+            });
+          }
+        }
+
+        const topology = await getGraphTopology();
+        sendJson(res, {
+          success: true,
+          currentRepo: activeRepo,
+          displayRepo: activeRepo === DEFAULT_TARGET_REPO ? 'demo-repo (Sandbox)' : activeRepo,
+          isDemoRepo: activeRepo === DEFAULT_TARGET_REPO,
+          currentPackId: activePackId,
+          mode: activeMode,
+          provider: activeProvider,
+          model: activeModel,
+          topology,
+        });
+      } catch (err: any) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    // 4. Codebase & Graph Reset
     if (pathname === '/api/reset' && req.method === 'POST') {
       try {
-        await resetDemoState();
+        if (activeRepo === DEFAULT_TARGET_REPO) {
+          await resetDemoState();
+        } else {
+          const client = await getClient();
+          await MigrationGraphManager.initMigrationGraph({
+            repoPath: activeRepo,
+            packId: activePackId,
+            graphName: GRAPH_NAME,
+            client,
+            reset: true,
+          });
+          currentOps = null;
+        }
+
         const topology = await getGraphTopology();
         sendJson(res, { success: true, topology });
       } catch (err: any) {
@@ -506,6 +647,7 @@ export function startDemoServer(port = PORT) {
       return;
     }
 
+    // 5. Query Unblocked Target (Claim Dry-Run)
     if (pathname === '/api/claim' && req.method === 'POST') {
       try {
         const ops = await getOps();
@@ -519,6 +661,7 @@ export function startDemoServer(port = PORT) {
       return;
     }
 
+    // 6. Step Forward Migration Execution
     if (pathname === '/api/step' && req.method === 'POST') {
       try {
         const ops = await getOps();
@@ -536,20 +679,51 @@ export function startDemoServer(port = PORT) {
           return;
         }
 
-        // Determine step key for pre-verified code diff
+        // Determine step key
         const sortedTargets = [...claim.targetPaths].sort().join(',');
         const stepKey = `${sortedTargets}:${claim.phase}`;
-        const replacements = STEP_CODE_STATES[stepKey];
+        let replacements: Record<string, string> | undefined;
 
-        if (!replacements) {
-          sendJson(res, { error: `No canned code state found for step key: ${stepKey}` }, 400);
-          return;
+        // Mode A: Canned step diff (if in canned mode and stepKey exists)
+        if (activeMode === 'canned' && activeRepo === DEFAULT_TARGET_REPO) {
+          replacements = STEP_CODE_STATES[stepKey];
         }
 
-        // Apply file writes
+        // Mode B: Live LLM Transform via LlmClient
+        if (!replacements) {
+          const llmClient = new LlmClient({
+            provider: activeProvider === 'mock' && activeRepo !== DEFAULT_TARGET_REPO ? 'ollama' : activeProvider,
+            model: activeModel,
+          });
+
+          const slice = await ops.getMigrationSlice(claim.targetPaths, claim.phase);
+          replacements = {};
+
+          // Snapshot checkpoint before modifying disk
+          const client = await getClient();
+          const epRows = await client.roQuery<any>(`MATCH (e:MigrationEpisode) RETURN count(e) AS n`);
+          const epStep = Number(epRows[0]?.n ?? 0) + 1;
+          saveCheckpoint(activeRepo, epStep, claim.targetPaths);
+
+          for (const targetPath of claim.targetPaths) {
+            const abs = resolve(activeRepo, targetPath);
+            const oldCode = existsSync(abs) ? readFileSync(abs, 'utf8') : '';
+            const transform = await llmClient.generateTransform({
+              targetPath,
+              phase: claim.phase,
+              fullSource: oldCode,
+              guidance: slice.guidance,
+              calleeSignatures: slice.calleeSignatures,
+              callerSnippets: slice.callerSnippets,
+            });
+            replacements[targetPath] = transform.code;
+          }
+        }
+
+        // Apply file writes to disk
         const modifiedFiles: Array<{ path: string; oldCode: string; newCode: string }> = [];
         for (const [relPath, newContent] of Object.entries(replacements)) {
-          const abs = resolve(TARGET_REPO, relPath);
+          const abs = resolve(activeRepo, relPath);
           let oldCode = '';
           try {
             oldCode = readFileSync(abs, 'utf8');
@@ -560,7 +734,7 @@ export function startDemoServer(port = PORT) {
           modifiedFiles.push({ path: relPath, oldCode, newCode: newContent });
         }
 
-        // Run real verify_and_commit_node on the engine
+        // Run real verification & node commit in FalkorDB
         const verifyStart = performance.now();
         const summary = `${claim.phase} applied to ${claim.targetPaths.join(', ')}`;
         const verifyResult = await ops.verifyAndCommitNode(claim.targetPaths, summary);
@@ -590,6 +764,127 @@ export function startDemoServer(port = PORT) {
       return;
     }
 
+    // 7. Disk File Content Viewer
+    if (pathname === '/api/file' && req.method === 'GET') {
+      const filePath = url.searchParams.get('path');
+      if (!filePath) {
+        sendJson(res, { error: 'Missing path query parameter' }, 400);
+        return;
+      }
+      try {
+        const absPath = resolve(activeRepo, filePath);
+        if (!existsSync(absPath)) {
+          sendJson(res, { error: `File not found: ${filePath}` }, 404);
+          return;
+        }
+        const content = readFileSync(absPath, 'utf8');
+        sendJson(res, {
+          path: filePath,
+          content,
+          linesCount: content.split('\n').length,
+        });
+      } catch (err: any) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    // 8. Detailed Node Inspector (Callers, Callees, Symbols, Blast Radius)
+    if (pathname === '/api/node-detail' && req.method === 'GET') {
+      const nodePath = url.searchParams.get('path');
+      if (!nodePath) {
+        sendJson(res, { error: 'Missing path query parameter' }, 400);
+        return;
+      }
+      try {
+        const client = await getClient();
+        const ops = await getOps();
+
+        // Node metadata
+        const nodeRows = await client.roQuery<any>(`
+          MATCH (m:Module {path: $path})
+          RETURN m.path AS path, m.status AS status, m.scc_id AS sccId, m.scc_size AS sccSize,
+                 m.pagerank AS pagerank, m.pending_callers_count AS pendingCallers,
+                 m.in_degree AS inDegree, m.shim_line_count AS shimLines
+        `, { path: nodePath });
+
+        const nodeMeta = nodeRows[0] ?? null;
+
+        // Direct Callees
+        const callees = await client.roQuery<any>(`
+          MATCH (m:Module {path: $path})-[:IMPORTS]->(callee:Module)
+          RETURN callee.path AS path, callee.status AS status
+        `, { path: nodePath });
+
+        // Direct Callers
+        const callers = await client.roQuery<any>(`
+          MATCH (caller:Module)-[:IMPORTS]->(m:Module {path: $path})
+          RETURN caller.path AS path, caller.status AS status
+        `, { path: nodePath });
+
+        // Symbols declared
+        const symbols = await client.roQuery<any>(`
+          MATCH (m:Module {path: $path})-[:DECLARES]->(s:Symbol)
+          RETURN s.name AS name, s.kind AS kind, s.signature AS signature
+        `, { path: nodePath });
+
+        // Multi-hop blast radius
+        const blast = await ops.simulateBlastRadius(nodePath).catch(() => []);
+
+        // File content from disk
+        let fileContent = '';
+        try {
+          const absPath = resolve(activeRepo, nodePath);
+          if (existsSync(absPath)) {
+            fileContent = readFileSync(absPath, 'utf8');
+          }
+        } catch {
+          fileContent = '';
+        }
+
+        sendJson(res, {
+          meta: nodeMeta,
+          callees,
+          callers,
+          symbols,
+          blastRadius: blast,
+          fileContent,
+        });
+      } catch (err: any) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    // 9. Checkpoints List & Rollback
+    if (pathname === '/api/checkpoints' && req.method === 'GET') {
+      try {
+        const checkpoints = listCheckpoints(activeRepo);
+        sendJson(res, { checkpoints });
+      } catch (err: any) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    if (pathname === '/api/rollback' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const result = await rollbackToCheckpoint(activeRepo, activePackId, body.step, GRAPH_NAME);
+        currentOps = null;
+        const topology = await getGraphTopology();
+        sendJson(res, {
+          ...result,
+          topology,
+          checkpoints: listCheckpoints(activeRepo),
+        });
+      } catch (err: any) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    // 10. Audit Trail & Checkpoint Verification Gate
     if (pathname === '/api/audit' && req.method === 'GET') {
       try {
         const ops = await getOps();
@@ -629,7 +924,7 @@ export function startDemoServer(port = PORT) {
     console.error(`======================================================\n`);
 
     // Ensure initial demo state exists
-    if (!existsSync(TARGET_REPO)) {
+    if (!existsSync(DEFAULT_TARGET_REPO)) {
       await resetDemoState();
     }
   });

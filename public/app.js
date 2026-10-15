@@ -78,6 +78,20 @@ let autoPlayTimer = null;
 let currentStepNumber = 0;
 const TOTAL_STEPS = 11;
 
+let currentAppInfo = {
+  currentRepo: 'scratch/cockpit-demo-repo',
+  displayRepo: 'demo-repo (Sandbox)',
+  isDemoRepo: true,
+  currentPackId: 'express-to-fastify',
+  mode: 'canned',
+  provider: 'mock',
+  model: 'qwen2.5-coder:latest',
+  availablePacks: ['express-to-fastify'],
+  checkpoints: [],
+};
+let observerInterval = null;
+let activeDrawerNode = null;
+
 // ── Hairline Compass Ring for Active Target ───────────────
 let radarPulseRadius = 0;
 let radarAnimationId = null;
@@ -229,8 +243,10 @@ function initNetwork(modules, edges) {
     if (params.nodes.length > 0) {
       const nodeId = params.nodes[0];
       highlightBlastRadius(nodeId);
+      openNodeInspector(nodeId);
     } else {
       clearBlastRadius();
+      closeNodeInspector();
     }
   });
 
@@ -498,9 +514,10 @@ function renderSingleFileDiff(f) {
   const oldLines = f.oldCode.split('\n');
   const newLines = f.newCode.split('\n');
 
-  let diffHtml = `<div style="font-weight: 600; color: #A5B4FC; margin-bottom: 5px;">--- ${f.path}</div>`;
+  let diffHtml = `<div style="font-weight: 600; color: #A5B4FC; margin-bottom: 8px; font-size: 0.75rem;">--- ${f.path}</div>`;
 
   let diffCount = 0;
+  let lineNum = 1;
   for (let i = 0; i < Math.max(oldLines.length, newLines.length); i++) {
     const o = oldLines[i];
     const n = newLines[i];
@@ -509,7 +526,7 @@ function renderSingleFileDiff(f) {
 
     if (o !== undefined && (n === undefined || !newLines.includes(o))) {
       diffCount++;
-      diffHtml += `<div class="diff-line diff-del">- ${escapeHtml(o)}</div>`;
+      diffHtml += `<div class="diff-line diff-del"><span style="display:inline-block;width:28px;color:#64748B;font-size:0.65rem;user-select:none;">${lineNum++}</span><span>- ${escapeHtml(o)}</span></div>`;
     }
     if (n !== undefined && (o === undefined || !oldLines.includes(n))) {
       diffCount++;
@@ -517,12 +534,13 @@ function renderSingleFileDiff(f) {
       if (isShim) {
         diffHtml += `
           <div class="diff-line diff-shim">
+            <span style="display:inline-block;width:28px;color:#A78BFA;font-size:0.65rem;user-select:none;">${lineNum++}</span>
             <span>+ ${escapeHtml(n)}</span>
             <span class="shim-tag">compat-shim</span>
           </div>
         `;
       } else {
-        diffHtml += `<div class="diff-line diff-add">+ ${escapeHtml(n)}</div>`;
+        diffHtml += `<div class="diff-line diff-add"><span style="display:inline-block;width:28px;color:#64748B;font-size:0.65rem;user-select:none;">${lineNum++}</span><span>+ ${escapeHtml(n)}</span></div>`;
       }
     }
   }
@@ -699,6 +717,7 @@ async function executeStep() {
     }
 
     currentStepNumber++;
+    renderTimelineStrip(currentStepNumber, currentAppInfo.checkpoints);
 
     showActiveTarget(data.claim, data.claimLatencyMs);
     renderCodeDiff(data.modifiedFiles);
@@ -734,6 +753,7 @@ async function resetCodebase() {
   activeTargetPaths = [];
   blastRadiusActiveNode = null;
   hideVictoryModal();
+  renderTimelineStrip(0, currentAppInfo.checkpoints);
 
   const btnReset = document.getElementById('btn-reset');
   btnReset.disabled = true;
@@ -834,6 +854,316 @@ async function downloadAuditReport() {
   }
 }
 
+// ── Node Inspector Drawer ─────────────────────────────────
+async function openNodeInspector(nodeId) {
+  activeDrawerNode = nodeId;
+  const drawer = document.getElementById('node-inspector-drawer');
+  if (!drawer) return;
+
+  drawer.style.display = 'flex';
+  document.getElementById('drawer-node-path').textContent = nodeId;
+  document.getElementById('drawer-file-code').textContent = '// Fetching node details and file contents...';
+
+  try {
+    const res = await fetch(`/api/node-detail?path=${encodeURIComponent(nodeId)}`);
+    const data = await res.json();
+
+    if (data.meta) {
+      document.getElementById('drawer-node-status').textContent = data.meta.status;
+      document.getElementById('drawer-node-status').className = `phase-pill status-${data.meta.status}`;
+      document.getElementById('drawer-pagerank').textContent = Number(data.meta.pagerank ?? 0).toFixed(4);
+      document.getElementById('drawer-indegree').textContent = data.meta.inDegree ?? 0;
+      document.getElementById('drawer-scc').textContent = `${data.meta.sccSize ?? 1} Nodes`;
+    }
+
+    // Tab 1: Source code
+    document.getElementById('drawer-file-code').textContent = data.fileContent || '// Empty or unreadable file';
+
+    // Tab 2: Callers & Callees & Blast Radius
+    const callersList = document.getElementById('drawer-callers-list');
+    document.getElementById('drawer-callers-count').textContent = data.callers?.length ?? 0;
+    callersList.innerHTML = data.callers?.length
+      ? data.callers.map((c) => `<span class="jump-chip" onclick="jumpToNode('${c.path}')">${c.path.replace(/^src\//, '')}</span>`).join('')
+      : '<span style="color: #64748B; font-size: 0.7rem;">None (Root entrypoint)</span>';
+
+    const calleesList = document.getElementById('drawer-callees-list');
+    document.getElementById('drawer-callees-count').textContent = data.callees?.length ?? 0;
+    calleesList.innerHTML = data.callees?.length
+      ? data.callees.map((c) => `<span class="jump-chip" onclick="jumpToNode('${c.path}')">${c.path.replace(/^src\//, '')}</span>`).join('')
+      : '<span style="color: #64748B; font-size: 0.7rem;">None (Leaf module)</span>';
+
+    const blastList = document.getElementById('drawer-blast-list');
+    document.getElementById('drawer-blast-count').textContent = data.blastRadius?.length ?? 0;
+    blastList.innerHTML = data.blastRadius?.length
+      ? data.blastRadius.map((b) => `
+          <div class="blast-row">
+            <span class="jump-chip" onclick="jumpToNode('${b.callerPath}')">${b.callerPath.replace(/^src\//, '')}</span>
+            <span class="hop-badge">${b.hops} Hop${b.hops > 1 ? 's' : ''}</span>
+          </div>
+        `).join('')
+      : '<div style="color: #64748B; padding: 4px; font-size: 0.7rem;">Zero reverse callers (Isolated blast radius)</div>';
+
+    // Tab 3: Symbols & AST
+    const symbolsList = document.getElementById('drawer-symbols-list');
+    symbolsList.innerHTML = data.symbols?.length
+      ? data.symbols.map((s) => `
+          <div class="symbol-item">
+            <span class="symbol-kind">[${s.kind}]</span>
+            <span class="symbol-sig">${escapeHtml(s.signature || s.name)}</span>
+          </div>
+        `).join('')
+      : '<div style="color: #64748B; padding: 4px; font-size: 0.7rem;">No exported symbols indexed</div>';
+
+  } catch (err) {
+    console.error('Failed to load node details:', err);
+    document.getElementById('drawer-file-code').textContent = `// Error loading details: ${err.message}`;
+  }
+}
+
+function closeNodeInspector() {
+  const drawer = document.getElementById('node-inspector-drawer');
+  if (drawer) drawer.style.display = 'none';
+  activeDrawerNode = null;
+}
+
+function jumpToNode(nodeId) {
+  if (network && nodeId) {
+    network.focus(nodeId, { scale: 1.15, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+    highlightBlastRadius(nodeId);
+    openNodeInspector(nodeId);
+  }
+}
+window.jumpToNode = jumpToNode;
+
+// ── Interactive Timeline Strip ────────────────────────────
+const CANNED_STEP_NAMES = [
+  'Baseline Express',
+  'response.ts (SHIM)',
+  'auth.ts (SHIM)',
+  'auditA + auditB (SHIM)',
+  'orders.ts (SHIM)',
+  'users.ts (SHIM)',
+  'app.ts (MIGRATE)',
+  'orders.ts (DE_SHIM)',
+  'users.ts (DE_SHIM)',
+  'auditA + auditB (DE_SHIM)',
+  'auth.ts (DE_SHIM)',
+  'response.ts (DE_SHIM)',
+];
+
+function renderTimelineStrip(stepNum, checkpoints = []) {
+  const track = document.getElementById('timeline-track');
+  if (!track) return;
+
+  track.innerHTML = '';
+  for (let i = 0; i < CANNED_STEP_NAMES.length; i++) {
+    const chip = document.createElement('div');
+    const isCompleted = i < stepNum;
+    const isCurrent = i === stepNum;
+
+    chip.className = `timeline-chip ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`;
+    chip.innerHTML = `
+      <span class="timeline-chip-dot"></span>
+      <span>${i === 0 ? '0: Baseline' : `${i}: ${CANNED_STEP_NAMES[i]}`}</span>
+    `;
+
+    chip.title = i === 0 ? 'Original Baseline' : `Step ${i}: ${CANNED_STEP_NAMES[i]}`;
+
+    chip.addEventListener('click', async () => {
+      if (i > stepNum) return;
+      if (confirm(`Do you want to roll back codebase and FalkorDB graph to Step ${i}?`)) {
+        await executeRollback(i);
+      }
+    });
+
+    track.appendChild(chip);
+  }
+}
+
+async function executeRollback(targetStep) {
+  try {
+    const res = await fetch('/api/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step: targetStep }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      currentStepNumber = targetStep;
+      activeTargetPaths = [];
+      updateNetworkTopology(data.topology.modules);
+      updateStatusCounts(data.topology.statusCounts);
+      renderTimelineStrip(currentStepNumber, data.checkpoints);
+      alert(data.message);
+    } else {
+      alert(`Rollback failed: ${data.message}`);
+    }
+  } catch (err) {
+    console.error('Rollback request failed:', err);
+  }
+}
+
+// ── System Info & Dynamic Target Manager ──────────────────
+async function loadSystemInfo() {
+  try {
+    const res = await fetch('/api/info');
+    const info = await res.json();
+    currentAppInfo = info;
+
+    const navRepo = document.getElementById('nav-repo-name');
+    const navPack = document.getElementById('nav-pack-name');
+    if (navRepo) navRepo.textContent = info.isDemoRepo ? 'demo-repo' : info.displayRepo.split('/').pop();
+    if (navPack) navPack.textContent = info.currentPackId;
+
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-mode') === info.mode);
+    });
+
+    const packSelect = document.getElementById('select-pack');
+    if (packSelect && info.availablePacks) {
+      packSelect.innerHTML = info.availablePacks
+        .map((p) => `<option value="${p}" ${p === info.currentPackId ? 'selected' : ''}>${p}</option>`)
+        .join('');
+    }
+
+    renderTimelineStrip(currentStepNumber, info.checkpoints);
+    handleObserverMode(info.mode);
+  } catch (err) {
+    console.error('Failed to load system info:', err);
+  }
+}
+
+function handleObserverMode(mode) {
+  if (observerInterval) {
+    clearInterval(observerInterval);
+    observerInterval = null;
+  }
+
+  if (mode === 'observer') {
+    observerInterval = setInterval(async () => {
+      try {
+        const topology = await fetchGraphData();
+        updateNetworkTopology(topology.modules);
+        updateStatusCounts(topology.statusCounts);
+      } catch (e) {
+        // Silent poll error
+      }
+    }, 2000);
+  }
+}
+
+async function setExecutionMode(newMode) {
+  try {
+    const res = await fetch('/api/target', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: newMode }),
+    });
+    const data = await res.json();
+    currentAppInfo.mode = newMode;
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-mode') === newMode);
+    });
+    handleObserverMode(newMode);
+  } catch (err) {
+    console.error('Failed to set mode:', err);
+  }
+}
+
+function setupSettingsModal() {
+  const btnOpen = document.getElementById('btn-project-settings');
+  const modal = document.getElementById('project-settings-modal');
+  const btnClose = document.getElementById('btn-close-settings');
+  const btnCancel = document.getElementById('btn-cancel-settings');
+  const btnSave = document.getElementById('btn-save-settings');
+  const btnPresetDemo = document.getElementById('btn-preset-demo');
+  const repoInput = document.getElementById('input-repo-path');
+  const packSelect = document.getElementById('select-pack');
+  const modeRadios = document.querySelectorAll('input[name="exec-mode"]');
+  const llmBox = document.getElementById('llm-options-box');
+
+  btnOpen?.addEventListener('click', () => {
+    if (repoInput) repoInput.value = currentAppInfo.isDemoRepo ? 'demo' : currentAppInfo.currentRepo;
+    if (packSelect) packSelect.value = currentAppInfo.currentPackId;
+    modeRadios.forEach((r) => {
+      r.checked = r.value === currentAppInfo.mode;
+    });
+    if (llmBox) llmBox.style.display = currentAppInfo.mode === 'llm' ? 'block' : 'none';
+    modal.style.display = 'flex';
+  });
+
+  const closeModal = () => { modal.style.display = 'none'; };
+  btnClose?.addEventListener('click', closeModal);
+  btnCancel?.addEventListener('click', closeModal);
+
+  btnPresetDemo?.addEventListener('click', () => {
+    if (repoInput) repoInput.value = 'demo';
+  });
+
+  modeRadios.forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (llmBox) llmBox.style.display = radio.value === 'llm' ? 'block' : 'none';
+    });
+  });
+
+  btnSave?.addEventListener('click', async () => {
+    btnSave.disabled = true;
+    btnSave.textContent = 'Ingesting...';
+
+    const selectedMode = document.querySelector('input[name="exec-mode"]:checked')?.value || 'canned';
+    const selectedProvider = document.getElementById('select-provider')?.value || 'ollama';
+    const selectedModel = document.getElementById('input-model')?.value || 'qwen2.5-coder:latest';
+
+    try {
+      const res = await fetch('/api/target', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: repoInput.value.trim(),
+          packId: packSelect.value,
+          mode: selectedMode,
+          provider: selectedProvider,
+          model: selectedModel,
+          reset: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        closeModal();
+        await loadSystemInfo();
+        updateNetworkTopology(data.topology.modules);
+        updateStatusCounts(data.topology.statusCounts);
+        if (network) network.fit({ animation: { duration: 500 } });
+      } else {
+        alert(`Failed to load target: ${data.error}`);
+      }
+    } catch (err) {
+      alert(`Network error: ${err.message}`);
+    } finally {
+      btnSave.disabled = false;
+      btnSave.textContent = 'Ingest & Load Graph';
+    }
+  });
+}
+
+function setupDrawerTabs() {
+  const tabs = document.querySelectorAll('.drawer-tab');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const target = tab.getAttribute('data-tab');
+      document.getElementById('tab-content-code').style.display = target === 'code' ? 'block' : 'none';
+      document.getElementById('tab-content-relations').style.display = target === 'relations' ? 'block' : 'none';
+      document.getElementById('tab-content-symbols').style.display = target === 'symbols' ? 'block' : 'none';
+    });
+  });
+
+  document.getElementById('btn-close-drawer')?.addEventListener('click', closeNodeInspector);
+}
+
 // ── Application Bootstrapper ──────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -841,6 +1171,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     initNetwork(data.modules, data.edges);
     updateStatusCounts(data.statusCounts);
     setupCypherDrawer();
+    setupSettingsModal();
+    setupDrawerTabs();
+    await loadSystemInfo();
+
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-mode');
+        setExecutionMode(mode);
+      });
+    });
 
     document.getElementById('btn-step').addEventListener('click', executeStep);
     document.getElementById('btn-auto').addEventListener('click', toggleAutoPlay);
