@@ -513,7 +513,7 @@ function renderSingleFileDiff(f) {
     }
     if (n !== undefined && (o === undefined || !oldLines.includes(n))) {
       diffCount++;
-      const isShim = n.includes('@shift-shim');
+      const isShim = n.includes('@bkb-shim') || n.includes('@shift-shim');
       if (isShim) {
         diffHtml += `
           <div class="diff-line diff-shim">

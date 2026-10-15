@@ -1,8 +1,8 @@
 /**
- * Layer 1 — Shift Configuration System (`src/engine/config.ts`).
+ * Layer 1 — Bagwan Kai Bandey (BKB) Configuration System (`src/engine/config.ts`).
  *
- * Allows projects to define a `shift.config.ts`, `shift.config.js`, or `shift.config.json`
- * in the repository root to automatically inject:
+ * Allows projects to define a `bkb.config.ts`, `bkb.config.js`, or `bkb.config.json`
+ * (or legacy `shift.config.*`) in the repository root to automatically inject:
  *  - Custom Language Adapters (Layer 2)
  *  - Custom Migration Pack directories (Layer 3)
  *  - Default settings (repo path, pack ID, FalkorDB connection opts)
@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url';
 import type { LanguageAdapter } from '../adapters/types';
 import { adapterRegistry } from '../adapters/registry';
 
-export interface ShiftConfig {
+export interface BkbConfig {
   /**
    * Custom LanguageAdapter instances or relative file paths to adapter modules.
    */
@@ -45,19 +45,19 @@ export interface ShiftConfig {
   };
 }
 
-export type BkbConfig = ShiftConfig;
+export type ShiftConfig = BkbConfig;
 
 /**
  * Type-safe configuration helper for `bkb.config.ts` or `shift.config.ts`.
  */
-export function defineConfig(config: ShiftConfig): ShiftConfig {
+export function defineConfig(config: BkbConfig): BkbConfig {
   return config;
 }
 
 /**
- * Discovers and applies `shift.config.(ts|js|mjs|json)` from the given root directory.
+ * Discovers and applies `bkb.config.(ts|js|mjs|json)` or `shift.config.*` from the given root directory.
  */
-export async function loadConfig(repoRoot = process.cwd()): Promise<ShiftConfig | null> {
+export async function loadConfig(repoRoot = process.cwd()): Promise<BkbConfig | null> {
   const candidateNames = [
     'bkb.config.ts',
     'bkb.config.js',

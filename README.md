@@ -53,7 +53,7 @@ Standard AI coding agents attempting framework migrations (e.g., Express $\right
 
 ## Extensibility: Injecting Layers 2 & 3
 
-Shift is designed for radical extensibility. Developers can inject custom **Language Adapters (Layer 2)** and **Migration Packs (Layer 3)** without ever touching engine internals.
+**Bagwan Kai Bandey (BKB)** is designed for radical extensibility. Developers can inject custom **Language Adapters (Layer 2)** and **Migration Packs (Layer 3)** without ever touching engine internals.
 
 ### 1. Injecting a Custom Language Adapter (Layer 2)
 
@@ -185,7 +185,7 @@ export default defineConfig({
 2. **Law 2: Atomic Cycle Collapse (Tarjan SCC Law)**
    * Circular dependencies ($A \rightarrow B \rightarrow A$) cannot be migrated file-by-file. All modules in an SCC are claimed and verified atomically in a single batch.
 3. **Law 3: Dual-Signature Shims & Deterministic De-Shimming (Strangler Fig Law)**
-   * When `pending_callers_count > 0`, the engine enforces backward-compatible shims (`// @shift-shim`). As soon as all callers migrate to the target framework, the module is surfaced with `phase: 'DE_SHIM'` to remove all legacy fallback branches.
+   * When `pending_callers_count > 0`, the engine enforces backward-compatible shims (`// @bkb-shim` or `// @shift-shim`). As soon as all callers migrate to the target framework, the module is surfaced with `phase: 'DE_SHIM'` to remove all legacy fallback branches.
 4. **Law 4: Per-Step Typechecking & Tiered Verification Gates**
    * Every step re-parses modified files with Tree-sitter, checks route set-equality invariants against immutable baselines, and executes `tsc --noEmit`. Checkpoint gates run full test suites and runtime route snapshot diffs.
 5. **Law 5: Scoped 1-Hop Subgraph Context (Minimum Viable Context)**
@@ -206,7 +206,7 @@ export default defineConfig({
 
 ## The 6 Model Context Protocol (MCP) Tools
 
-Shift exposes 6 high-level MCP tools for LLMs:
+**BKB** exposes 6 high-level MCP tools for LLMs:
 
 | Tool | Parameters | Description |
 |---|---|---|
@@ -230,9 +230,9 @@ Evaluated on a synthetic enterprise graph with 150 modules, 320 edges, and 3 mul
 | **`CLAIM_DESHIM`** (Pass A De-Shim Search) | $< 25.0\text{ ms}$ | **0.33 ms** | **0.42 ms** | ✅ **59.5x faster** |
 | **`SHORTEST_PATH`** (Proof Generation) | $< 10.0\text{ ms}$ | **0.42 ms** | **0.52 ms** | ✅ **19.2x faster** |
 
-### Agent Efficiency: Naive Grep vs. Shift MCP
+### Agent Efficiency: Naive Grep vs. BKB MCP
 
-| Metric | Naive Grep Agent | Shift MCP Engine | Shift Advantage |
+| Metric | Naive Grep Agent | BKB MCP Engine | BKB Advantage |
 |---|---|---|---|
 | **Total Tool Calls** | 42+ calls (guess & fix) | **11 discrete steps** | **74% reduction** |
 | **Context Tokens** | ~180,000 tokens | **~34,000 tokens** | **81% reduction** |
@@ -245,9 +245,9 @@ Evaluated on a synthetic enterprise graph with 150 modules, 320 edges, and 3 mul
 
 ---
 
-## How to Use Shift for Your Codebase (User Guide)
+## How to Use Bagwan Kai Bandey for Your Codebase (User Guide)
 
-Whether you are migrating an existing Express repository to Fastify or building a custom migration for your team's internal framework, Shift operates in two primary modes:
+Whether you are migrating an existing Express repository to Fastify or building a custom migration for your team's internal framework, **Bagwan Kai Bandey** operates in two primary modes:
 1. **Autonomous AI Agent via Model Context Protocol (MCP)** *(Recommended)*
 2. **Interactive CLI / Scripted Workflow**
 
@@ -255,17 +255,17 @@ Whether you are migrating an existing Express repository to Fastify or building 
 
 ### Step 1: Start FalkorDB
 
-Shift requires a running FalkorDB graph instance. Start it via Docker:
+BKB requires a running FalkorDB graph instance. Start it via Docker:
 ```bash
-docker run -p 6379:6379 -p 3000:3000 -d --name falkordb-shift falkordb/falkordb:latest
+docker run -p 6379:6379 -p 3000:3000 -d --name falkordb-bkb-engine falkordb/falkordb:latest
 ```
-*(Shift will also automatically attempt to start the container if Docker is running on your machine).*
+*(BKB will also automatically attempt to start the container if Docker is running on your machine).*
 
 ---
 
 ### Step 2: Ingest & Initialize Your Codebase
 
-Point Shift at your repository root to scan source files, compute baseline route invariants, detect legacy API usages, and condense circular dependencies:
+Point BKB at your repository root to scan source files, compute baseline route invariants, detect legacy API usages, and condense circular dependencies:
 
 ```bash
 # Using npm script:
@@ -295,20 +295,20 @@ FalkorDB UI:      http://localhost:3000
 
 #### Option A: Autonomous AI Agent via MCP (Recommended)
 
-Shift turns any LLM into a graph-governed migration engineer with zero chance of breaking intermediate builds or deadlocking on circular imports.
+**Bagwan Kai Bandey** turns any LLM into a graph-governed migration engineer with zero chance of breaking intermediate builds or deadlocking on circular imports.
 
-##### 1. Add Shift to your MCP Client Configuration:
+##### 1. Add BKB to your MCP Client Configuration:
 
 **For Claude Desktop (`claude_desktop_config.json`):**
 ```json
 {
   "mcpServers": {
-    "shift": {
+    "bkb": {
       "command": "npx",
       "args": [
         "-y",
         "tsx",
-        "/absolute/path/to/shift/bin/cli.ts",
+        "/absolute/path/to/bagwan-kai-bandey/bin/cli.ts",
         "serve",
         "--repo",
         "/absolute/path/to/your-repo",
@@ -324,9 +324,9 @@ Shift turns any LLM into a graph-governed migration engineer with zero chance of
 ```json
 {
   "mcpServers": {
-    "shift": {
+    "bkb": {
       "command": "tsx",
-      "args": ["/absolute/path/to/shift/bin/cli.ts", "serve", "--repo", "/absolute/path/to/your-repo", "--pack", "express-to-fastify"]
+      "args": ["/absolute/path/to/bagwan-kai-bandey/bin/cli.ts", "serve", "--repo", "/absolute/path/to/your-repo", "--pack", "express-to-fastify"]
     }
   }
 }
@@ -334,12 +334,12 @@ Shift turns any LLM into a graph-governed migration engineer with zero chance of
 
 ##### 2. Instruct Your AI Agent:
 Prompt your agent in chat:
-> *"Migrate this repository from Express to Fastify using the Shift MCP tools. Follow this loop: call `claim_next_leaf` to get the next unblocked module(s) and phase (`SHIM`, `MIGRATE`, or `DE_SHIM`), inspect context with `get_migration_slice`, apply the changes to disk, and call `verify_and_commit_node`. Repeat until all modules reach `VERIFIED`."*
+> *"Migrate this repository from Express to Fastify using the BKB MCP tools. Follow this loop: call `claim_next_leaf` to get the next unblocked module(s) and phase (`SHIM`, `MIGRATE`, or `DE_SHIM`), inspect context with `get_migration_slice`, apply the changes to disk, and call `verify_and_commit_node`. Repeat until all modules reach `VERIFIED`."*
 
 The agent will execute the topological plan automatically:
 1. Claims foundational leaves (highest PageRank helpers) first.
 2. Migrates circular dependencies ($A \leftrightarrow B$) atomically in a single batch.
-3. Automatically generates dual-signature shims (`// @shift-shim`) for modules with pending callers.
+3. Automatically generates dual-signature shims (`// @bkb-shim`) for modules with pending callers.
 4. Cascades de-shimming top-down once all upstream callers are verified.
 
 ---
@@ -373,7 +373,7 @@ Repeat steps 1–4 until `bkb claim` reports:
 ### Step 4: Live Visual Cockpit & FalkorDB Browser
 
 #### 1. Interactive Migration Cockpit (`http://localhost:4200`)
-Launch Shift's real-time visual cockpit:
+Launch the **Bagwan Kai Bandey** real-time visual cockpit:
 ```bash
 npm run demo
 ```
@@ -395,7 +395,7 @@ ORDER BY m.pagerank DESC
 
 ## How to Build a Custom Migration (Your Own Framework / Language)
 
-Shift is completely language- and framework-agnostic. To migrate a different library (e.g. Flask $\rightarrow$ FastAPI, React Router 5 $\rightarrow$ 6, Jest $\rightarrow$ Vitest, or internal company SDKs):
+**Bagwan Kai Bandey** is completely language- and framework-agnostic. To migrate a different library (e.g. Flask $\rightarrow$ FastAPI, React Router 5 $\rightarrow$ 6, Jest $\rightarrow$ Vitest, or internal company SDKs):
 
 ### Step 1: Scaffold a Migration Pack
 ```bash
@@ -446,7 +446,7 @@ bkb init --repo /path/to/python-app --pack flask-to-fastapi --adapter ./adapters
 | `bkb blast-radius` | `--repo <path> --pack <id> --module <path>` | Evaluates reverse multi-hop dependencies (`[:IMPORTS*1..6]`) before editing. |
 | `bkb verify` | `--repo <path> --pack <id> --module <path> [--summary <text>]` | Re-parses AST, checks invariants, runs `tsc --noEmit`, and commits state in FalkorDB. |
 | `bkb audit` | `--repo <path> --pack <id> [--checkpoint]` | Streams cryptographic episode audit log; runs full checkpoint gates (tests + route diffs). |
-| `bkb serve` | `[--repo <path>] [--pack <id>]` | Starts the Shift Model Context Protocol (MCP) server over standard I/O (stdio). |
+| `bkb serve` | `[--repo <path>] [--pack <id>]` | Starts the BKB Model Context Protocol (MCP) server over standard I/O (stdio). |
 | `bkb pack init` | `<pack-id> [--lang <language>]` | Scaffolds a new validated Migration Pack starter template. |
 | `bkb pack validate`| `<path-to-pack>` | Validates Migration Pack structure, AST queries, and verification commands. |
 | `bkb adapter init` | `<language>` | Scaffolds a new Language Adapter starter template extending `BaseLanguageAdapter`. |

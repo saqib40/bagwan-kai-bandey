@@ -23,7 +23,7 @@ export interface APIUsage {
   line: number;
   /** Source code snippet / preview */
   snippet: string;
-  /** True if the line contains `// @shift-shim` */
+  /** True if the line contains `// @bkb-shim` or `// @shift-shim` */
   isShimmed: boolean;
 }
 
@@ -40,7 +40,7 @@ export interface ParsedModule {
   apiUsages: APIUsage[];
   /** Extracted AST invariant sets (e.g., route surface) */
   invariantSets: Record<string, string[]>;
-  /** Count of lines containing `// @shift-shim` */
+  /** Count of lines containing `// @bkb-shim` or `// @shift-shim` */
   shimLineCount: number;
   /** Whether parser encountered syntax errors */
   hasSyntaxError: boolean;

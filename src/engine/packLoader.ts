@@ -76,11 +76,13 @@ export function validatePack(pack: any): { valid: boolean; errors: string[] } {
  * Resolves candidate file paths for a pack identifier or path.
  */
 function getPackCandidates(packIdOrPath: string, searchDirs: string[] = []): string[] {
-  const envDirs = process.env.SHIFT_PACK_DIR ? process.env.SHIFT_PACK_DIR.split(':') : [];
+  const envPackDirs = process.env.BKB_PACK_DIR ?? process.env.SHIFT_PACK_DIR;
+  const envDirs = envPackDirs ? envPackDirs.split(':') : [];
   const allDirs = [
     ...searchDirs,
     ...envDirs,
     join(process.cwd(), 'packs'),
+    join(process.cwd(), '.bkb/packs'),
     join(process.cwd(), '.shift/packs'),
     resolve(process.cwd(), 'node_modules'),
   ];

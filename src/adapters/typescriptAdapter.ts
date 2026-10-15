@@ -157,7 +157,8 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
             seenLines.add(line);
 
             const snippet = lines[startRow]?.trim() ?? '';
-            const isShimmed = lines[startRow]?.includes('// @shift-shim') ?? false;
+            const lineContent = lines[startRow] ?? '';
+            const isShimmed = lineContent.includes('// @bkb-shim') || lineContent.includes('// @shift-shim');
 
             apiUsages.push({
               ruleId: rule.id,
@@ -213,7 +214,7 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
     // 6. Count shim lines
     let shimLineCount = 0;
     for (const l of lines) {
-      if (l.includes('// @shift-shim')) shimLineCount++;
+      if (l.includes('// @bkb-shim') || l.includes('// @shift-shim')) shimLineCount++;
     }
 
     return {

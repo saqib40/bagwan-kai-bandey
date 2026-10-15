@@ -1,6 +1,6 @@
 /**
  * Layer 1 MCP Server (`src/mcp/server.ts`).
- * Exposes the 6 Shift Migration Engine tools defined in plan §8.
+ * Exposes the 6 Bagwan Kai Bandey (BKB) Migration Engine tools defined in plan §8.
  *
  * Stdio discipline: Redirects all diagnostic logging to console.error so that
  * stdout is strictly reserved for JSON-RPC transport frames.
@@ -17,22 +17,24 @@ import { MigrationOps, type Phase } from '../engine/operations';
 
 import { FalkorClient } from '../engine/falkorClient';
 
-export interface ShiftServerOptions {
+export interface BkbServerOptions {
   defaultRepoPath?: string;
   defaultPackId?: string;
   graphName?: string;
   client?: FalkorClient;
 }
 
-export function createShiftMcpServer(options: ShiftServerOptions = {}): McpServer {
+export type ShiftServerOptions = BkbServerOptions;
+
+export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
   const server = new McpServer({
-    name: 'shift-migration-engine',
+    name: 'bkb-migration-engine',
     version: '0.1.0',
   });
 
   let activeRepoPath = resolve(options.defaultRepoPath ?? './demo-repo');
   let activePackId = options.defaultPackId ?? 'express-to-fastify';
-  const activeGraphName = options.graphName ?? process.env.SHIFT_GRAPH ?? 'shift';
+  const activeGraphName = options.graphName ?? process.env.BKB_GRAPH ?? process.env.SHIFT_GRAPH ?? 'bkb';
   let activeClient: FalkorClient | null = options.client ?? null;
 
   async function getClient(): Promise<FalkorClient> {
@@ -295,7 +297,7 @@ export function createShiftMcpServer(options: ShiftServerOptions = {}): McpServe
         const ops = await getOps(repoPath, packId);
         const trail = await ops.getAuditTrail(runCheckpointNow);
 
-        let reportMarkdown = `# Shift Migration Audit Trail\n\n`;
+        let reportMarkdown = `# Bagwan Kai Bandey Migration Audit Trail\n\n`;
         reportMarkdown += `* **Repository:** \`${ops.repoPath}\`\n`;
         reportMarkdown += `* **Migration Pack:** \`${ops.pack.id}\`\n`;
         reportMarkdown += `* **Total Episodes:** ${trail.episodes.length}\n\n`;
@@ -358,18 +360,20 @@ export function createShiftMcpServer(options: ShiftServerOptions = {}): McpServe
   return server;
 }
 
-export async function startMcpServer(options: ShiftServerOptions = {}): Promise<void> {
-  const mcpServer = createShiftMcpServer(options);
+export const createShiftMcpServer = createBkbMcpServer;
+
+export async function startMcpServer(options: BkbServerOptions = {}): Promise<void> {
+  const mcpServer = createBkbMcpServer(options);
   const transport = new StdioServerTransport();
-  console.error('[shift] Starting Shift MCP server over stdio transport...');
+  console.error('[bkb] Starting BKB MCP server over stdio transport...');
   await mcpServer.connect(transport);
-  console.error('[shift] Shift MCP server running and listening for requests.');
+  console.error('[bkb] BKB MCP server running and listening for requests.');
 }
 
 // Auto-start if executed directly as entrypoint
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   startMcpServer().catch((err) => {
-    console.error('[shift] Fatal server error:', err);
+    console.error('[bkb] Fatal server error:', err);
     process.exit(1);
   });
 }

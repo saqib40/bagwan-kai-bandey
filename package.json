@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Shift: graph-governed codebase migration engine powered by FalkorDB.",
+  "description": "Bagwan Kai Bandey (BKB): graph-governed codebase migration engine powered by FalkorDB.",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",

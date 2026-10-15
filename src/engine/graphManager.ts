@@ -42,7 +42,7 @@ export class MigrationGraphManager {
   static async create(repoPath: string, packId: string, opts: { graphName?: string; client?: FalkorClient } = {}): Promise<MigrationGraphManager> {
     const absRepoPath = resolve(repoPath);
     const pack = loadPack(packId);
-    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? 'shift' }));
+    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? 'bkb' }));
     return new MigrationGraphManager(client, pack, absRepoPath);
   }
 
@@ -55,10 +55,10 @@ export class MigrationGraphManager {
     const adapter = adapterRegistry.get(pack.language);
     await adapter.init();
 
-    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? 'shift' }));
+    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? 'bkb' }));
 
     if (opts.reset) {
-      console.error(`[shift] Resetting graph "${client.graphName}"...`);
+      console.error(`[bkb] Resetting graph "${client.graphName}"...`);
       await client.reset();
     }
 
@@ -68,7 +68,7 @@ export class MigrationGraphManager {
     }
 
     // 2. Capture baseline route snapshot using pack's command
-    console.error(`[shift] Capturing baseline routes via "${pack.verification.routeSnapshotCmd}"...`);
+    console.error(`[bkb] Capturing baseline routes via "${pack.verification.routeSnapshotCmd}"...`);
     let baselineRoutesJson = '[]';
     try {
       const out = execSync(pack.verification.routeSnapshotCmd, {
@@ -79,7 +79,7 @@ export class MigrationGraphManager {
       const parsedRoutes = JSON.parse(out);
       baselineRoutesJson = JSON.stringify(Array.isArray(parsedRoutes) ? parsedRoutes.sort() : []);
     } catch (err) {
-      console.error('[shift] Warning: Failed to run routeSnapshotCmd:', err);
+      console.error('[bkb] Warning: Failed to run routeSnapshotCmd:', err);
     }
 
     // 3. Upsert singleton :MigrationMeta node
@@ -104,9 +104,9 @@ export class MigrationGraphManager {
     }
 
     // 5. Scan and parse all source files
-    console.error(`[shift] Scanning source files in "${absRepoPath}"...`);
+    console.error(`[bkb] Scanning source files in "${absRepoPath}"...`);
     const filePaths = await adapter.findSourceFiles(absRepoPath, pack.sourceGlobs);
-    console.error(`[shift] Found ${filePaths.length} source files to parse.`);
+    console.error(`[bkb] Found ${filePaths.length} source files to parse.`);
 
     const parsedModules: ParsedModule[] = [];
     const adjacency = new Map<string, string[]>();
@@ -211,7 +211,7 @@ export class MigrationGraphManager {
     try {
       await client.query(Q.PAGERANK);
     } catch (err) {
-      console.error('[shift] Warning: Failed to run FalkorDB algo.pageRank procedure:', err);
+      console.error('[bkb] Warning: Failed to run FalkorDB algo.pageRank procedure:', err);
     }
 
     // 10. Recompute global in_degree and pending_callers_count

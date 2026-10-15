@@ -1,4 +1,4 @@
-/* Shift Migration Cockpit — Minimalist Linear/Obsidian Design System */
+/* Bagwan Kai Bandey (BKB) Migration Cockpit — Minimalist Linear/Obsidian Design System */
 
 :root {
   --bg-app: #08090C;
@@ -958,7 +958,7 @@ body {
 }
 
 .col-naive { color: #FDA4AF; }
-.col-shift { color: #86EFAC; }
+.col-shift, .col-bkb { color: #86EFAC; }
 .text-danger { color: #F87171; }
 .text-success { color: #34D399; font-weight: 500; }
 

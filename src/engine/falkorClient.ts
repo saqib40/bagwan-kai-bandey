@@ -16,9 +16,9 @@ export class FalkorClient {
 
   static async connect(opts: { url?: string; graphName?: string } = {}): Promise<FalkorClient> {
     const url = opts.url ?? process.env.FALKORDB_URL ?? 'falkor://127.0.0.1:6379';
-    const graphName = opts.graphName ?? process.env.SHIFT_GRAPH ?? 'shift';
+    const graphName = opts.graphName ?? process.env.BKB_GRAPH ?? process.env.SHIFT_GRAPH ?? 'bkb';
     const db = await FalkorDB.connect({ url });
-    db.on('error', (err: unknown) => console.error('[shift] falkordb error:', err));
+    db.on('error', (err: unknown) => console.error('[bkb] falkordb error:', err));
     return new FalkorClient(db, db.selectGraph(graphName), graphName);
   }
 

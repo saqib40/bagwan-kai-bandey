@@ -145,7 +145,7 @@ export class MigrationOps {
       lines.push(
         `All upstream callers have been migrated. pending_callers_count = 0.`,
         `Target module(s): ${targetPaths.join(', ')}`,
-        `Action: Remove all // @shift-shim lines and legacy fallback branches.`,
+        `Action: Remove all // @bkb-shim lines and legacy fallback branches.`,
       );
       return lines.join('\n');
     }
@@ -195,7 +195,7 @@ export class MigrationOps {
         try {
           fullSource = readFileSync(fullPath, 'utf8');
         } catch {
-          fullSource = `// [shift] File not found: ${path}`;
+          fullSource = `// [bkb] File not found: ${path}`;
         }
         const row = await this.db.roQuery<any>(
           `MATCH (m:Module {path: $path}) RETURN m.baseline_sets AS baseline`,
@@ -421,19 +421,19 @@ export class MigrationOps {
         }
         if (shimmed.length > 0) {
           errors.push(
-            `[Step 3] ${parsed.path}: Has ${shimmed.length} shimmed legacy API usage(s) remaining. Remove all @shift-shim lines for VERIFIED status.`,
+            `[Step 3] ${parsed.path}: Has ${shimmed.length} shimmed legacy API usage(s) remaining. Remove all @bkb-shim lines for VERIFIED status.`,
           );
         }
         if (parsed.shimLineCount > 0) {
           errors.push(
-            `[Step 3] ${parsed.path}: ${parsed.shimLineCount} lines still contain // @shift-shim. Remove all for VERIFIED status.`,
+            `[Step 3] ${parsed.path}: ${parsed.shimLineCount} lines still contain // @bkb-shim. Remove all for VERIFIED status.`,
           );
         }
       } else {
         // SHIMMED gate: 0 unshimmed legacy edges
         if (unshimmed.length > 0) {
           errors.push(
-            `[Step 3] ${parsed.path}: Has ${unshimmed.length} unshimmed legacy API usage(s). For SHIMMED status, all legacy lines must have // @shift-shim.`,
+            `[Step 3] ${parsed.path}: Has ${unshimmed.length} unshimmed legacy API usage(s). For SHIMMED status, all legacy lines must have // @bkb-shim.`,
           );
         }
       }
@@ -586,7 +586,7 @@ export class MigrationOps {
       errors.push(`Route snapshot command failed: ${routeResult.output.slice(0, 200)}`);
     }
 
-    // 4. Count SHIMMED modules and @shift-shim markers in source files
+    // 4. Count SHIMMED modules and @bkb-shim markers in source files
     const shimCountRow = await this.db.roQuery<any>(
       `MATCH (m:Module) WHERE m.shim_line_count > 0 RETURN sum(m.shim_line_count) AS totalShims`,
     );

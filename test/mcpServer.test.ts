@@ -119,7 +119,10 @@ test('Shift MCP Server exposes 6 tools and executes end-to-end tool calls', asyn
     assert.equal(auditRes.isError ?? false, false);
     const auditData = JSON.parse((auditRes.content as any)[0].text);
     assert.ok(typeof auditData.reportMarkdown === 'string');
-    assert.ok(auditData.reportMarkdown.includes('# Shift Migration Audit Trail'));
+    assert.ok(
+      auditData.reportMarkdown.includes('# Bagwan Kai Bandey Migration Audit Trail') ||
+      auditData.reportMarkdown.includes('# Shift Migration Audit Trail'),
+    );
   } finally {
     await client.close();
     await server.close();

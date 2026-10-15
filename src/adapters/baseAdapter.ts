@@ -76,10 +76,13 @@ export abstract class BaseLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Counts the lines tagged with the dual-compatibility shim marker (`// @shift-shim`).
+   * Counts the lines tagged with the dual-compatibility shim marker (`// @bkb-shim` or `// @shift-shim`).
    */
-  protected countShimLines(source: string, marker = '@shift-shim'): number {
-    return source.split('\n').filter((l) => l.includes(marker)).length;
+  protected countShimLines(source: string, marker?: string): number {
+    return source.split('\n').filter((l) => {
+      if (marker) return l.includes(marker);
+      return l.includes('@bkb-shim') || l.includes('@shift-shim');
+    }).length;
   }
 
   /**
@@ -96,7 +99,7 @@ export abstract class BaseLanguageAdapter implements LanguageAdapter {
     syntaxErrors?: string[];
     shimMarker?: string;
   }): ParsedModule {
-    const shimLineCount = this.countShimLines(options.fullSource, options.shimMarker ?? '@shift-shim');
+    const shimLineCount = this.countShimLines(options.fullSource, options.shimMarker);
 
     return {
       path: options.path,

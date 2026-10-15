@@ -113,7 +113,7 @@ export class AdapterRegistry {
           await this.registerFromPath(full);
           count++;
         } catch (err) {
-          console.error(`[shift] Warning: Failed to auto-register adapter from ${entry}:`, err);
+          console.error(`[bkb] Warning: Failed to auto-register adapter from ${entry}:`, err);
         }
       }
     }

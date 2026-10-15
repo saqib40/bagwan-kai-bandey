@@ -1,7 +1,7 @@
 /**
- * Shift Migration Cockpit — Backend Server (`src/server/demoServer.ts`).
+ * Bagwan Kai Bandey (BKB) Migration Cockpit — Backend Server (`src/server/demoServer.ts`).
  *
- * Drives the live Shift migration engine and FalkorDB graph in real time:
+ * Drives the live BKB migration engine and FalkorDB graph in real time:
  *  - GET /api/graph -> Current nodes, edges, SCC clusters, PageRank, status counts
  *  - POST /api/reset -> Resets scratch demo-repo to original Express and re-inits FalkorDB
  *  - POST /api/step  -> Executes the next topological claim + edit + verify + checkpoint gate
@@ -24,7 +24,7 @@ const PORT = Number(process.env.PORT ?? 4200);
 const WORKSPACE = resolve(import.meta.dirname, '../..');
 const SOURCE_REPO = resolve(WORKSPACE, 'demo-repo');
 const TARGET_REPO = resolve(WORKSPACE, 'scratch/cockpit-demo-repo');
-const GRAPH_NAME = 'shift_cockpit';
+const GRAPH_NAME = process.env.BKB_GRAPH ?? 'bkb_cockpit';
 const PACK_ID = 'express-to-fastify';
 
 // Pre-defined code states for the 11 migration steps (exact code verified in Milestone 3)

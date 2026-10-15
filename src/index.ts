@@ -1,5 +1,5 @@
 /**
- * Shift — Graph-Governed Codebase Migration Engine.
+ * Bagwan Kai Bandey (BKB) — Graph-Governed Codebase Migration Engine.
  * Public SDK & Extensibility Entrypoint (`src/index.ts`).
  */
 
@@ -27,6 +27,7 @@ export {
 export {
   defineConfig,
   loadConfig,
+  type BkbConfig,
   type ShiftConfig,
 } from './engine/config';
 
@@ -45,4 +46,10 @@ export { TypeScriptAdapter } from './adapters/typescriptAdapter';
 export { adapterRegistry, AdapterRegistry } from './adapters/registry';
 
 // Layer 3: MCP Server
-export { startMcpServer } from './mcp/server';
+export {
+  startMcpServer,
+  createBkbMcpServer,
+  createShiftMcpServer,
+  type BkbServerOptions,
+  type ShiftServerOptions,
+} from './mcp/server';
