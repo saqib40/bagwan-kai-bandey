@@ -166,14 +166,16 @@ export async function runDiagnostics(repoRoot = process.cwd()): Promise<DoctorRe
     ok: isGit,
     message: gitMsg,
     remediation: !isGit
-      ? 'Initialize a git repository (`git init`) to allow automatic rollbacks during migration.'
+      ? 'Current directory is not a git repository. Target an existing codebase with `bkb doctor --repo <path>` or run `git init` to enable automatic rollbacks.'
       : !isClean
         ? 'Recommended: Commit or stash uncommitted changes before running migrations for easy rollback.'
         : undefined,
   });
 
   // 6. Migration Packs Available
+  const builtInPacksDir = resolve(import.meta.dirname, '../../packs');
   const packDirs = [
+    builtInPacksDir,
     join(repoRoot, 'packs'),
     join(process.cwd(), 'packs'),
     join(repoRoot, '.bkb/packs'),

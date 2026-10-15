@@ -77,10 +77,11 @@ export function validatePack(pack: any): { valid: boolean; errors: string[] } {
  */
 function getPackCandidates(packIdOrPath: string, searchDirs: string[] = []): string[] {
   const envPackDirs = process.env.BKB_PACK_DIR ?? process.env.SHIFT_PACK_DIR;
-  const envDirs = envPackDirs ? envPackDirs.split(':') : [];
+  const builtInPacksDir = resolve(import.meta.dirname, '../../packs');
   const allDirs = [
     ...searchDirs,
     ...envDirs,
+    builtInPacksDir,
     join(process.cwd(), 'packs'),
     join(process.cwd(), '.bkb/packs'),
     join(process.cwd(), '.shift/packs'),
