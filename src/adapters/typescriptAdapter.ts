@@ -16,10 +16,11 @@ import type {
   APIUsage,
   MigrationPack,
 } from './types';
+import { BaseLanguageAdapter } from './baseAdapter';
 
 const require = createRequire(import.meta.url);
 
-export class TypeScriptAdapter implements LanguageAdapter {
+export class TypeScriptAdapter extends BaseLanguageAdapter {
   readonly language = 'typescript';
 
   private parser: Parser | null = null;

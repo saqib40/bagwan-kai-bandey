@@ -167,7 +167,7 @@ export class MigrationOps {
             calleePath: target,
           });
           if (chain.length && chain[0].dependencyChain) {
-            const short = (p: string) => p.replace(/^src\//, '').replace(/\.[jt]sx?$/, '');
+            const short = (p: string) => p.replace(/^src\//, '').replace(/\.[^/.]+$/, '');
             lines.push(
               `Dependency proof: ${chain[0].dependencyChain.map(short).join(' → ')}`,
             );
@@ -248,7 +248,7 @@ export class MigrationOps {
           const callerSource = readFileSync(resolve(this.repoPath, c.callerPath), 'utf8');
           const lines = callerSource.split('\n');
           // Extract import lines and usage lines referencing the target module
-          const baseName = mp.replace(/.*\//, '').replace(/\.[jt]sx?$/, '');
+          const baseName = mp.replace(/.*\//, '').replace(/\.[^/.]+$/, '');
           const snippetLines = lines
             .filter((l) => l.includes(baseName) || l.includes(mp))
             .slice(0, 5);
@@ -295,7 +295,7 @@ export class MigrationOps {
     const adapter = adapterRegistry.get(this.pack.language);
     await adapter.init();
 
-    // ── Step 1: Re-parse modified files + replace outgoing edges ──
+    // ── Step 1: Re-parse modified files + check syntax errors ──
 
     const parsedModules: ParsedModule[] = [];
     for (const mp of modulePaths) {
@@ -306,8 +306,15 @@ export class MigrationOps {
       if (parsed.hasSyntaxError) {
         errors.push(`[Step 1] Syntax error in ${mp}: ${parsed.syntaxErrors.join('; ')}`);
       }
+    }
 
-      // Replace outgoing edges
+    if (errors.length) {
+      return this.revertAndReturn(modulePaths, errors, 1);
+    }
+
+    // Replace outgoing edges in FalkorDB only after syntax checks pass
+    for (const parsed of parsedModules) {
+      const mp = parsed.path;
       const setsJson = JSON.stringify(parsed.invariantSets);
       await this.db.query(Q.REPLACE_OUTGOING, {
         modulePath: mp,
@@ -356,10 +363,6 @@ export class MigrationOps {
           },
         );
       }
-    }
-
-    if (errors.length) {
-      return this.revertAndReturn(modulePaths, errors, 1);
     }
 
     // ── Step 2: Recompute Tarjan SCCs across the graph ──
@@ -484,7 +487,6 @@ export class MigrationOps {
     for (const mp of modulePaths) {
       await this.db.query(
         `MATCH (m:Module {path: $path})
-         WHERE m.status = 'IN_PROGRESS'
          SET m.status = $status`,
         { path: mp, status: newStatus },
       );

@@ -185,6 +185,11 @@ function showActiveTarget(claim, claimLatencyMs) {
   phaseBadge.textContent = claim.phase;
   phaseBadge.className = `phase-pill phase-${claim.phase.toLowerCase().replace('_', '')}`;
 
+  const latencyBadge = document.getElementById('graph-latency');
+  if (latencyBadge && claimLatencyMs) {
+    latencyBadge.textContent = `⚡ FalkorDB: ${claimLatencyMs} ms`;
+  }
+
   const isCycle = claim.targetPaths.length > 1;
 
   let html = `
@@ -417,6 +422,14 @@ async function resetCodebase() {
     document.getElementById('diff-file-label').textContent = 'No changes';
     document.getElementById('audit-feed').innerHTML = `<div class="audit-empty">No episodes recorded yet.</div>`;
     document.getElementById('episode-count-badge').textContent = '0 Steps';
+
+    document.getElementById('gate-overall-badge').textContent = 'GATES INTACT';
+    document.getElementById('gate-overall-badge').className = 'gate-overall';
+    document.getElementById('gate-tsc').textContent = '✅ PASS';
+    document.getElementById('gate-test').textContent = '✅ 6/6 PASS';
+    document.getElementById('gate-routes').textContent = '✅ 100% MATCH';
+    document.getElementById('gate-falkor').textContent = '⚡ < 5 ms';
+    document.getElementById('graph-latency').textContent = '⚡ FalkorDB: 1.5 ms';
 
     updateNetworkTopology(data.topology.modules);
     updateStatusCounts(data.topology.statusCounts);

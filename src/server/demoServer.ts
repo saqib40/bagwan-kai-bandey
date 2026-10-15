@@ -280,8 +280,8 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
     return sendSuccess(reply, { items: users, audit: auditRequest(request) });
   });
   fastify.get<{ Params: { id: string } }>('/:id', { preHandler: requireAuth }, async (request, reply) => {
-    const user = users.find((o) => o.id === Number(request.params.id));
-    if (!user) return sendError(reply, 'Order not found', 404);
+    const user = users.find((u) => u.id === Number(request.params.id));
+    if (!user) return sendError(reply, 'User not found', 404);
     return sendSuccess(reply, user);
   });
   fastify.post<{ Body: { name?: string } }>('/', { preHandler: requireAuth }, async (request, reply) => {

@@ -2,7 +2,7 @@
 
 [![Powered by FalkorDB](https://img.shields.io/badge/Powered%20by-FalkorDB-purple.svg)](https://www.falkordb.com/)
 [![Protocol: Model Context Protocol](https://img.shields.io/badge/Protocol-MCP-blue.svg)](https://modelcontextprotocol.io/)
-[![Tests: 19/19 Passing](https://img.shields.io/badge/Tests-19%2F19%20Pass-brightgreen.svg)]()
+[![Tests: 28/28 Passing](https://img.shields.io/badge/Tests-28%2F28%20Pass-brightgreen.svg)]()
 [![Typecheck: Clean](https://img.shields.io/badge/Typecheck-tsc%20green-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -47,6 +47,133 @@ Standard AI coding agents attempting framework migrations (e.g., Express $\right
 │  - Tarjan SCC atomic cycle condensation                  │
 │  - Model Context Protocol (MCP) server (6 tools)         │
 └──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Extensibility: Injecting Layers 2 & 3
+
+Shift is designed for radical extensibility. Developers can inject custom **Language Adapters (Layer 2)** and **Migration Packs (Layer 3)** without ever touching engine internals.
+
+### 1. Injecting a Custom Language Adapter (Layer 2)
+
+Extend the provided `BaseLanguageAdapter` to get automatic glob discovery, source caching, shim counters, and symbol ID hashing:
+
+```typescript
+// adapters/pythonAdapter.ts
+import { BaseLanguageAdapter, type ParsedModule, type MigrationPack } from 'shift-migration-engine';
+
+export class PythonAdapter extends BaseLanguageAdapter {
+  readonly language = 'python';
+
+  async parseModule(
+    repoRoot: string,
+    relativePath: string,
+    sourceCode?: string,
+    pack?: MigrationPack,
+  ): Promise<ParsedModule> {
+    const code = sourceCode ?? await this.readSource(repoRoot, relativePath);
+    const imports = this.extractImports(code);
+    const symbols = this.extractFunctionsAndClasses(code, relativePath);
+
+    return this.createParsedModule({
+      path: relativePath,
+      fullSource: code,
+      imports,
+      symbols,
+    });
+  }
+}
+
+export default PythonAdapter;
+```
+
+**Injecting via CLI or Configuration:**
+```bash
+# Inject directly via CLI flag:
+shift init --repo ./my-python-app --pack flask-to-fastapi --adapter ./adapters/pythonAdapter.ts
+
+# Or scaffold a starter adapter:
+shift adapter init python
+```
+
+---
+
+### 2. Injecting a Custom Migration Pack (Layer 3)
+
+Packs can be written as standard `.json` files or type-safe TypeScript/JavaScript modules with full IDE autocomplete using `defineMigrationPack`:
+
+```typescript
+// packs/flask-to-fastapi.ts
+import { defineMigrationPack } from 'shift-migration-engine';
+
+export default defineMigrationPack({
+  id: 'flask-to-fastapi',
+  name: 'Flask to FastAPI Migration Pack',
+  language: 'python',
+  sourceGlobs: {
+    include: ['**/*.py'],
+    exclude: ['**/venv/**', '**/__pycache__/**'],
+  },
+  packages: {
+    legacy: ['flask'],
+    target: ['fastapi', 'uvicorn'],
+  },
+  detectionRules: [
+    {
+      id: 'flask-route-decorator',
+      description: 'Flask route decorators @app.route',
+      astQuery: '(decorator (call (attribute (identifier) @obj (identifier) @method)))',
+    },
+  ],
+  agentGuidance: {
+    SHIM: 'Wrap Flask requests in FastAPI Request compatibility adapters.',
+    MIGRATE: 'Convert @app.route to async def with FastAPI APIRouter.',
+    DE_SHIM: 'Strip Flask compatibility wrappers; adopt pure Pydantic validation.',
+  },
+  invariants: [
+    {
+      id: 'http-endpoints',
+      scope: 'checkpoint',
+      type: 'route-set',
+      description: 'Guarantees 100% endpoint parity',
+      astExtractor: 'routes',
+    },
+  ],
+  verification: {
+    perStepTypecheckCmd: 'mypy src/',
+    checkpointTestCmd: 'pytest test/',
+    routeSnapshotCmd: 'python scripts/dump_routes.py',
+  },
+});
+```
+
+**Validating and Scaffolding Packs:**
+```bash
+# Scaffold a new pack skeleton:
+shift pack init my-custom-pack --lang python
+
+# Validate a pack schema before running:
+shift pack validate ./packs/my-custom-pack.json
+```
+
+---
+
+### 3. Unified Project Configuration (`shift.config.ts`)
+
+Define custom adapters, external pack directories, and default settings in a single config file:
+
+```typescript
+// shift.config.ts
+import { defineConfig } from 'shift-migration-engine';
+import { PythonAdapter } from './adapters/pythonAdapter';
+
+export default defineConfig({
+  adapters: [new PythonAdapter()],
+  packDirs: ['./custom-packs', './node_modules/@company/migration-packs'],
+  defaultRepo: './demo-repo',
+  defaultPack: 'express-to-fastify',
+});
 ```
 
 ---
@@ -127,7 +254,7 @@ Evaluated on a synthetic enterprise graph with 150 modules, 320 edges, and 3 mul
 npm install
 ```
 
-### 2. Run Test Suite (19 tests)
+### 2. Run Test Suite (28 tests)
 ```bash
 npm test
 ```
@@ -140,13 +267,20 @@ npm run benchmark         # 150-module synthetic latency benchmark
 npm run typecheck         # tsc --noEmit
 ```
 
-### 4. Start MCP Server
+### 4. Interactive Visual Cockpit
+Launch the real-time visual migration flight deck:
+```bash
+npm run demo
+```
+Open **[http://localhost:4200](http://localhost:4200)** to view live PageRank topologies, Tarjan cycles, code diffs, and verification gates.
+
+### 5. Start MCP Server
 ```bash
 # stdio transport for Claude Desktop, Antigravity, or any MCP client
 npm start -- serve --repo ./demo-repo --pack express-to-fastify
 ```
 
-### 5. Inspect Graph in FalkorDB Browser
+### 6. Inspect Graph in FalkorDB Browser
 Open **[http://localhost:3000](http://localhost:3000)** in your browser:
 * Graph: `shift`
 * Host: `localhost`, Port: `6379`

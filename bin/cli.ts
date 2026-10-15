@@ -5,24 +5,31 @@
  * for MCP JSON-RPC protocol frames when the MCP server runs.
  */
 
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { ensureFalkorDB } from '../src/engine/docker';
 import { MigrationGraphManager } from '../src/engine/graphManager';
 import { MigrationOps } from '../src/engine/operations';
 import { startMcpServer } from '../src/mcp/server';
+import { adapterRegistry } from '../src/adapters/registry';
+import { loadConfig } from '../src/engine/config';
+import { validatePack, loadPack } from '../src/engine/packLoader';
 
 function printHelp() {
   console.error(`
 Shift: Graph-Governed Codebase Migration Engine (Powered by FalkorDB)
 
 Usage:
-  shift init --repo <path> --pack <id> [--reset]
+  shift init --repo <path> --pack <id> [--reset] [--adapter <path>]
   shift claim --repo <path> --pack <id>
   shift slice --repo <path> --pack <id> --module <path> --phase <MIGRATE|SHIM|DE_SHIM>
   shift blast-radius --repo <path> --pack <id> --module <path>
   shift verify --repo <path> --pack <id> --module <path> [--summary <text>]
   shift audit --repo <path> --pack <id> [--checkpoint]
   shift serve [--repo <path>] [--pack <id>]
+  shift pack init <pack-id> [--lang <language>]
+  shift pack validate <path>
+  shift adapter init <language>
   shift --help
 
 Commands:
@@ -33,11 +40,16 @@ Commands:
   verify         Re-parse, gate-check, and commit a migrated module
   audit          Show the full migration audit trail
   serve          Start the Shift MCP server (stdio transport)
+  pack init      Scaffold a new Migration Pack starter template
+  pack validate  Validate a Migration Pack schema and detection rules
+  adapter init   Scaffold a starter Language Adapter template
   --help         Show this help message
 
 Options:
   --repo <path>      Path to target repository (default: ./demo-repo)
   --pack <id>        Migration pack id or path (default: express-to-fastify)
+  --adapter <path>   Path to custom Language Adapter (.ts / .js) to inject
+  --pack-dir <path>  Additional directory to search for migration packs
   --module <path>    Relative path to target module (can be repeated)
   --phase <phase>    Migration phase: MIGRATE, SHIM, or DE_SHIM
   --summary <text>   Agent summary for audit trail (default: "CLI verify")
@@ -76,7 +88,7 @@ function parseArgs(args: string[]) {
     }
   }
 
-  return { command: positional[0] ?? 'help', flags, multiFlags };
+  return { command: positional[0] ?? 'help', subCommand: positional[1], arg: positional[2], positional, flags, multiFlags };
 }
 
 async function createOps(flags: Record<string, string | boolean>): Promise<MigrationOps> {
@@ -87,14 +99,151 @@ async function createOps(flags: Record<string, string | boolean>): Promise<Migra
 }
 
 async function main() {
-  const { command, flags, multiFlags } = parseArgs(process.argv.slice(2));
+  const parsed = parseArgs(process.argv.slice(2));
+  const { command, subCommand, positional, flags, multiFlags } = parsed;
 
   if (flags.help || command === 'help') {
     printHelp();
     process.exit(0);
   }
 
-  // Ensure FalkorDB container is up and healthy
+  // 1. Load project config if present (e.g. shift.config.ts)
+  try {
+    await loadConfig();
+  } catch (err) {
+    console.error('[shift] Warning: Failed to load shift.config:', err);
+  }
+
+  // 2. Register custom adapter if passed via --adapter
+  if (flags.adapter) {
+    const adapterPath = resolve(String(flags.adapter));
+    console.error(`[shift] Injecting custom language adapter from "${adapterPath}"...`);
+    await adapterRegistry.registerFromPath(adapterPath);
+  }
+
+  // 3. Handle standalone developer scaffolding commands (does not require FalkorDB)
+  if (command === 'pack') {
+    if (subCommand === 'init') {
+      const packId = positional[2] ?? 'my-custom-pack';
+      const lang = String(flags.lang ?? 'typescript');
+      const packsDir = resolve(process.cwd(), 'packs');
+      if (!existsSync(packsDir)) mkdirSync(packsDir, { recursive: true });
+
+      const targetPath = join(packsDir, `${packId}.json`);
+      const template = {
+        $schema: 'https://raw.githubusercontent.com/saqib40/bagwan-kai-bandey/main/packs/schema.json',
+        id: packId,
+        name: `${packId} Migration Pack`,
+        language: lang,
+        sourceGlobs: {
+          include: [`**/*.${lang === 'python' ? 'py' : lang === 'go' ? 'go' : 'ts'}`],
+          exclude: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
+        },
+        packages: {
+          legacy: ['legacy-package'],
+          target: ['target-package'],
+        },
+        detectionRules: [
+          {
+            id: 'legacy-api-call',
+            description: 'Detects usage of legacy package APIs',
+            astQuery: '(call_expression (identifier) @api)',
+          },
+        ],
+        agentGuidance: {
+          SHIM: 'Implement dual-compatibility adapters for legacy callers.',
+          MIGRATE: 'Migrate internal module logic to modern framework semantics.',
+          DE_SHIM: 'Remove legacy shims and convert to pure target framework calls.',
+        },
+        invariants: [
+          {
+            id: 'api-routes',
+            scope: 'checkpoint',
+            type: 'route-set',
+            description: 'Guarantees 100% route invariant parity across migration',
+            astExtractor: 'routes',
+          },
+        ],
+        verification: {
+          perStepTypecheckCmd: lang === 'python' ? 'mypy .' : 'npm run typecheck',
+          checkpointTestCmd: lang === 'python' ? 'pytest' : 'npm test',
+          routeSnapshotCmd: 'node scripts/dump-routes.mjs',
+        },
+      };
+
+      writeFileSync(targetPath, JSON.stringify(template, null, 2) + '\n');
+      console.error(`[shift] Successfully scaffolded new Migration Pack at: ${targetPath}`);
+      process.exit(0);
+    }
+
+    if (subCommand === 'validate') {
+      const packPath = positional[2];
+      if (!packPath) {
+        console.error('[shift] Error: Path to pack is required (e.g. `shift pack validate ./packs/my-pack.json`)');
+        process.exit(1);
+      }
+      try {
+        const pack = loadPack(packPath);
+        const res = validatePack(pack);
+        if (res.valid) {
+          console.error(`[shift] ✅ Pack "${pack.id}" is structurally valid and ready for use!`);
+          console.error(`  - Language:        ${pack.language}`);
+          console.error(`  - Detection Rules: ${pack.detectionRules.length}`);
+          console.error(`  - Verification:    ${pack.verification.perStepTypecheckCmd}`);
+          process.exit(0);
+        } else {
+          console.error(`[shift] ❌ Validation failed with ${res.errors.length} error(s):`);
+          res.errors.forEach((e) => console.error(`  - ${e}`));
+          process.exit(1);
+        }
+      } catch (err: any) {
+        console.error(`[shift] ❌ Failed to validate pack:`, err.message);
+        process.exit(1);
+      }
+    }
+  }
+
+  if (command === 'adapter' && subCommand === 'init') {
+    const lang = positional[2] ?? 'python';
+    const adaptersDir = resolve(process.cwd(), 'adapters');
+    if (!existsSync(adaptersDir)) mkdirSync(adaptersDir, { recursive: true });
+
+    const targetPath = join(adaptersDir, `${lang}Adapter.ts`);
+    const template = `import { BaseLanguageAdapter, type ParsedModule, type MigrationPack } from 'shift-migration-engine';
+
+export class ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter extends BaseLanguageAdapter {
+  readonly language = '${lang.toLowerCase()}';
+
+  async parseModule(
+    repoRoot: string,
+    relativePath: string,
+    sourceCode?: string,
+    pack?: MigrationPack,
+  ): Promise<ParsedModule> {
+    const fullSource = sourceCode ?? await this.readSource(repoRoot, relativePath);
+    
+    // Extract imports and symbols using regex or language parser
+    const imports: string[] = [];
+    const symbols = [];
+
+    return this.createParsedModule({
+      path: relativePath,
+      fullSource,
+      imports,
+      symbols,
+    });
+  }
+}
+
+export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
+`;
+
+    writeFileSync(targetPath, template);
+    console.error(`[shift] Successfully scaffolded new Language Adapter at: ${targetPath}`);
+    process.exit(0);
+  }
+
+  // Ensure FalkorDB container is up and healthy for graph operations
   try {
     await ensureFalkorDB();
   } catch (err) {

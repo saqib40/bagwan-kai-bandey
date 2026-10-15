@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "description": "Shift: graph-governed codebase migration engine powered by FalkorDB.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapters": "./src/adapters/types.ts",
+    "./pack": "./src/engine/packLoader.ts"
+  },
   "bin": {
     "shift": "./bin/cli.ts"
   },
