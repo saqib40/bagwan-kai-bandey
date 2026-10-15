@@ -23,31 +23,38 @@ let autoPlayTimer = null;
 function initNetwork(modules, edges) {
   const container = document.getElementById('network-container');
 
+  if (typeof vis === 'undefined') {
+    console.error('Vis.js is not loaded!');
+    container.innerHTML = '<div style="color:#EF4444;padding:24px;text-align:center;">Error: Vis.js library failed to load. Please check network connection.</div>';
+    return;
+  }
+
   const nodes = modules.map((m) => {
     const isCycle = (m.sccSize ?? 1) > 1;
     const baseColors = STATUS_COLORS[m.status] || STATUS_COLORS.PENDING;
     const label = m.path.replace(/^src\//, '');
-    const size = Math.max(16, Math.min(36, Math.round((m.pagerank || 0.1) * 200 + 14)));
+    const size = Math.max(18, Math.min(38, Math.round((m.pagerank || 0.1) * 200 + 16)));
 
     return {
       id: m.path,
       label,
       title: `${m.path}\nStatus: ${m.status}\nPageRank: ${Number(m.pagerank ?? 0).toFixed(4)}\nPending Callers: ${m.pendingCallers ?? 0}\nSCC Size: ${m.sccSize ?? 1}`,
+      size,
       value: size,
       shape: 'dot',
       color: isCycle ? { ...baseColors, border: '#EF4444' } : baseColors,
-      borderWidth: isCycle ? 3 : 2,
+      borderWidth: isCycle ? 4 : 2,
       font: {
         color: '#F8FAFC',
         face: 'JetBrains Mono, monospace',
-        size: 11,
+        size: 12,
         strokeWidth: 2,
         strokeColor: '#090D16',
       },
       shadow: {
         enabled: true,
         color: baseColors.background,
-        size: 10,
+        size: 12,
         x: 0,
         y: 0,
       },
@@ -62,7 +69,7 @@ function initNetwork(modules, edges) {
       id: `edge-${idx}`,
       from: e.source,
       to: e.target,
-      arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+      arrows: { to: { enabled: true, scaleFactor: 0.7 } },
       color: isCycleEdge ? { color: '#EF4444', highlight: '#F87171' } : { color: 'rgba(148, 163, 184, 0.45)', highlight: '#A78BFA' },
       dashes: isCycleEdge,
       width: isCycleEdge ? 2.5 : 1.5,
@@ -75,24 +82,51 @@ function initNetwork(modules, edges) {
 
   const options = {
     physics: {
-      solver: 'forceAtlas2Based',
-      forceAtlas2Based: {
-        gravitationalConstant: -70,
-        centralGravity: 0.015,
-        springLength: 110,
-        springConstant: 0.08,
-        damping: 0.4,
+      enabled: true,
+      barnesHut: {
+        gravitationalConstant: -2800,
+        centralGravity: 0.35,
+        springLength: 120,
+        springConstant: 0.05,
+        damping: 0.12,
+        avoidOverlap: 0.3,
       },
-      stabilization: { iterations: 120 },
+      stabilization: {
+        enabled: true,
+        iterations: 150,
+      },
+    },
+    nodes: {
+      shape: 'dot',
+      scaling: {
+        min: 16,
+        max: 38,
+      },
     },
     interaction: {
       hover: true,
       tooltipDelay: 100,
       zoomView: true,
     },
+    autoResize: true,
+    height: '100%',
+    width: '100%',
   };
 
   network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+
+  network.once('stabilizationIterationsDone', () => {
+    network.fit({
+      animation: { duration: 600, easingFunction: 'easeInOutQuad' },
+    });
+  });
+
+  setTimeout(() => {
+    if (network) {
+      network.redraw();
+      network.fit();
+    }
+  }, 250);
 
   network.on('click', (params) => {
     if (params.nodes.length > 0) {
@@ -112,10 +146,11 @@ function updateNetworkTopology(modules) {
   const updates = modules.map((m) => {
     const isCycle = (m.sccSize ?? 1) > 1;
     const baseColors = STATUS_COLORS[m.status] || STATUS_COLORS.PENDING;
-    const size = Math.max(16, Math.min(36, Math.round((m.pagerank || 0.1) * 200 + 14)));
+    const size = Math.max(18, Math.min(38, Math.round((m.pagerank || 0.1) * 200 + 16)));
 
     return {
       id: m.path,
+      size,
       value: size,
       color: isCycle ? { ...baseColors, border: '#EF4444' } : baseColors,
       shadow: {

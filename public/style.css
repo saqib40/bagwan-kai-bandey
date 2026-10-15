@@ -215,6 +215,8 @@ body {
   padding: 20px 28px;
   flex: 1;
   height: calc(100vh - 72px);
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1200px) {
@@ -235,6 +237,7 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  box-sizing: border-box;
 }
 
 .pane-header {
@@ -242,6 +245,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .pane-title {
@@ -260,6 +264,8 @@ body {
 .graph-pane {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -307,17 +313,31 @@ body {
 }
 
 .network-canvas {
-  flex: 1;
-  min-height: 480px;
+  flex: 1 1 0;
+  min-height: 380px;
+  height: calc(100% - 90px);
+  max-height: calc(100% - 90px);
   background: rgba(8, 12, 20, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
   position: relative;
+  overflow: hidden;
+}
+
+.network-canvas .vis-network {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .graph-legend {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 18px;
   padding-top: 12px;
   font-size: 0.75rem;
