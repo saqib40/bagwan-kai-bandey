@@ -11,31 +11,30 @@
     "./pack": "./src/engine/packLoader.ts"
   },
   "bin": {
-    "bkb": "./bin/cli.ts",
-    "shift": "./bin/cli.ts"
+    "bkb": "./bin/bkb.js",
+    "shift": "./bin/bkb.js"
   },
   "scripts": {
-    "bkb": "tsx bin/cli.ts",
-    "shift": "tsx bin/cli.ts",
+    "bkb": "node ./bin/bkb.js",
+    "shift": "node ./bin/bkb.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/**/*.test.ts",
     "validate:queries": "tsx scripts/validate-queries.ts",
     "validate:cypher": "tsx scripts/validate-cypher.ts",
     "benchmark": "tsx scripts/benchmark-scale.ts",
     "demo": "tsx src/server/demoServer.ts",
-    "start": "tsx bin/cli.ts"
+    "start": "node ./bin/bkb.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "falkordb": "^6.0.0",
     "tree-sitter-typescript": "^0.23.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "web-tree-sitter": "^0.25.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "@types/node": "^22.10.0"
   }
 }
