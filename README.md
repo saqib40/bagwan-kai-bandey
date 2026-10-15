@@ -2,7 +2,7 @@
 
 [![Powered by FalkorDB](https://img.shields.io/badge/Powered%20by-FalkorDB-purple.svg)](https://www.falkordb.com/)
 [![Protocol: Model Context Protocol](https://img.shields.io/badge/Protocol-MCP-blue.svg)](https://modelcontextprotocol.io/)
-[![Tests: 28/28 Passing](https://img.shields.io/badge/Tests-28%2F28%20Pass-brightgreen.svg)]()
+[![Tests: 34/34 Passing](https://img.shields.io/badge/Tests-34%2F34%20Pass-brightgreen.svg)]()
 [![Typecheck: Clean](https://img.shields.io/badge/Typecheck-tsc%20green-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -371,9 +371,40 @@ The agent will execute the topological plan automatically:
 
 ---
 
-#### Option B: Step-by-Step CLI Workflow
+#### Option B: Terminal Autonomous Runner & Rollback (`bkb run` / `bkb rollback`)
 
-You can also drive the migration manually or via scripts using the BKB CLI:
+Run the complete graph-governed migration loop autonomously right from your command line without requiring an external MCP GUI:
+
+```bash
+# 1. Zero-cost deterministic autonomous migration (mock provider, instant dry run):
+bkb run --dry-run
+
+# 2. Local zero-cost LLM via Ollama (e.g. Qwen2.5-Coder or DeepSeek-Coder):
+bkb run --provider ollama --model qwen2.5-coder:latest
+
+# 3. Cloud LLM providers (OpenAI / Anthropic):
+export OPENAI_API_KEY="sk-..."
+bkb run --provider openai --model gpt-4o
+
+# 4. Instant Rollback to any checkpoint if needed:
+bkb rollback            # Rollback disk files and FalkorDB graph to latest checkpoint
+bkb rollback 3          # Rollback to specific Step 3
+bkb rollback --list     # List all available step snapshots in .bkb/checkpoints
+```
+
+During autonomous execution, BKB automatically:
+1. Claims the next unblocked leaf or circular SCC cluster.
+2. Creates a pre-modification disk checkpoint at `.bkb/checkpoints/step-<N>/`.
+3. Requests contextual code transforms from the chosen LLM provider.
+4. Validates AST, invariants, and `tsc --noEmit` on every step.
+5. Employs automatic self-healing retry if compilation issues arise, and auto-rolls back if unrecoverable.
+6. Enforces full checkpoint integration tests and route parity snapshots.
+
+---
+
+#### Option C: Step-by-Step Manual CLI Workflow
+
+You can also drive the migration manually or via scripts using individual BKB CLI commands:
 
 ```bash
 # 1. Claim next unblocked leaf or atomic SCC
@@ -470,6 +501,8 @@ bkb init --repo /path/to/python-app --pack flask-to-fastapi --adapter ./adapters
 | `bkb doctor` | `[--repo <path>]` | Evaluates environment health (Node.js, Docker daemon, FalkorDB ports, Git status). |
 | `bkb mcp install` | `[cursor\|claude\|vscode\|windsurf\|all]` | 1-Click registers BKB MCP server into your editor's configuration. |
 | `bkb init` | `[--interactive\|-i] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
+| `bkb run`, `bkb auto` | `[--repo <path>] [--pack <id>] [--provider <p>] [--model <m>] [--dry-run] [--no-rollback]` | Autonomously executes the migration loop (claim $\rightarrow$ checkpoint $\rightarrow$ slice $\rightarrow$ transform $\rightarrow$ verify $\rightarrow$ gate). |
+| `bkb rollback` | `[step] [--repo <path>] [--pack <id>] [--list]` | Rollback source files and FalkorDB graph state to a previous step (or latest checkpoint). |
 | `bkb claim` | `--repo <path> --pack <id>` | Computes transitive callee graph and claims the next unblocked leaf or circular SCC cluster. |
 | `bkb slice` | `--repo <path> --pack <id> --module <path> --phase <phase>` | Returns 1-hop contextual slice (target files, callee signatures, caller snippets, phase guidance). |
 | `bkb blast-radius` | `--repo <path> --pack <id> --module <path>` | Evaluates reverse multi-hop dependencies (`[:IMPORTS*1..6]`) before editing. |

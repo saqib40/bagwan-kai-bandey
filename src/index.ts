@@ -53,3 +53,25 @@ export {
   type BkbServerOptions,
   type ShiftServerOptions,
 } from './mcp/server';
+
+// Layer 4: Autonomous Terminal Runner & Rollback
+export {
+  runAutonomousMigration,
+  type RunOptions,
+  type AutonomousRunResult,
+} from './runner/autonomousRunner';
+export {
+  LlmClient,
+  type LlmClientOptions,
+  type LlmRequest,
+  type LlmResponse,
+  extractCodeFromMarkdown,
+} from './runner/llmClient';
+export {
+  saveCheckpoint,
+  listCheckpoints,
+  rollbackToCheckpoint,
+  clearCheckpoints,
+  getCheckpointsDir,
+  type CheckpointInfo,
+} from './runner/rollback';

@@ -17,6 +17,8 @@ import { validatePack, loadPack } from '../src/engine/packLoader';
 import { runDiagnostics, formatDoctorReport } from '../src/cli/doctor';
 import { installMcpConfig, formatMcpInstallReport, type McpTarget } from '../src/cli/mcpInstaller';
 import { runInteractiveInit } from '../src/cli/wizard';
+import { runAutonomousMigration } from '../src/runner/autonomousRunner';
+import { rollbackToCheckpoint, listCheckpoints } from '../src/runner/rollback';
 
 function printHelp() {
   console.error(`
@@ -26,6 +28,8 @@ Usage:
   bkb doctor [--repo <path>]
   bkb mcp install [cursor|claude|vscode|windsurf|all]
   bkb init [--interactive] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]
+  bkb run [--repo <path>] [--pack <id>] [--provider <p>] [--model <m>] [--dry-run] [--no-rollback]
+  bkb rollback [step] [--repo <path>] [--pack <id>] [--list]
   bkb claim --repo <path> --pack <id>
   bkb slice --repo <path> --pack <id> --module <path> --phase <MIGRATE|SHIM|DE_SHIM>
   bkb blast-radius --repo <path> --pack <id> --module <path>
@@ -41,6 +45,8 @@ Commands:
   doctor         Run pre-flight environment diagnostics (Node, Docker, FalkorDB, Git)
   mcp install    1-Click install BKB MCP server config into Cursor, Claude, or VS Code
   init           Initialize the migration graph in FalkorDB (interactive wizard if -i)
+  run, auto      Autonomously execute the migration loop (claim -> slice -> transform -> verify)
+  rollback       Rollback source files and FalkorDB graph to a previous checkpoint (or latest)
   claim          Claim the next unblocked leaf / SCC for migration
   slice          Get the migration slice (source, 1-hop context) for claimed modules
   blast-radius   Simulate the blast radius of changing a module
@@ -56,6 +62,12 @@ Options:
   --interactive, -i  Run interactive setup wizard for bkb init
   --repo <path>      Path to target repository (default: ./demo-repo)
   --pack <id>        Migration pack id or path (default: express-to-fastify)
+  --provider <p>     LLM provider for run: mock (default / zero-cost), ollama, openai, anthropic
+  --model <id>       Model identifier (e.g. gpt-4o, qwen2.5-coder:latest, claude-3-5-sonnet-20241022)
+  --dry-run          Run autonomous migration using deterministic mock transforms (zero API cost)
+  --list             List available checkpoints for bkb rollback
+  --no-rollback      Disable automatic rollback on unrecoverable step failure
+  --max-steps <num>  Maximum number of migration steps to run (default: 50)
   --adapter <path>   Path to custom Language Adapter (.ts / .js) to inject
   --pack-dir <path>  Additional directory to search for migration packs
   --module <path>    Relative path to target module (can be repeated)
@@ -77,7 +89,13 @@ function parseArgs(args: string[]) {
       flags.help = true;
     } else if (arg === '--interactive' || arg === '-i') {
       flags.interactive = true;
-    } else if (arg === '--reset' || arg === '--checkpoint') {
+    } else if (
+      arg === '--reset' ||
+      arg === '--checkpoint' ||
+      arg === '--dry-run' ||
+      arg === '--list' ||
+      arg === '--no-rollback'
+    ) {
       flags[arg.slice(2)] = true;
     } else if (arg.startsWith('--')) {
       const key = arg.slice(2);
@@ -431,6 +449,115 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     const pack = flags.pack ? String(flags.pack) : undefined;
     await startMcpServer({ defaultRepoPath: repo, defaultPackId: pack });
     return;
+  }
+
+  if (command === 'rollback') {
+    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve('./demo-repo');
+    const packId = String(flags.pack ?? 'express-to-fastify');
+
+    if (flags.list) {
+      const checkpoints = listCheckpoints(repoPath);
+      if (!checkpoints.length) {
+        console.error(`[bkb] No checkpoints found for "${repoPath}".`);
+      } else {
+        console.error(`[bkb] Available checkpoints for "${repoPath}":`);
+        for (const cp of checkpoints) {
+          console.error(`  - step-${cp}`);
+        }
+      }
+      process.exit(0);
+    }
+
+    const stepArg = positional[1] ?? flags.step;
+    const targetStep =
+      stepArg !== undefined && !isNaN(parseInt(String(stepArg), 10))
+        ? parseInt(String(stepArg), 10)
+        : undefined;
+
+    console.error(
+      `[bkb] Rolling back "${repoPath}" (pack: ${packId})${
+        targetStep !== undefined ? ` to step-${targetStep}` : ' to latest checkpoint'
+      }...`,
+    );
+
+    const result = await rollbackToCheckpoint(repoPath, packId, targetStep);
+    if (result.ok) {
+      console.error(`[bkb] ✅ ${result.message}`);
+      process.exit(0);
+    } else {
+      console.error(`[bkb] ❌ Rollback failed: ${result.message}`);
+      process.exit(1);
+    }
+  }
+
+  if (command === 'run' || command === 'auto') {
+    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve('./demo-repo');
+    const packId = String(flags.pack ?? 'express-to-fastify');
+    const dryRun = Boolean(flags['dry-run'] || flags.dryRun);
+    const provider = dryRun ? 'mock' : ((flags.provider ? String(flags.provider) : undefined) as any);
+    const model = flags.model ? String(flags.model) : undefined;
+    const maxSteps = flags['max-steps'] ? parseInt(String(flags['max-steps']), 10) : undefined;
+    const autoRollback = flags['no-rollback'] === true ? false : true;
+
+    console.error(`[bkb] Starting autonomous migration runner on "${repoPath}"`);
+    console.error(`  - Migration Pack: ${packId}`);
+    console.error(
+      `  - LLM Provider:   ${
+        provider ??
+        (process.env.OPENAI_API_KEY
+          ? 'openai'
+          : process.env.ANTHROPIC_API_KEY
+          ? 'anthropic'
+          : 'mock (built-in deterministic)')
+      }`,
+    );
+    if (model) console.error(`  - Model:          ${model}`);
+    console.error(`  - Auto Rollback:  ${autoRollback ? 'enabled' : 'disabled'}`);
+    console.error('');
+
+    const res = await runAutonomousMigration({
+      repoPath,
+      packId,
+      provider,
+      model,
+      maxSteps,
+      reset: Boolean(flags.reset),
+      autoRollbackOnFailure: autoRollback,
+      onProgress: (p) => {
+        const icon =
+          p.status === 'success'
+            ? '✅'
+            : p.status === 'warning'
+            ? '⚠️'
+            : p.status === 'error'
+            ? '❌'
+            : '⚡';
+
+        console.error(`[bkb] ${icon} Step ${p.step} [${p.phase}] ${p.action}`);
+        if (p.details && p.status === 'warning') {
+          console.error(`      ${p.details.split('\n')[0]}`);
+        }
+      },
+    });
+
+    console.error('');
+    if (res.ok) {
+      console.error('====================================================');
+      console.error('🎉 Autonomous Migration Completed Successfully!');
+      console.error(`  - Total Steps:      ${res.totalSteps}`);
+      console.error(`  - Modules Migrated: ${res.migratedModules}`);
+      console.error(`  - Route Parity:     ${res.routeParity ? '100% Match' : 'Mismatch'}`);
+      console.error(`  - Checkpoint Tests: ${res.checkpointPassed ? 'Passed' : 'Failed'}`);
+      console.error(`  - Total Duration:   ${(res.durationMs / 1000).toFixed(2)}s`);
+      console.error('====================================================');
+      process.exit(0);
+    } else {
+      console.error('====================================================');
+      console.error(`❌ Autonomous Migration Failed at step ${res.totalSteps}:`);
+      console.error(`  ${res.error ?? 'Unknown error'}`);
+      console.error('====================================================');
+      process.exit(1);
+    }
   }
 
   console.error(`[bkb] Unknown command "${command}". Use "bkb --help" for usage.`);
