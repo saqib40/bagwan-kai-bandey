@@ -1,4 +1,4 @@
-# Shift: Graph-Governed Codebase Migration Engine
+# Bagwan Kai Bandey: Graph-Governed Codebase Migration Engine
 
 [![Powered by FalkorDB](https://img.shields.io/badge/Powered%20by-FalkorDB-purple.svg)](https://www.falkordb.com/)
 [![Protocol: Model Context Protocol](https://img.shields.io/badge/Protocol-MCP-blue.svg)](https://modelcontextprotocol.io/)
@@ -6,7 +6,7 @@
 [![Typecheck: Clean](https://img.shields.io/badge/Typecheck-tsc%20green-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
-> **Universal laws, pluggable packs.** Shift is an autonomous, graph-governed migration engine powered by **FalkorDB** that computes callee-first execution order, collapses circular dependencies into atomic batches via Tarjan's SCC algorithm, enforces dual-signature shims with automatic de-shimming, and verifies edge-level invariants—keeping `tsc` green at every single step, test suites green at every checkpoint, and route surfaces 100% identical.
+> **Universal laws, pluggable packs.** Bagwan Kai Bandey is an autonomous, graph-governed migration engine powered by **FalkorDB** that computes callee-first execution order, collapses circular dependencies into atomic batches via Tarjan's SCC algorithm, enforces dual-signature shims with automatic de-shimming, and verifies edge-level invariants—keeping `tsc` green at every single step, test suites green at every checkpoint, and route surfaces 100% identical.
 
 ---
 

@@ -624,7 +624,7 @@ export function startDemoServer(port = PORT) {
 
   server.listen(port, async () => {
     console.error(`\n======================================================`);
-    console.error(`  SHIFT MIGRATION COCKPIT IS LIVE ON HTTP`);
+    console.error(`  BAGWAN KAI BANDEY MIGRATION COCKPIT IS LIVE ON HTTP`);
     console.error(`  URL: http://localhost:${port}`);
     console.error(`======================================================\n`);
 

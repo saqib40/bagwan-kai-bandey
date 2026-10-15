@@ -1,5 +1,5 @@
 /**
- * Shift Migration Cockpit — Minimalist Client Application (`public/app.js`).
+ * Bagwan Kai Bandey — Minimalist Migration Cockpit Client (`public/app.js`).
  * Clean, distraction-free architecture powered by FalkorDB openCypher graph engine.
  */
 
@@ -825,7 +825,7 @@ async function downloadAuditReport() {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(trail, null, 2));
     const dlAnchor = document.createElement('a');
     dlAnchor.setAttribute('href', dataStr);
-    dlAnchor.setAttribute('download', `shift-migration-audit-${Date.now()}.json`);
+    dlAnchor.setAttribute('download', `bagwan-kai-bandey-audit-${Date.now()}.json`);
     document.body.appendChild(dlAnchor);
     dlAnchor.click();
     dlAnchor.remove();
