@@ -13,6 +13,7 @@
     "validate:queries": "tsx scripts/validate-queries.ts",
     "validate:cypher": "tsx scripts/validate-cypher.ts",
     "benchmark": "tsx scripts/benchmark-scale.ts",
+    "demo": "tsx src/server/demoServer.ts",
     "start": "tsx bin/cli.ts"
   },
   "dependencies": {

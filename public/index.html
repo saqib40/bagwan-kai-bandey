@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shift — Graph-Governed Codebase Migration Cockpit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Vis.js Network CDN -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Header / Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <div class="logo-mark">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="url(#brand-grad)" stroke="#8B5CF6" stroke-width="1.5"/>
+          <defs>
+            <linearGradient id="brand-grad" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#8B5CF6"/>
+              <stop offset="1" stop-color="#3B82F6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">SHIFT <span class="badge-falkor">FALKORDB</span></div>
+        <div class="brand-subtitle">Graph-Governed Migration Engine • Track 01</div>
+      </div>
+    </div>
+
+    <!-- Live Status Pill HUD -->
+    <div class="status-hud">
+      <div class="hud-item hud-clean"><span class="hud-dot"></span> CLEAN <span id="count-clean" class="hud-val">2</span></div>
+      <div class="hud-item hud-pending"><span class="hud-dot"></span> PENDING <span id="count-pending" class="hud-val">7</span></div>
+      <div class="hud-item hud-shimmed"><span class="hud-dot"></span> SHIMMED <span id="count-shimmed" class="hud-val">0</span></div>
+      <div class="hud-item hud-verified"><span class="hud-dot"></span> VERIFIED <span id="count-verified" class="hud-val">0</span></div>
+    </div>
+
+    <!-- Action Controls -->
+    <div class="nav-actions">
+      <button id="btn-reset" class="btn btn-secondary" title="Reset codebase to original Express baseline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Reset Baseline
+      </button>
+      <button id="btn-step" class="btn btn-primary" title="Execute next topological migration step">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+        Step Forward
+      </button>
+      <button id="btn-auto" class="btn btn-accent" title="Auto-migrate the entire codebase step-by-step">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Auto-Play ▶
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Grid Workspace -->
+  <main class="cockpit-grid">
+    <!-- Left: Topology Graph Visualizer -->
+    <section class="card graph-pane">
+      <div class="pane-header">
+        <div class="pane-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Live Dependency Graph Topology
+        </div>
+        <div class="graph-badges">
+          <span class="badge badge-scc" title="Strongly Connected Component cycle detected">
+            <span class="pulse-scc"></span> 2-Node SCC Cycle Detected
+          </span>
+          <span class="badge badge-latency" id="graph-latency">⚡ FalkorDB: 1.5 ms</span>
+        </div>
+      </div>
+
+      <!-- Graph Canvas Container -->
+      <div id="network-container" class="network-canvas"></div>
+
+      <!-- Graph Footer Legend -->
+      <div class="graph-legend">
+        <div class="legend-item"><span class="leg-pill pill-pending"></span> PENDING (Express)</div>
+        <div class="legend-item"><span class="leg-pill pill-shimmed"></span> SHIMMED (Dual-Compat)</div>
+        <div class="legend-item"><span class="leg-pill pill-verified"></span> VERIFIED (Pure Fastify)</div>
+        <div class="legend-item"><span class="leg-pill pill-clean"></span> CLEAN (Framework-free)</div>
+        <div class="legend-item"><span class="leg-pill pill-scc"></span> Circular SCC Cycle</div>
+      </div>
+    </section>
+
+    <!-- Right: Active Flight Deck / Inspector -->
+    <aside class="sidebar-pane">
+      <!-- Active Claim Panel -->
+      <div class="card active-card">
+        <div class="pane-header">
+          <div class="pane-title">Active Migration Target</div>
+          <span id="phase-badge" class="phase-pill phase-idle">READY</span>
+        </div>
+
+        <div id="target-details" class="target-body">
+          <div class="target-empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <p>Click <strong>"Step Forward"</strong> or <strong>"Auto-Play"</strong> to begin graph-governed migration.</p>
+          </div>
+        </div>
+
+        <!-- Dependency Proof Card -->
+        <div id="proof-container" class="proof-box" style="display: none;">
+          <div class="proof-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Topological Proof (openCypher shortestPath)
+          </div>
+          <div id="proof-text" class="proof-content"></div>
+        </div>
+      </div>
+
+      <!-- Verification Gates HUD -->
+      <div class="card gates-card">
+        <div class="pane-header">
+          <div class="pane-title">Tiered Verification Gates</div>
+          <span class="gate-overall" id="gate-overall-badge">GATES INTACT</span>
+        </div>
+        <div class="gates-grid">
+          <div class="gate-tile">
+            <div class="gate-status" id="gate-tsc">✅ PASS</div>
+            <div class="gate-label">Typecheck (tsc --noEmit)</div>
+          </div>
+          <div class="gate-tile">
+            <div class="gate-status" id="gate-test">✅ 6/6 PASS</div>
+            <div class="gate-label">Integration Tests</div>
+          </div>
+          <div class="gate-tile">
+            <div class="gate-status" id="gate-routes">✅ 100% MATCH</div>
+            <div class="gate-label">Route Invariant Parity</div>
+          </div>
+          <div class="gate-tile">
+            <div class="gate-status" id="gate-falkor">⚡ &lt; 5 ms</div>
+            <div class="gate-label">FalkorDB Query SLA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-Time Code Diff Inspector -->
+      <div class="card diff-card">
+        <div class="pane-header">
+          <div class="pane-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Code Diff &amp; Shim Inspector
+          </div>
+          <span id="diff-file-label" class="diff-file-badge">No changes</span>
+        </div>
+        <div id="diff-viewer" class="diff-body">
+          <pre class="diff-placeholder">Code modifications and dual-signature shims will stream here in real time...</pre>
+        </div>
+      </div>
+
+      <!-- Migration Audit Trail Stream -->
+      <div class="card audit-card">
+        <div class="pane-header">
+          <div class="pane-title">Chronological Episode Stream</div>
+          <span id="episode-count-badge" class="badge-mini">0 Steps</span>
+        </div>
+        <div id="audit-feed" class="audit-feed-list">
+          <div class="audit-empty">No episodes recorded yet.</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
