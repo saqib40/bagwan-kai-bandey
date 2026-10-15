@@ -568,6 +568,7 @@ export function startDemoServer(port = PORT) {
 
         // Get updated graph topology
         const topology = await getGraphTopology();
+        const claimCypher = (claim.phase === 'DE_SHIM' ? Q.CLAIM_DESHIM : Q.CLAIM_LEAF).trim();
 
         sendJson(res, {
           finished: false,
@@ -577,6 +578,11 @@ export function startDemoServer(port = PORT) {
           verifyLatencyMs,
           modifiedFiles,
           topology,
+          cypherTrace: {
+            name: claim.phase === 'DE_SHIM' ? 'Pass A: De-shim Candidate Scan' : 'Pass B: Unblocked Leaf Claim',
+            query: claimCypher,
+            latencyMs: claimLatencyMs,
+          },
         });
       } catch (err: any) {
         sendJson(res, { error: err.message }, 500);
