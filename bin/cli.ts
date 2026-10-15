@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Shift CLI & Bootstrapper (`bin/cli.ts`).
+ * Bagwan Kai Bandey (BKB) CLI & Bootstrapper (`bin/cli.ts`).
  * Stdio discipline: all logging goes to console.error so stdout remains clean
  * for MCP JSON-RPC protocol frames when the MCP server runs.
  */
@@ -237,7 +237,7 @@ async function main() {
     if (!existsSync(adaptersDir)) mkdirSync(adaptersDir, { recursive: true });
 
     const targetPath = join(adaptersDir, `${lang}Adapter.ts`);
-    const template = `import { BaseLanguageAdapter, type ParsedModule, type MigrationPack } from 'shift-migration-engine';
+    const template = `import { BaseLanguageAdapter, type ParsedModule, type MigrationPack } from 'bagwan-kai-bandey';
 
 export class ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter extends BaseLanguageAdapter {
   readonly language = '${lang.toLowerCase()}';

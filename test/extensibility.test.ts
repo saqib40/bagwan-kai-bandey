@@ -174,7 +174,7 @@ describe('Layer 3 Extensibility: Migration Packs', () => {
   });
 });
 
-describe('Shift Configuration System', () => {
+describe('BKB Configuration System', () => {
   test('defineConfig returns typed configuration object', () => {
     const config = defineConfig({
       packDirs: ['./custom-packs'],

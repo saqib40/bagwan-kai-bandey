@@ -1,9 +1,9 @@
 {
-  "name": "shift-demo-repo",
+  "name": "bkb-demo-repo",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Self-contained Express TypeScript app used as the Shift migration target.",
+  "description": "Self-contained Express TypeScript app used as the BKB migration target.",
   "scripts": {
     "start": "node --import tsx src/server.ts",
     "typecheck": "tsc --noEmit",

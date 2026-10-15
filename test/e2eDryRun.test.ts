@@ -23,7 +23,7 @@ const TARGET_REPO = resolve(WORKSPACE, 'scratch/e2e-demo-repo');
 const TEST_GRAPH = 'shift_e2e_dryrun';
 const PACK_ID = 'express-to-fastify';
 
-test('End-to-End Autonomous Migration: demo-repo completely migrated via Shift MCP', async () => {
+test('End-to-End Autonomous Migration: demo-repo completely migrated via BKB MCP', async () => {
   // ── Setup Scratch Target Repo ──
   rmSync(TARGET_REPO, { recursive: true, force: true });
   mkdirSync(TARGET_REPO, { recursive: true });

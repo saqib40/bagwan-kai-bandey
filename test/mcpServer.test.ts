@@ -14,7 +14,7 @@ const repoPath = resolve(import.meta.dirname, '../demo-repo');
 const packId = 'express-to-fastify';
 const testGraphName = 'shift_mcp_test';
 
-test('Shift MCP Server exposes 6 tools and executes end-to-end tool calls', async () => {
+test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async () => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
   const server = createShiftMcpServer({

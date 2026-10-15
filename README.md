@@ -61,7 +61,7 @@ Extend the provided `BaseLanguageAdapter` to get automatic glob discovery, sourc
 
 ```typescript
 // adapters/pythonAdapter.ts
-import { BaseLanguageAdapter, type ParsedModule, type MigrationPack } from 'shift-migration-engine';
+import { BaseLanguageAdapter, type ParsedModule, type MigrationPack } from 'bagwan-kai-bandey';
 
 export class PythonAdapter extends BaseLanguageAdapter {
   readonly language = 'python';
@@ -105,7 +105,7 @@ Packs can be written as standard `.json` files or type-safe TypeScript/JavaScrip
 
 ```typescript
 // packs/flask-to-fastapi.ts
-import { defineMigrationPack } from 'shift-migration-engine';
+import { defineMigrationPack } from 'bagwan-kai-bandey';
 
 export default defineMigrationPack({
   id: 'flask-to-fastapi',
@@ -164,8 +164,8 @@ bkb pack validate ./packs/my-custom-pack.json
 Define custom adapters, external pack directories, and default settings in a single config file:
 
 ```typescript
-// bkb.config.ts (or shift.config.ts)
-import { defineConfig } from 'shift-migration-engine';
+// bkb.config.ts
+import { defineConfig } from 'bagwan-kai-bandey';
 import { PythonAdapter } from './adapters/pythonAdapter';
 
 export default defineConfig({
@@ -185,7 +185,7 @@ export default defineConfig({
 2. **Law 2: Atomic Cycle Collapse (Tarjan SCC Law)**
    * Circular dependencies ($A \rightarrow B \rightarrow A$) cannot be migrated file-by-file. All modules in an SCC are claimed and verified atomically in a single batch.
 3. **Law 3: Dual-Signature Shims & Deterministic De-Shimming (Strangler Fig Law)**
-   * When `pending_callers_count > 0`, the engine enforces backward-compatible shims (`// @bkb-shim` or `// @shift-shim`). As soon as all callers migrate to the target framework, the module is surfaced with `phase: 'DE_SHIM'` to remove all legacy fallback branches.
+   * When `pending_callers_count > 0`, the engine enforces backward-compatible shims (`// @bkb-shim`). As soon as all callers migrate to the target framework, the module is surfaced with `phase: 'DE_SHIM'` to remove all legacy fallback branches.
 4. **Law 4: Per-Step Typechecking & Tiered Verification Gates**
    * Every step re-parses modified files with Tree-sitter, checks route set-equality invariants against immutable baselines, and executes `tsc --noEmit`. Checkpoint gates run full test suites and runtime route snapshot diffs.
 5. **Law 5: Scoped 1-Hop Subgraph Context (Minimum Viable Context)**
