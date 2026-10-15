@@ -45,8 +45,10 @@ export interface ShiftConfig {
   };
 }
 
+export type BkbConfig = ShiftConfig;
+
 /**
- * Type-safe configuration helper for `shift.config.ts`.
+ * Type-safe configuration helper for `bkb.config.ts` or `shift.config.ts`.
  */
 export function defineConfig(config: ShiftConfig): ShiftConfig {
   return config;
@@ -57,6 +59,11 @@ export function defineConfig(config: ShiftConfig): ShiftConfig {
  */
 export async function loadConfig(repoRoot = process.cwd()): Promise<ShiftConfig | null> {
   const candidateNames = [
+    'bkb.config.ts',
+    'bkb.config.js',
+    'bkb.config.mjs',
+    'bkb.config.json',
+    '.bkbrc.json',
     'shift.config.ts',
     'shift.config.js',
     'shift.config.mjs',

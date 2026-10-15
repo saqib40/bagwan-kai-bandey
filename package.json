@@ -11,9 +11,12 @@
     "./pack": "./src/engine/packLoader.ts"
   },
   "bin": {
+    "bkb": "./bin/cli.ts",
     "shift": "./bin/cli.ts"
   },
   "scripts": {
+    "bkb": "tsx bin/cli.ts",
+    "shift": "tsx bin/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/**/*.test.ts",
     "validate:queries": "tsx scripts/validate-queries.ts",

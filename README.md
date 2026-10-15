@@ -91,10 +91,10 @@ export default PythonAdapter;
 **Injecting via CLI or Configuration:**
 ```bash
 # Inject directly via CLI flag:
-shift init --repo ./my-python-app --pack flask-to-fastapi --adapter ./adapters/pythonAdapter.ts
+bkb init --repo ./my-python-app --pack flask-to-fastapi --adapter ./adapters/pythonAdapter.ts
 
 # Or scaffold a starter adapter:
-shift adapter init python
+bkb adapter init python
 ```
 
 ---
@@ -151,20 +151,20 @@ export default defineMigrationPack({
 **Validating and Scaffolding Packs:**
 ```bash
 # Scaffold a new pack skeleton:
-shift pack init my-custom-pack --lang python
+bkb pack init my-custom-pack --lang python
 
 # Validate a pack schema before running:
-shift pack validate ./packs/my-custom-pack.json
+bkb pack validate ./packs/my-custom-pack.json
 ```
 
 ---
 
-### 3. Unified Project Configuration (`shift.config.ts`)
+### 3. Unified Project Configuration (`bkb.config.ts`)
 
 Define custom adapters, external pack directories, and default settings in a single config file:
 
 ```typescript
-// shift.config.ts
+// bkb.config.ts (or shift.config.ts)
 import { defineConfig } from 'shift-migration-engine';
 import { PythonAdapter } from './adapters/pythonAdapter';
 
@@ -268,12 +268,12 @@ docker run -p 6379:6379 -p 3000:3000 -d --name falkordb-shift falkordb/falkordb:
 Point Shift at your repository root to scan source files, compute baseline route invariants, detect legacy API usages, and condense circular dependencies:
 
 ```bash
-# Using local CLI:
-npm start -- init --repo /path/to/your-repo --pack express-to-fastify
+# Using npm script:
+npm run bkb -- init --repo /path/to/your-repo --pack express-to-fastify
 
 # Or link globally:
 npm link
-shift init --repo /path/to/your-repo --pack express-to-fastify
+bkb init --repo /path/to/your-repo --pack express-to-fastify
 ```
 
 Output:
@@ -346,27 +346,27 @@ The agent will execute the topological plan automatically:
 
 #### Option B: Step-by-Step CLI Workflow
 
-You can also drive the migration manually or via scripts using the Shift CLI:
+You can also drive the migration manually or via scripts using the BKB CLI:
 
 ```bash
 # 1. Claim next unblocked leaf or atomic SCC
-shift claim --repo ./my-app --pack express-to-fastify
+bkb claim --repo ./my-app --pack express-to-fastify
 # Output: Returns JSON with targetPaths: ["src/utils/response.ts"], phase: "SHIM"
 
 # 2. Inspect 1-hop contextual slice and guidance
-shift slice --repo ./my-app --pack express-to-fastify --module src/utils/response.ts --phase SHIM
+bkb slice --repo ./my-app --pack express-to-fastify --module src/utils/response.ts --phase SHIM
 
 # 3. Edit your file(s) on disk (e.g., adding Fastify types and dual-signature wrappers)
 
 # 4. Gate-check, typecheck, and commit the node in FalkorDB
-shift verify --repo ./my-app --pack express-to-fastify --module src/utils/response.ts --summary "Dual-compat response shim"
+bkb verify --repo ./my-app --pack express-to-fastify --module src/utils/response.ts --summary "Dual-compat response shim"
 
 # 5. Check audit trail and trigger test checkpoint
-shift audit --repo ./my-app --pack express-to-fastify --checkpoint
+bkb audit --repo ./my-app --pack express-to-fastify --checkpoint
 ```
 
-Repeat steps 1–4 until `shift claim` reports:
-`[shift] No unblocked modules to claim. Migration complete.`
+Repeat steps 1–4 until `bkb claim` reports:
+`[bkb] No unblocked modules to claim. Migration complete.`
 
 ---
 
@@ -399,7 +399,7 @@ Shift is completely language- and framework-agnostic. To migrate a different lib
 
 ### Step 1: Scaffold a Migration Pack
 ```bash
-shift pack init flask-to-fastapi --lang python
+bkb pack init flask-to-fastapi --lang python
 ```
 This generates a starter pack at `packs/flask-to-fastapi.json`.
 
@@ -418,20 +418,20 @@ Edit `packs/flask-to-fastapi.json`:
 
 ### Step 3: Validate Your Pack Schema
 ```bash
-shift pack validate ./packs/flask-to-fastapi.json
+bkb pack validate ./packs/flask-to-fastapi.json
 ```
-Output: `[shift] ✅ Pack "flask-to-fastapi" is structurally valid and ready for use!`
+Output: `[bkb] ✅ Pack "flask-to-fastapi" is structurally valid and ready for use!`
 
 ### Step 4 (If New Language): Scaffold a Language Adapter
 For languages other than TypeScript, scaffold an adapter:
 ```bash
-shift adapter init python
+bkb adapter init python
 ```
 This creates `adapters/pythonAdapter.ts` extending `BaseLanguageAdapter`. Implement `parseModule()` to extract imports and symbol signatures.
 
 ### Step 5: Run Your Custom Migration
 ```bash
-shift init --repo /path/to/python-app --pack flask-to-fastapi --adapter ./adapters/pythonAdapter.ts
+bkb init --repo /path/to/python-app --pack flask-to-fastapi --adapter ./adapters/pythonAdapter.ts
 ```
 
 ---
@@ -440,16 +440,16 @@ shift init --repo /path/to/python-app --pack flask-to-fastapi --adapter ./adapte
 
 | Command | Arguments / Flags | Description |
 |---|---|---|
-| `shift init` | `--repo <path> --pack <id> [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
-| `shift claim` | `--repo <path> --pack <id>` | Computes transitive callee graph and claims the next unblocked leaf or circular SCC cluster. |
-| `shift slice` | `--repo <path> --pack <id> --module <path> --phase <phase>` | Returns 1-hop contextual slice (target files, callee signatures, caller snippets, phase guidance). |
-| `shift blast-radius` | `--repo <path> --pack <id> --module <path>` | Evaluates reverse multi-hop dependencies (`[:IMPORTS*1..6]`) before editing. |
-| `shift verify` | `--repo <path> --pack <id> --module <path> [--summary <text>]` | Re-parses AST, checks invariants, runs `tsc --noEmit`, and commits state in FalkorDB. |
-| `shift audit` | `--repo <path> --pack <id> [--checkpoint]` | Streams cryptographic episode audit log; runs full checkpoint gates (tests + route diffs). |
-| `shift serve` | `[--repo <path>] [--pack <id>]` | Starts the Shift Model Context Protocol (MCP) server over standard I/O (stdio). |
-| `shift pack init` | `<pack-id> [--lang <language>]` | Scaffolds a new validated Migration Pack starter template. |
-| `shift pack validate`| `<path-to-pack>` | Validates Migration Pack structure, AST queries, and verification commands. |
-| `shift adapter init` | `<language>` | Scaffolds a new Language Adapter starter template extending `BaseLanguageAdapter`. |
+| `bkb init` | `--repo <path> --pack <id> [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
+| `bkb claim` | `--repo <path> --pack <id>` | Computes transitive callee graph and claims the next unblocked leaf or circular SCC cluster. |
+| `bkb slice` | `--repo <path> --pack <id> --module <path> --phase <phase>` | Returns 1-hop contextual slice (target files, callee signatures, caller snippets, phase guidance). |
+| `bkb blast-radius` | `--repo <path> --pack <id> --module <path>` | Evaluates reverse multi-hop dependencies (`[:IMPORTS*1..6]`) before editing. |
+| `bkb verify` | `--repo <path> --pack <id> --module <path> [--summary <text>]` | Re-parses AST, checks invariants, runs `tsc --noEmit`, and commits state in FalkorDB. |
+| `bkb audit` | `--repo <path> --pack <id> [--checkpoint]` | Streams cryptographic episode audit log; runs full checkpoint gates (tests + route diffs). |
+| `bkb serve` | `[--repo <path>] [--pack <id>]` | Starts the Shift Model Context Protocol (MCP) server over standard I/O (stdio). |
+| `bkb pack init` | `<pack-id> [--lang <language>]` | Scaffolds a new validated Migration Pack starter template. |
+| `bkb pack validate`| `<path-to-pack>` | Validates Migration Pack structure, AST queries, and verification commands. |
+| `bkb adapter init` | `<language>` | Scaffolds a new Language Adapter starter template extending `BaseLanguageAdapter`. |
 
 ---
 

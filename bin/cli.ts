@@ -17,20 +17,20 @@ import { validatePack, loadPack } from '../src/engine/packLoader';
 
 function printHelp() {
   console.error(`
-Shift: Graph-Governed Codebase Migration Engine (Powered by FalkorDB)
+Bagwan Kai Bandey (bkb): Graph-Governed Codebase Migration Engine (Powered by FalkorDB)
 
 Usage:
-  shift init --repo <path> --pack <id> [--reset] [--adapter <path>]
-  shift claim --repo <path> --pack <id>
-  shift slice --repo <path> --pack <id> --module <path> --phase <MIGRATE|SHIM|DE_SHIM>
-  shift blast-radius --repo <path> --pack <id> --module <path>
-  shift verify --repo <path> --pack <id> --module <path> [--summary <text>]
-  shift audit --repo <path> --pack <id> [--checkpoint]
-  shift serve [--repo <path>] [--pack <id>]
-  shift pack init <pack-id> [--lang <language>]
-  shift pack validate <path>
-  shift adapter init <language>
-  shift --help
+  bkb init --repo <path> --pack <id> [--reset] [--adapter <path>]
+  bkb claim --repo <path> --pack <id>
+  bkb slice --repo <path> --pack <id> --module <path> --phase <MIGRATE|SHIM|DE_SHIM>
+  bkb blast-radius --repo <path> --pack <id> --module <path>
+  bkb verify --repo <path> --pack <id> --module <path> [--summary <text>]
+  bkb audit --repo <path> --pack <id> [--checkpoint]
+  bkb serve [--repo <path>] [--pack <id>]
+  bkb pack init <pack-id> [--lang <language>]
+  bkb pack validate <path>
+  bkb adapter init <language>
+  bkb --help
 
 Commands:
   init           Initialize the migration graph in FalkorDB for a repo and pack
@@ -39,7 +39,7 @@ Commands:
   blast-radius   Simulate the blast radius of changing a module
   verify         Re-parse, gate-check, and commit a migrated module
   audit          Show the full migration audit trail
-  serve          Start the Shift MCP server (stdio transport)
+  serve          Start the Model Context Protocol (MCP) server (stdio transport)
   pack init      Scaffold a new Migration Pack starter template
   pack validate  Validate a Migration Pack schema and detection rules
   adapter init   Scaffold a starter Language Adapter template
@@ -107,17 +107,17 @@ async function main() {
     process.exit(0);
   }
 
-  // 1. Load project config if present (e.g. shift.config.ts)
+  // 1. Load project config if present (e.g. bkb.config.ts or shift.config.ts)
   try {
     await loadConfig();
   } catch (err) {
-    console.error('[shift] Warning: Failed to load shift.config:', err);
+    console.error('[bkb] Warning: Failed to load config:', err);
   }
 
   // 2. Register custom adapter if passed via --adapter
   if (flags.adapter) {
     const adapterPath = resolve(String(flags.adapter));
-    console.error(`[shift] Injecting custom language adapter from "${adapterPath}"...`);
+    console.error(`[bkb] Injecting custom language adapter from "${adapterPath}"...`);
     await adapterRegistry.registerFromPath(adapterPath);
   }
 
@@ -172,32 +172,32 @@ async function main() {
       };
 
       writeFileSync(targetPath, JSON.stringify(template, null, 2) + '\n');
-      console.error(`[shift] Successfully scaffolded new Migration Pack at: ${targetPath}`);
+      console.error(`[bkb] Successfully scaffolded new Migration Pack at: ${targetPath}`);
       process.exit(0);
     }
 
     if (subCommand === 'validate') {
       const packPath = positional[2];
       if (!packPath) {
-        console.error('[shift] Error: Path to pack is required (e.g. `shift pack validate ./packs/my-pack.json`)');
+        console.error('[bkb] Error: Path to pack is required (e.g. `bkb pack validate ./packs/my-pack.json`)');
         process.exit(1);
       }
       try {
         const pack = loadPack(packPath);
         const res = validatePack(pack);
         if (res.valid) {
-          console.error(`[shift] ✅ Pack "${pack.id}" is structurally valid and ready for use!`);
+          console.error(`[bkb] ✅ Pack "${pack.id}" is structurally valid and ready for use!`);
           console.error(`  - Language:        ${pack.language}`);
           console.error(`  - Detection Rules: ${pack.detectionRules.length}`);
           console.error(`  - Verification:    ${pack.verification.perStepTypecheckCmd}`);
           process.exit(0);
         } else {
-          console.error(`[shift] ❌ Validation failed with ${res.errors.length} error(s):`);
+          console.error(`[bkb] ❌ Validation failed with ${res.errors.length} error(s):`);
           res.errors.forEach((e) => console.error(`  - ${e}`));
           process.exit(1);
         }
       } catch (err: any) {
-        console.error(`[shift] ❌ Failed to validate pack:`, err.message);
+        console.error(`[bkb] ❌ Failed to validate pack:`, err.message);
         process.exit(1);
       }
     }
@@ -239,7 +239,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
 `;
 
     writeFileSync(targetPath, template);
-    console.error(`[shift] Successfully scaffolded new Language Adapter at: ${targetPath}`);
+    console.error(`[bkb] Successfully scaffolded new Language Adapter at: ${targetPath}`);
     process.exit(0);
   }
 
@@ -247,7 +247,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
   try {
     await ensureFalkorDB();
   } catch (err) {
-    console.error('[shift] Fatal: FalkorDB bootstrap failed:', err instanceof Error ? err.message : String(err));
+    console.error('[bkb] Fatal: FalkorDB bootstrap failed:', err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
 
@@ -256,7 +256,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     const packId = String(flags.pack ?? 'express-to-fastify');
     const reset = Boolean(flags.reset ?? true);
 
-    console.error(`[shift] Initializing migration graph for "${repoPath}" with pack "${packId}" (reset=${reset})...`);
+    console.error(`[bkb] Initializing migration graph for "${repoPath}" with pack "${packId}" (reset=${reset})...`);
     try {
       const summary = await MigrationGraphManager.initMigrationGraph({
         repoPath,
@@ -275,7 +275,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       console.error('FalkorDB UI:      http://localhost:3000\n');
       process.exit(0);
     } catch (err) {
-      console.error('[shift] Failed to initialize migration graph:', err);
+      console.error('[bkb] Failed to initialize migration graph:', err);
       process.exit(1);
     }
   }
@@ -285,12 +285,12 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       const ops = await createOps(flags);
       const result = await ops.claimNextLeaf();
       if (!result) {
-        console.error('[shift] No unblocked modules to claim. Migration may be complete.');
+        console.error('[bkb] No unblocked modules to claim. Migration may be complete.');
         // Print status counts
         const counts = await ops.db.roQuery<{ status: string; n: number }>(
           'MATCH (m:Module) RETURN m.status AS status, count(m) AS n',
         );
-        console.error('[shift] Status counts:', JSON.stringify(counts));
+        console.error('[bkb] Status counts:', JSON.stringify(counts));
         process.exit(0);
       }
       // Output claim result as JSON on stdout (machine-readable)
@@ -298,7 +298,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       await ops.db.close();
       process.exit(0);
     } catch (err) {
-      console.error('[shift] Claim failed:', err);
+      console.error('[bkb] Claim failed:', err);
       process.exit(1);
     }
   }
@@ -306,7 +306,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
   if (command === 'slice') {
     const modulePaths = multiFlags.module ?? (flags.module ? [String(flags.module)] : []);
     if (!modulePaths.length) {
-      console.error('[shift] Error: --module <path> is required');
+      console.error('[bkb] Error: --module <path> is required');
       process.exit(1);
     }
     const phase = String(flags.phase ?? 'MIGRATE') as any;
@@ -317,7 +317,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       await ops.db.close();
       process.exit(0);
     } catch (err) {
-      console.error('[shift] Slice failed:', err);
+      console.error('[bkb] Slice failed:', err);
       process.exit(1);
     }
   }
@@ -325,7 +325,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
   if (command === 'blast-radius') {
     const modulePath = String(flags.module ?? '');
     if (!modulePath) {
-      console.error('[shift] Error: --module <path> is required');
+      console.error('[bkb] Error: --module <path> is required');
       process.exit(1);
     }
     try {
@@ -335,7 +335,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       await ops.db.close();
       process.exit(0);
     } catch (err) {
-      console.error('[shift] Blast radius failed:', err);
+      console.error('[bkb] Blast radius failed:', err);
       process.exit(1);
     }
   }
@@ -343,7 +343,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
   if (command === 'verify') {
     const modulePaths = multiFlags.module ?? (flags.module ? [String(flags.module)] : []);
     if (!modulePaths.length) {
-      console.error('[shift] Error: --module <path> is required');
+      console.error('[bkb] Error: --module <path> is required');
       process.exit(1);
     }
     const summary = String(flags.summary ?? 'CLI verify');
@@ -354,7 +354,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       await ops.db.close();
       process.exit(result.ok ? 0 : 1);
     } catch (err) {
-      console.error('[shift] Verify failed:', err);
+      console.error('[bkb] Verify failed:', err);
       process.exit(1);
     }
   }
@@ -367,7 +367,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       await ops.db.close();
       process.exit(0);
     } catch (err) {
-      console.error('[shift] Audit trail failed:', err);
+      console.error('[bkb] Audit trail failed:', err);
       process.exit(1);
     }
   }
@@ -379,11 +379,11 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     return;
   }
 
-  console.error(`[shift] Unknown command "${command}". Use "shift --help" for usage.`);
+  console.error(`[bkb] Unknown command "${command}". Use "bkb --help" for usage.`);
   process.exit(1);
 }
 
 main().catch((err) => {
-  console.error('[shift] Unhandled error:', err);
+  console.error('[bkb] Unhandled error:', err);
   process.exit(1);
 });
