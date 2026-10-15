@@ -116,7 +116,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
   // ─── 2. claim_next_leaf (§8.2) ───────────────────────────
   server.tool(
     'claim_next_leaf',
-    'Claim the next unblocked leaf module or atomic cycle (SCC) for migration, prioritizing de-shim cleanup.',
+    'Claim the next unblocked leaf module or atomic cycle (SCC) for migration, prioritizing de-shim cleanup. Returns target paths and phase. Do NOT manually grep or explore the repo—immediately call get_migration_slice with the returned targetPaths to receive the pre-packaged 1-hop slice.',
     {
       repoPath: z.string().optional().describe('Target repository path (defaults to initialized repo)'),
       packId: z.string().optional().describe('Pack identifier (defaults to initialized pack)'),
@@ -162,7 +162,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                   pendingCallersCount: claim.pendingCallersCount,
                   pendingCallerPaths: claim.pendingCallerPaths,
                   proof: claim.proof,
-                  nextAction: `Call get_migration_slice with modulePaths=${JSON.stringify(claim.targetPaths)} and phase="${claim.phase}" to get context and guidance.`,
+                  nextAction: `Do NOT explore other files. Call get_migration_slice with modulePaths=${JSON.stringify(claim.targetPaths)} and phase="${claim.phase}" to get the complete disk source and callee/caller context.`,
                 },
                 null,
                 2,
@@ -182,7 +182,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
   // ─── 3. get_migration_slice (§8.3) ───────────────────────
   server.tool(
     'get_migration_slice',
-    'Get the 1-hop context slice for a set of modules: full disk source, callee symbol signatures, caller snippets, and phase guidance.',
+    'Get the 1-hop context slice for a set of modules: full disk source, callee symbol signatures, caller snippets, and phase guidance. Contains ALL context needed to perform the edit—do NOT read additional files, grep, or crawl directories.',
     {
       modulePaths: z.array(z.string()).describe('Array of relative module paths in the target cluster'),
       phase: z.enum(['MIGRATE', 'SHIM', 'DE_SHIM']).describe('Target migration phase'),
