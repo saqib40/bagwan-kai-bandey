@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   generateServerConfig,
+  generateOpencodeConfig,
   installMcpConfig,
   formatMcpInstallReport,
 } from '../src/cli/mcpInstaller';
@@ -13,6 +14,23 @@ test('bkb mcp install: generates valid server configuration', () => {
   const config = generateServerConfig('/path/to/cli.ts', '/my/repo', 'express-to-fastify');
   assert.equal(config.command, 'tsx');
   assert.deepEqual(config.args, [
+    '/path/to/cli.ts',
+    'serve',
+    '--repo',
+    '/my/repo',
+    '--pack',
+    'express-to-fastify',
+  ]);
+});
+
+test('bkb mcp install: generates valid opencode configuration', () => {
+  const config = generateOpencodeConfig('/path/to/cli.ts', '/my/repo', 'express-to-fastify');
+  assert.equal(config.type, 'local');
+  assert.equal(config.enabled, true);
+  assert.deepEqual(config.command, [
+    'npx',
+    '-y',
+    'tsx',
     '/path/to/cli.ts',
     'serve',
     '--repo',
@@ -60,3 +78,54 @@ test('bkb mcp install: installs into custom workspace directory idempotently', a
     rmSync(scratchDir, { recursive: true, force: true });
   }
 });
+
+test('bkb mcp install: installs opencode config into custom workspace directory idempotently', async () => {
+  const scratchDir = mkdtempSync(join(tmpdir(), 'bkb-mcp-opencode-test-'));
+
+  try {
+    const results = await installMcpConfig('opencode', {
+      cliPath: '/test/bin/cli.ts',
+      repoPath: '/test/repo',
+      packId: 'express-to-fastify',
+      workspaceRoot: scratchDir,
+    });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0]?.status, 'created');
+
+    const expectedFile = join(scratchDir, 'opencode.json');
+    assert.ok(existsSync(expectedFile));
+
+    const content = JSON.parse(readFileSync(expectedFile, 'utf8'));
+    assert.ok(content.mcp?.servers?.bkb);
+    assert.equal(content.mcp.servers.bkb.type, 'local');
+    assert.deepEqual(content.mcp.servers.bkb.command, [
+      'npx',
+      '-y',
+      'tsx',
+      '/test/bin/cli.ts',
+      'serve',
+      '--repo',
+      '/test/repo',
+      '--pack',
+      'express-to-fastify',
+    ]);
+
+    // Second run: test idempotency
+    const rerun = await installMcpConfig('opencode', {
+      cliPath: '/test/bin/cli.ts',
+      repoPath: '/test/repo',
+      packId: 'express-to-fastify',
+      workspaceRoot: scratchDir,
+    });
+
+    assert.equal(rerun[0]?.status, 'already_configured');
+
+    const report = formatMcpInstallReport(results);
+    assert.ok(report.includes('1-Click MCP Setup'));
+    assert.ok(report.includes('[OPENCODE]'));
+  } finally {
+    rmSync(scratchDir, { recursive: true, force: true });
+  }
+});
+

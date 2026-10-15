@@ -48,11 +48,14 @@ Rather than guessing which files to edit, an AI coding agent connected to BKB qu
 
 ---
 
-## 3. 1-Click Editor Installation
+## 3. 1-Click Editor & Agent Installation
 
-BKB provides a built-in installation command that auto-detects and writes configuration files for your favorite editors:
+BKB provides a built-in installation command that auto-detects and registers configuration for your favorite editors and AI coding agents:
 
 ```bash
+# Auto-configure OpenCode CLI / opencode.jsonc:
+bkb mcp install opencode
+
 # Auto-configure Cursor (.cursor/mcp.json):
 bkb mcp install cursor
 
@@ -65,7 +68,7 @@ bkb mcp install vscode
 # Auto-configure Windsurf (.codeium/windsurf/mcp_config.json):
 bkb mcp install windsurf
 
-# Or configure all detected editors at once:
+# Or configure all detected editors and agents at once:
 bkb mcp install all
 ```
 
@@ -74,6 +77,37 @@ bkb mcp install all
 ## 4. Manual Configuration
 
 If you prefer to configure your editor manually:
+
+### For OpenCode (`~/.config/opencode/opencode.jsonc` or `./opencode.json`)
+```json
+{
+  "mcp": {
+    "servers": {
+      "bkb": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "tsx",
+          "/absolute/path/to/bagwan-kai-bandey/bin/cli.ts",
+          "serve",
+          "--repo",
+          "/absolute/path/to/your-repo",
+          "--pack",
+          "express-to-fastify"
+        ],
+        "enabled": true
+      }
+    }
+  }
+}
+```
+*Tip: You can also register directly via the OpenCode CLI:*
+```bash
+opencode mcp add bkb -- npx -y tsx /absolute/path/to/bagwan-kai-bandey/bin/cli.ts serve
+# Verify status:
+opencode mcp list
+```
 
 ### For Claude Desktop (`claude_desktop_config.json`)
 ```json

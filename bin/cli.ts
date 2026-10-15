@@ -26,7 +26,7 @@ Bagwan Kai Bandey (bkb): Graph-Governed Codebase Migration Engine (Powered by Fa
 
 Usage:
   bkb doctor [--repo <path>]
-  bkb mcp install [cursor|claude|vscode|windsurf|all]
+  bkb mcp install [cursor|claude|vscode|windsurf|opencode|all]
   bkb init [--interactive] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]
   bkb run [--repo <path>] [--pack <id>] [--provider <p>] [--model <m>] [--dry-run] [--no-rollback]
   bkb rollback [step] [--repo <path>] [--pack <id>] [--list]
@@ -43,7 +43,7 @@ Usage:
 
 Commands:
   doctor         Run pre-flight environment diagnostics (Node, Docker, FalkorDB, Git)
-  mcp install    1-Click install BKB MCP server config into Cursor, Claude, or VS Code
+  mcp install    1-Click install BKB MCP server config into Cursor, Claude, VS Code, Windsurf, or OpenCode
   init           Initialize the migration graph in FalkorDB (interactive wizard if -i)
   run, auto      Autonomously execute the migration loop (claim -> slice -> transform -> verify)
   rollback       Rollback source files and FalkorDB graph to a previous checkpoint (or latest)
@@ -290,7 +290,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       const hasSuccess = results.some((r) => r.status === 'created' || r.status === 'updated' || r.status === 'already_configured');
       process.exit(hasSuccess ? 0 : 1);
     }
-    console.error(`[bkb] Unknown mcp subcommand "${subCommand}". Usage: bkb mcp install [cursor|claude|vscode|windsurf|all]`);
+    console.error(`[bkb] Unknown mcp subcommand "${subCommand}". Usage: bkb mcp install [cursor|claude|vscode|windsurf|opencode|all]`);
     process.exit(1);
   }
 

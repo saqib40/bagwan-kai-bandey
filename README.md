@@ -47,15 +47,17 @@ bkb init --repo /path/to/your-repo --pack express-to-fastify
 ## 🚀 Migration Modes
 
 ### Mode A: Autonomous AI Agent via MCP (Recommended)
-BKB turns Cursor, Claude Desktop, or VS Code into a graph-governed migration engineer.
+BKB turns Cursor, Claude Desktop, VS Code, Windsurf, or OpenCode into a graph-governed migration engineer.
 
-**1-Click Editor Installation:**
+**1-Click Editor & Agent Installation:**
 ```bash
-# Auto-configure your favorite editor:
+# Auto-configure your favorite editor or coding agent:
+bkb mcp install opencode   # OpenCode CLI / opencode.jsonc
 bkb mcp install cursor     # Cursor (.cursor/mcp.json)
 bkb mcp install claude     # Claude Desktop (claude_desktop_config.json)
 bkb mcp install vscode     # VS Code (.vscode/mcp.json)
-bkb mcp install all        # All detected editors
+bkb mcp install windsurf   # Windsurf (.codeium/windsurf/mcp_config.json)
+bkb mcp install all        # All detected editors & agents
 ```
 
 **Instruct Your Agent in Chat:**
@@ -118,7 +120,7 @@ For in-depth architectural details, custom framework extensions, and benchmark r
 | Command | Arguments / Flags | Description |
 |---|---|---|
 | `bkb doctor` | `[--repo <path>]` | Evaluates environment health (Node.js, Docker, FalkorDB ports, Git status). |
-| `bkb mcp install` | `[cursor\|claude\|vscode\|windsurf\|all]` | 1-Click registers BKB MCP server into your editor's configuration. |
+| `bkb mcp install` | `[cursor\|claude\|vscode\|windsurf\|opencode\|all]` | 1-Click registers BKB MCP server into your editor or agent configuration. |
 | `bkb init` | `[--interactive\|-i] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
 | `bkb run` / `bkb auto`| `[--repo <path>] [--pack <id>] [--provider <p>] [--model <m>] [--dry-run]` | Autonomously executes migration loop (claim $\rightarrow$ checkpoint $\rightarrow$ slice $\rightarrow$ transform $\rightarrow$ verify $\rightarrow$ gate). |
 | `bkb rollback` | `[step] [--repo <path>] [--pack <id>] [--list]` | Rollback source files and FalkorDB graph state to a previous step (or latest checkpoint). |
