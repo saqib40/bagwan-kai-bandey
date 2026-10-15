@@ -1,0 +1,62 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  generateServerConfig,
+  installMcpConfig,
+  formatMcpInstallReport,
+} from '../src/cli/mcpInstaller';
+
+test('bkb mcp install: generates valid server configuration', () => {
+  const config = generateServerConfig('/path/to/cli.ts', '/my/repo', 'express-to-fastify');
+  assert.equal(config.command, 'tsx');
+  assert.deepEqual(config.args, [
+    '/path/to/cli.ts',
+    'serve',
+    '--repo',
+    '/my/repo',
+    '--pack',
+    'express-to-fastify',
+  ]);
+});
+
+test('bkb mcp install: installs into custom workspace directory idempotently', async () => {
+  const scratchDir = mkdtempSync(join(tmpdir(), 'bkb-mcp-test-'));
+
+  try {
+    const results = await installMcpConfig('vscode', {
+      cliPath: '/test/bin/cli.ts',
+      repoPath: '/test/repo',
+      packId: 'express-to-fastify',
+      workspaceRoot: scratchDir,
+    });
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0]?.status, 'created');
+
+    const expectedFile = join(scratchDir, '.vscode', 'mcp.json');
+    assert.ok(existsSync(expectedFile));
+
+    const content = JSON.parse(readFileSync(expectedFile, 'utf8'));
+    assert.ok(content.mcpServers?.bkb);
+    assert.equal(content.mcpServers.bkb.command, 'tsx');
+
+    // Second run: test idempotency
+    const rerun = await installMcpConfig('vscode', {
+      cliPath: '/test/bin/cli.ts',
+      repoPath: '/test/repo',
+      packId: 'express-to-fastify',
+      workspaceRoot: scratchDir,
+    });
+
+    assert.equal(rerun[0]?.status, 'already_configured');
+
+    const report = formatMcpInstallReport(results);
+    assert.ok(report.includes('1-Click MCP Setup'));
+    assert.ok(report.includes('[VSCODE]'));
+  } finally {
+    rmSync(scratchDir, { recursive: true, force: true });
+  }
+});

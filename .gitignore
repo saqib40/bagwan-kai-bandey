@@ -1,6 +1,9 @@
 node_modules/
 demo-repo/node_modules/
 .shift/
+.bkb/
+.vscode/
+.cursor/
 *.log
 .DS_Store
 scratch/

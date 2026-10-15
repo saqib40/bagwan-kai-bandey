@@ -14,13 +14,18 @@ import { startMcpServer } from '../src/mcp/server';
 import { adapterRegistry } from '../src/adapters/registry';
 import { loadConfig } from '../src/engine/config';
 import { validatePack, loadPack } from '../src/engine/packLoader';
+import { runDiagnostics, formatDoctorReport } from '../src/cli/doctor';
+import { installMcpConfig, formatMcpInstallReport, type McpTarget } from '../src/cli/mcpInstaller';
+import { runInteractiveInit } from '../src/cli/wizard';
 
 function printHelp() {
   console.error(`
 Bagwan Kai Bandey (bkb): Graph-Governed Codebase Migration Engine (Powered by FalkorDB)
 
 Usage:
-  bkb init --repo <path> --pack <id> [--reset] [--adapter <path>]
+  bkb doctor [--repo <path>]
+  bkb mcp install [cursor|claude|vscode|windsurf|all]
+  bkb init [--interactive] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]
   bkb claim --repo <path> --pack <id>
   bkb slice --repo <path> --pack <id> --module <path> --phase <MIGRATE|SHIM|DE_SHIM>
   bkb blast-radius --repo <path> --pack <id> --module <path>
@@ -33,7 +38,9 @@ Usage:
   bkb --help
 
 Commands:
-  init           Initialize the migration graph in FalkorDB for a repo and pack
+  doctor         Run pre-flight environment diagnostics (Node, Docker, FalkorDB, Git)
+  mcp install    1-Click install BKB MCP server config into Cursor, Claude, or VS Code
+  init           Initialize the migration graph in FalkorDB (interactive wizard if -i)
   claim          Claim the next unblocked leaf / SCC for migration
   slice          Get the migration slice (source, 1-hop context) for claimed modules
   blast-radius   Simulate the blast radius of changing a module
@@ -46,6 +53,7 @@ Commands:
   --help         Show this help message
 
 Options:
+  --interactive, -i  Run interactive setup wizard for bkb init
   --repo <path>      Path to target repository (default: ./demo-repo)
   --pack <id>        Migration pack id or path (default: express-to-fastify)
   --adapter <path>   Path to custom Language Adapter (.ts / .js) to inject
@@ -67,6 +75,8 @@ function parseArgs(args: string[]) {
     const arg = args[i];
     if (arg === '--help' || arg === '-h') {
       flags.help = true;
+    } else if (arg === '--interactive' || arg === '-i') {
+      flags.interactive = true;
     } else if (arg === '--reset' || arg === '--checkpoint') {
       flags[arg.slice(2)] = true;
     } else if (arg.startsWith('--')) {
@@ -243,23 +253,59 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     process.exit(0);
   }
 
-  // Ensure FalkorDB container is up and healthy for graph operations
-  try {
-    await ensureFalkorDB();
-  } catch (err) {
-    console.error('[bkb] Fatal: FalkorDB bootstrap failed:', err instanceof Error ? err.message : String(err));
+  // Doctor diagnostics command (does not require FalkorDB to be running)
+  if (command === 'doctor') {
+    const repoPath = flags.repo ? resolve(String(flags.repo)) : process.cwd();
+    const report = await runDiagnostics(repoPath);
+    console.error(formatDoctorReport(report));
+    process.exit(report.ok ? 0 : 1);
+  }
+
+  // 1-Click MCP installer command (does not require FalkorDB)
+  if (command === 'mcp') {
+    if (subCommand === 'install' || !subCommand) {
+      const target = (positional[2] ?? flags.target ?? 'all') as McpTarget;
+      const repo = flags.repo ? String(flags.repo) : undefined;
+      const pack = flags.pack ? String(flags.pack) : undefined;
+      const results = await installMcpConfig(target, { repoPath: repo, packId: pack });
+      console.error(formatMcpInstallReport(results));
+      const hasSuccess = results.some((r) => r.status === 'created' || r.status === 'updated' || r.status === 'already_configured');
+      process.exit(hasSuccess ? 0 : 1);
+    }
+    console.error(`[bkb] Unknown mcp subcommand "${subCommand}". Usage: bkb mcp install [cursor|claude|vscode|windsurf|all]`);
     process.exit(1);
   }
 
   if (command === 'init') {
-    const repoPath = resolve(String(flags.repo ?? './demo-repo'));
-    const packId = String(flags.pack ?? 'express-to-fastify');
-    const reset = Boolean(flags.reset ?? true);
+    let repoPath = flags.repo ? String(flags.repo) : undefined;
+    let packId = flags.pack ? String(flags.pack) : undefined;
+    let reset = flags.reset !== undefined ? Boolean(flags.reset) : undefined;
 
-    console.error(`[bkb] Initializing migration graph for "${repoPath}" with pack "${packId}" (reset=${reset})...`);
+    if (flags.interactive || (!flags.repo && !flags.pack && process.stdin.isTTY && flags.reset === undefined)) {
+      const wizardRes = await runInteractiveInit(repoPath ?? './demo-repo');
+      repoPath = wizardRes.repoPath;
+      packId = wizardRes.packId;
+      reset = wizardRes.reset;
+    } else {
+      repoPath = repoPath ?? './demo-repo';
+      packId = packId ?? 'express-to-fastify';
+      reset = reset ?? true;
+    }
+
+    const absRepoPath = resolve(repoPath);
+
+    // Ensure FalkorDB container is up and healthy
+    try {
+      await ensureFalkorDB();
+    } catch (err) {
+      console.error('[bkb] Fatal: FalkorDB bootstrap failed:', err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+
+    console.error(`[bkb] Initializing migration graph for "${absRepoPath}" with pack "${packId}" (reset=${reset})...`);
     try {
       const summary = await MigrationGraphManager.initMigrationGraph({
-        repoPath,
+        repoPath: absRepoPath,
         packId,
         reset,
       });
@@ -278,6 +324,14 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       console.error('[bkb] Failed to initialize migration graph:', err);
       process.exit(1);
     }
+  }
+
+  // Ensure FalkorDB container is up and healthy for graph operations
+  try {
+    await ensureFalkorDB();
+  } catch (err) {
+    console.error('[bkb] Fatal: FalkorDB bootstrap failed:', err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
 
   if (command === 'claim') {

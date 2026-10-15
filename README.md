@@ -253,6 +253,16 @@ Whether you are migrating an existing Express repository to Fastify or building 
 
 ---
 
+### Step 0: Pre-Flight Diagnostics (`bkb doctor`)
+
+Check that your environment (Node runtime, Docker daemon, FalkorDB port `:6379`, git status) is ready with one command:
+```bash
+bkb doctor
+```
+*(BKB automatically evaluates your runtime and prints immediate remediation suggestions if anything is missing).*
+
+---
+
 ### Step 1: Start FalkorDB
 
 BKB requires a running FalkorDB graph instance. Start it via Docker:
@@ -297,7 +307,24 @@ FalkorDB UI:      http://localhost:3000
 
 **Bagwan Kai Bandey** turns any LLM into a graph-governed migration engineer with zero chance of breaking intermediate builds or deadlocking on circular imports.
 
-##### 1. Add BKB to your MCP Client Configuration:
+##### 1. Add BKB to your MCP Client:
+
+**Automatic 1-Click Installation (Recommended):**
+```bash
+# Auto-configure Cursor:
+bkb mcp install cursor
+
+# Auto-configure Claude Desktop:
+bkb mcp install claude
+
+# Auto-configure VS Code (.vscode/mcp.json):
+bkb mcp install vscode
+
+# Or configure all detected editors at once:
+bkb mcp install all
+```
+
+**Or Manual Configuration:**
 
 **For Claude Desktop (`claude_desktop_config.json`):**
 ```json
@@ -440,7 +467,9 @@ bkb init --repo /path/to/python-app --pack flask-to-fastapi --adapter ./adapters
 
 | Command | Arguments / Flags | Description |
 |---|---|---|
-| `bkb init` | `--repo <path> --pack <id> [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
+| `bkb doctor` | `[--repo <path>]` | Evaluates environment health (Node.js, Docker daemon, FalkorDB ports, Git status). |
+| `bkb mcp install` | `[cursor\|claude\|vscode\|windsurf\|all]` | 1-Click registers BKB MCP server into your editor's configuration. |
+| `bkb init` | `[--interactive\|-i] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
 | `bkb claim` | `--repo <path> --pack <id>` | Computes transitive callee graph and claims the next unblocked leaf or circular SCC cluster. |
 | `bkb slice` | `--repo <path> --pack <id> --module <path> --phase <phase>` | Returns 1-hop contextual slice (target files, callee signatures, caller snippets, phase guidance). |
 | `bkb blast-radius` | `--repo <path> --pack <id> --module <path>` | Evaluates reverse multi-hop dependencies (`[:IMPORTS*1..6]`) before editing. |
