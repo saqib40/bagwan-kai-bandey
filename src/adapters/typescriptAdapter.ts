@@ -9,6 +9,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, resolve, relative, normalize } from 'node:path';
 import { createRequire } from 'node:module';
 import { Parser, Language, Query, type Node as TSNode } from 'web-tree-sitter';
+import ts from 'typescript';
 import type {
   LanguageAdapter,
   ParsedModule,
@@ -27,6 +28,32 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
   private tsLang: Language | null = null;
   private tsxLang: Language | null = null;
   private queryCache = new Map<string, Query>();
+  private tsConfigCache = new Map<string, { baseUrl?: string; paths?: Record<string, string[]> }>();
+
+  private getTsConfig(repoRoot: string): { baseUrl?: string; paths?: Record<string, string[]> } {
+    let cached = this.tsConfigCache.get(repoRoot);
+    if (cached) return cached;
+
+    const tsConfigPath = join(repoRoot, 'tsconfig.json');
+    if (existsSync(tsConfigPath)) {
+      try {
+        const text = readFileSync(tsConfigPath, 'utf8');
+        const parsed = ts.parseConfigFileTextToJson(tsConfigPath, text);
+        const opts = parsed.config?.compilerOptions ?? {};
+        cached = {
+          baseUrl: opts.baseUrl,
+          paths: opts.paths,
+        };
+      } catch {
+        cached = {};
+      }
+    } else {
+      cached = {};
+    }
+
+    this.tsConfigCache.set(repoRoot, cached);
+    return cached;
+  }
 
   async init(): Promise<void> {
     if (this.parser && this.tsLang && this.tsxLang) return;
@@ -270,27 +297,73 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
 
     const resolvedSet = new Set<string>();
     const currentDir = dirname(resolve(repoRoot, currentFile));
+    const tsConfig = this.getTsConfig(repoRoot);
+    const baseDir = tsConfig.baseUrl ? resolve(repoRoot, tsConfig.baseUrl) : repoRoot;
 
     for (const spec of rawSpecifiers) {
-      if (!spec.startsWith('./') && !spec.startsWith('../')) continue;
+      const candidateBases: string[] = [];
 
-      const candidateBase = resolve(currentDir, spec);
-      const extensions = ['', '.ts', '.tsx', '.d.ts', '.js', '.mjs', '/index.ts', '/index.tsx', '/index.js'];
-
-      let found = false;
-      for (const ext of extensions) {
-        const full = candidateBase + ext;
-        if (existsSync(full) && statSync(full).isFile()) {
-          const rel = relative(repoRoot, full).split('\\').join('/');
-          resolvedSet.add(rel);
-          found = true;
-          break;
+      if (spec.startsWith('./') || spec.startsWith('../')) {
+        candidateBases.push(resolve(currentDir, spec));
+      } else {
+        // 1. Check tsconfig paths mappings (e.g. @/* or @routes/*)
+        if (tsConfig.paths) {
+          for (const [pattern, targets] of Object.entries(tsConfig.paths)) {
+            if (pattern.endsWith('*')) {
+              const prefix = pattern.slice(0, -1);
+              if (spec.startsWith(prefix)) {
+                const subPath = spec.slice(prefix.length);
+                for (const target of targets) {
+                  const targetPrefix = target.endsWith('*') ? target.slice(0, -1) : target;
+                  candidateBases.push(resolve(baseDir, targetPrefix + subPath));
+                }
+              }
+            } else if (spec === pattern) {
+              for (const target of targets) {
+                candidateBases.push(resolve(baseDir, target));
+              }
+            }
+          }
+        }
+        // 2. Check tsconfig baseUrl resolution
+        if (tsConfig.baseUrl) {
+          candidateBases.push(resolve(baseDir, spec));
         }
       }
 
-      // If file doesn't exist on disk yet (e.g. planned import), normalize with .ts
-      if (!found) {
-        let assumed = relative(repoRoot, candidateBase).split('\\').join('/');
+      if (candidateBases.length === 0) continue;
+
+      const extensions = ['', '.ts', '.tsx', '.d.ts', '.js', '.mjs', '/index.ts', '/index.tsx', '/index.js'];
+      let found = false;
+
+      for (const candidateBase of candidateBases) {
+        const baseWithoutJs = candidateBase.replace(/\.(m|c)?jsx?$/, '');
+        const basesToTry = candidateBase !== baseWithoutJs ? [candidateBase, baseWithoutJs] : [candidateBase];
+
+        for (const base of basesToTry) {
+          for (const ext of extensions) {
+            const full = base + ext;
+            if (existsSync(full) && statSync(full).isFile()) {
+              const rel = relative(repoRoot, full).split('\\').join('/');
+              resolvedSet.add(rel);
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+        if (found) break;
+      }
+
+      // If relative file doesn't exist on disk yet (e.g. planned import), normalize with .ts
+      if (!found && (spec.startsWith('./') || spec.startsWith('../')) && candidateBases[0]) {
+        let assumed = relative(repoRoot, candidateBases[0]).split('\\').join('/');
+        if (assumed.endsWith('.js') || assumed.endsWith('.mjs') || assumed.endsWith('.cjs')) {
+          const assumedTs = assumed.replace(/\.(m|c)?js$/, '.ts');
+          if (existsSync(resolve(repoRoot, assumedTs))) {
+            assumed = assumedTs;
+          }
+        }
         if (!assumed.endsWith('.ts') && !assumed.endsWith('.tsx') && !assumed.endsWith('.js')) {
           assumed += '.ts';
         }

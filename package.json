@@ -29,6 +29,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "falkordb": "^6.0.0",
     "tree-sitter-typescript": "^0.23.2",
+    "typescript": "^5.7.2",
     "web-tree-sitter": "^0.25.0",
     "zod": "^3.23.8"
   },

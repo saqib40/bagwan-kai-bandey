@@ -66,3 +66,27 @@ test('TypeScriptAdapter resolves app.ts imports to routes', async () => {
   assert.ok(parsed.imports.includes('src/routes/users.ts'));
   assert.ok(parsed.imports.includes('src/routes/orders.ts'));
 });
+
+test('TypeScriptAdapter resolves ESM .js imports to existing .ts files', async () => {
+  const adapter = new TypeScriptAdapter();
+  await adapter.init();
+  // Simulate an ESM source file importing a relative module with .js extension
+  const source = `import { sendSuccess } from "./response.js";\nimport { hashPassword } from "./hash.js";`;
+  const parsed = await adapter.parseModule(repoRoot, 'src/utils/testModule.ts', source, pack);
+
+  assert.ok(parsed.imports.includes('src/utils/response.ts'));
+  assert.ok(parsed.imports.includes('src/utils/hash.ts'));
+});
+
+test('TypeScriptAdapter resolves path aliases and baseUrl from tsconfig.json', async () => {
+  const adapter = new TypeScriptAdapter();
+  await adapter.init();
+  const realStarterRepo = resolve(import.meta.dirname, '../scratch/test-repos/typescript-express-starter/templates/default');
+  const parsed = await adapter.parseModule(realStarterRepo, 'src/server.ts', undefined, pack);
+
+  assert.ok(parsed.imports.includes('src/app.ts'));
+  assert.ok(parsed.imports.includes('src/routes/auth.route.ts'));
+  assert.ok(parsed.imports.includes('src/routes/users.route.ts'));
+  assert.ok(parsed.imports.includes('src/utils/logger.ts'));
+});
+
