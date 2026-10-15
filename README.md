@@ -24,19 +24,29 @@ Standard AI coding agents attempting framework migrations (e.g., Express $\right
 
 ## ⚡ 3-Minute Quickstart
 
-### Step 0: Pre-Flight Check (`bkb doctor`)
+### Step 1: Install & Link CLI
+Clone the repository, install dependencies, and register the `bkb` CLI command globally:
+```bash
+git clone https://github.com/saqib40/bagwan-kai-bandey.git
+cd bagwan-kai-bandey
+npm install
+npm link
+```
+> **Tip:** If you prefer not to link globally, you can prefix any command with `npm run bkb --` (e.g. `npm run bkb -- doctor`).
+
+### Step 2: Pre-Flight Check (`bkb doctor`)
 Verify that Node.js, Docker, FalkorDB port `:6379`, and git are ready:
 ```bash
 bkb doctor
 ```
 
-### Step 1: Start FalkorDB
+### Step 3: Start FalkorDB
 ```bash
 docker run -p 6379:6379 -p 3000:3000 -d --name falkordb-bkb-engine falkordb/falkordb:latest
 ```
 *(BKB will also auto-start this container if Docker is running).*
 
-### Step 2: Initialize Your Target Codebase
+### Step 4: Initialize Your Target Codebase
 Ingest your repository, compute circular dependencies, and snapshot route invariants:
 ```bash
 bkb init --repo /path/to/your-repo --pack express-to-fastify

@@ -25,8 +25,10 @@ npm install
 # 3. Start FalkorDB
 docker run -p 6379:6379 -p 3000:3000 -d --name falkordb-bkb-engine falkordb/falkordb:latest
 
-# 4. Optional: Link CLI globally for convenient local testing
+# 4. Link CLI globally for direct `bkb` command usage
 npm link
+
+# (Or run locally without global linking: `npm run bkb -- <command>`)
 ```
 
 ---
