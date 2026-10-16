@@ -89,14 +89,15 @@ WITH m ORDER BY m.scc_size ASC, m.pagerank DESC, m.path ASC LIMIT 1
 MATCH (peer:Module)
 WHERE peer.scc_id = m.scc_id
 WITH m.scc_id AS sccId, collect(peer) AS clusterNodes
-FOREACH (n IN [x IN clusterNodes WHERE x.status = 'PENDING'] | SET n.status = 'IN_PROGRESS')
-WITH sccId, clusterNodes
 UNWIND clusterNodes AS node
 OPTIONAL MATCH (caller:Module)-[:IMPORTS]->(node)
 WHERE caller.scc_id <> sccId AND caller.status IN $legacyCallers
 WITH sccId, clusterNodes, collect(DISTINCT node.path) AS allClusterPaths, collect(DISTINCT caller.path) AS pendingCallerPaths
+WITH sccId, clusterNodes, allClusterPaths, pendingCallerPaths,
+     CASE WHEN size(pendingCallerPaths) > 0 THEN 'SHIM' ELSE 'MIGRATE' END AS phase
+FOREACH (n IN [x IN clusterNodes WHERE x.status = 'PENDING'] | SET n.status = 'IN_PROGRESS', n.claimed_phase = phase)
 RETURN
-  CASE WHEN size(pendingCallerPaths) > 0 THEN 'SHIM' ELSE 'MIGRATE' END AS phase,
+  phase,
   sccId,
   allClusterPaths,
   [x IN clusterNodes WHERE x.status = 'IN_PROGRESS' | x.path] AS targetPaths,

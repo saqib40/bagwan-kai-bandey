@@ -147,10 +147,18 @@ export class MigrationOps {
     const allClusterPaths: string[] = Array.isArray(c.allClusterPaths) ? c.allClusterPaths : [];
     const pendingCallerPaths: string[] = Array.isArray(c.pendingCallerPaths) ? c.pendingCallerPaths : [];
 
-    // Persist claimed_phase on target modules
+    // Persist claimed_phase on target modules as fallback safeguard
     if (targetPaths.length) {
       await this.db.query(Q.SET_CLAIMED_PHASE, { paths: targetPaths, phase });
     }
+
+    broadcastLiveEvent({
+      type: 'claim',
+      repoPath: this.repoPath,
+      packId: this.pack.id,
+      targetPaths,
+      phase,
+    });
 
     // Build human-readable proof via shortestPath
     const proof = await this.buildProof(targetPaths, phase);
