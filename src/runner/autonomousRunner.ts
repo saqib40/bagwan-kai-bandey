@@ -13,7 +13,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { FalkorClient } from '../engine/falkorClient';
-import { MigrationGraphManager } from '../engine/graphManager';
+import { MigrationGraphManager, getGraphNameForRepo } from '../engine/graphManager';
 import { MigrationOps } from '../engine/operations';
 import { LlmClient, type LlmClientOptions } from './llmClient';
 import { saveCheckpoint, rollbackToCheckpoint } from './rollback';
@@ -49,7 +49,7 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
   const startTime = Date.now();
   const repoPath = resolve(options.repoPath);
   const packId = options.packId ?? 'express-to-fastify';
-  const graphName = options.graphName ?? process.env.BKB_GRAPH ?? 'bkb';
+  const graphName = options.graphName ?? getGraphNameForRepo(repoPath);
   const maxSteps = options.maxSteps ?? 50;
   const autoRollback = options.autoRollbackOnFailure ?? true;
 
