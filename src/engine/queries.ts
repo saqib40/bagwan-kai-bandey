@@ -31,7 +31,7 @@ RETURN node.path AS path, score ORDER BY score DESC`;
 /** §5.2 Shortest dependency path (FalkorDB native; must live in WITH/RETURN). */
 export const SHORTEST_PATH = `
 MATCH (caller:Module {path: $callerPath}), (callee:Module {path: $calleePath})
-WITH shortestPath((caller)-[:IMPORTS*1..50]->(callee)) AS p
+WITH shortestPath((caller)-[:IMPORTS*1..15]->(callee)) AS p
 WHERE p IS NOT NULL
 RETURN [n IN nodes(p) | n.path] AS dependencyChain`;
 
@@ -80,7 +80,7 @@ RETURN
 /** §6.1 Pass B — Unblocked leaf / atomic SCC claim. */
 export const CLAIM_LEAF = `
 MATCH (m:Module {status: 'PENDING'})
-OPTIONAL MATCH (m)-[:IMPORTS*1..50]->(blocker:Module)
+OPTIONAL MATCH (m)-[:IMPORTS*1..15]->(blocker:Module)
 WHERE blocker.scc_id <> m.scc_id
   AND blocker.status IN $blocking
 WITH m, count(DISTINCT blocker) AS blockerCount
@@ -142,7 +142,7 @@ RETURN count(DISTINCT caller) AS pendingCallers, collect(DISTINCT caller.path) A
 /** §8.4 Multi-hop blast radius. */
 export const BLAST_RADIUS = `
 MATCH (m:Module {path: $modulePath})
-MATCH p = (m)<-[:IMPORTS*1..15]-(caller:Module)
+MATCH p = (m)<-[:IMPORTS*1..10]-(caller:Module)
 WITH m, caller, min(length(p)) AS hops
 RETURN caller.path AS path, caller.status AS status, hops, caller.pagerank AS pagerank, m.pagerank AS targetPagerank
 ORDER BY hops ASC, path ASC`;
