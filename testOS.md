@@ -397,14 +397,14 @@ Use this tracking scorecard to record results as each candidate repository is te
 
 | Target Repository | Migration Pack | Phase 0: Pack Adapted? | Phase 1: Ingestion & AST | Phase 2: Claim Schedule | Phase 3: Migration Loop | Phase 4: Snapshot Parity | Final Test Suite | Notes / Observations |
 |---|---|---|---|---|---|---|---|---|
-| `node-express-realworld` | `express-to-fastify` | Pending | Pending | Pending | Pending | Pending | Pending | Primary REST API |
-| `TypeScript-Node-Starter` | `express-to-fastify` | Pending | Pending | Pending | Pending | Pending | Pending | Secondary (Archived / Ingestion focus) |
-| `flask-realworld` | `flask-to-fastapi` | Pending | Pending | Pending | Pending | Pending | Pending | Primary REST API |
-| `flaskr` (Pallets) | `flask-to-fastapi` | Pending | Pending | Pending | Pending | Pending | Pending | Secondary (Jinja / Ingestion smoke only) |
+| `node-express-realworld` | `express-to-fastify` (adapted) | ✅ Adapted | ✅ 13 mod · 18 routes · 13 SCCs | ✅ 1st claim `routes/api/articles.js` | ✅ Bounded 1/7 → SHIMMED (`--provider opencode`, `--max-steps 1`) | ✅ 100% route parity | ✅ newman 241/241 assertions | Primary REST API; pinned pre-rewrite `ba04b70`; Node 18 + Mongo 3.4 |
+| `TypeScript-Node-Starter` | `express-to-fastify` | ✅ `dump-routes.mjs` | ✅ 8 mod (6 pending) · 21 routes · 14 SCCs | ✅ 1st claim `src/config/passport.ts` | — env-blocked | — | ⚠️ Baseline blocked (jest 19 / ts-jest 19 vs Node ≥18) | Fork `nodejsapps` @ `a9664be` (upstream 404); ingestion focus |
+| `flask-realworld` | `flask-to-fastapi` | ✅ `dump_routes.py` | ✅ 23 mod (5 pending) · 19 routes · 20 SCCs | ✅ 1st claim `conduit/exceptions.py` (+advisory detector warns) | — env-blocked | — | ⚠️ Blocked (SQLAlchemy 1.1.9 vs Python 3.12) | Primary REST API; 2017 deps (`collections.MutableMapping`, `inspect.formatargspec`) |
+| `flaskr` (Pallets) | `flask-to-fastapi` | ✅ `dump_routes.py` | ✅ 5 mod (4 pending) · 12 routes · 5 SCCs | ✅ 1st claim `flaskr/db.py` | — ingestion-only | — | — | Jinja/form app; blueprint-prefix snapshot |
 | `node-glob@v7` | `cjs-to-esm` (adapted) | ✅ Adapted | ✅ 3 mod, 2 SCCs | ⚠️ 1st claim only | — | — | — | Real `glob.js:51` ⇄ `sync.js:7` cycle verified; full schedule needs mocks |
 | `is-plain-obj@v2` | `cjs-to-esm` (adapted) | ✅ Adapted | ✅ 1 mod | ⚠️ needs mocks | ✅ Mock run completed | ✅ Export surface 1:1 | ✅ `node --check` + smoke | CJS confirmed; add `"type":"module"` post-step |
-| `node-express-boilerplate` | `jest-to-vitest` | Pending | Pending | Pending | Pending | Pending | Pending | `.js` tests; needs `tests/**/*.js` glob |
-| `TypeScript-Node-Starter (test/)` | `jest-to-vitest` | Pending | Pending | Pending | Pending | Pending | Pending | TypeScript Jest types (`MockInstance`); globs match |
+| `node-express-boilerplate` | `jest-to-vitest` (adapted) | ✅ Adapted | ✅ 10 mod (2 pending) · 24 SCCs | ✅ 1st claim `tests/integration/auth.test.js` (14 legacy) | — not attempted (CJS `require()` vs Vitest ESM) | — | ✅ Baseline jest 7 suites / 113 tests | `.js` tests; glob `tests/**/*.js`, `node --check` gate, runner scripts |
+| `TypeScript-Node-Starter (test/)` | `jest-to-vitest` | ✅ scripts copied | ✅ 5 mod · 0 pending | ✅ 1-step no-op (0 modules) | — n/a (no `jest.*` usage) | — | ⚠️ checkpoint "Failed" (jest 19 unrunnable) | Tests use `supertest` only; nothing to migrate |
 
 **Legend:** ✅ pass · ⚠️ partial (see Notes) · — not run · `Pending` not started.
 Repo-local adapted packs live under `scratch/<repo>/oss-cjs-esm-pack.json` (Phase 0) and are not committed (`scratch/` is gitignored).

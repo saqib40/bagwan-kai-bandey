@@ -14,7 +14,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { FalkorClient } from '../engine/falkorClient';
 import { MigrationGraphManager, getGraphNameForRepo } from '../engine/graphManager';
-import { MigrationOps } from '../engine/operations';
+import { MigrationOps, type VerifyResult } from '../engine/operations';
 import { LlmClient, type LlmClientOptions } from './llmClient';
 import { saveCheckpoint, rollbackToCheckpoint } from './rollback';
 
@@ -121,28 +121,43 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
       // 3. Obtain 1-hop migration slice
       const slice = await ops.getMigrationSlice(claim.targetPaths, claim.phase);
 
-      // 4. Generate transform and write to disk
+      // 4. Generate transform and write to disk. A provider-level failure (e.g.
+      // a subprocess timeout) must not abort the whole run: treat it as a step
+      // failure so the self-healing pass below can retry, then roll back.
       let lastSummary = `Step ${stepCount} automated migration`;
-      for (const targetMod of slice.targetModules) {
+      let generationError: string | undefined;
+      try {
+        for (const targetMod of slice.targetModules) {
+          options.onProgress?.({
+            step: stepCount,
+            phase: claim.phase,
+            modules: [targetMod.path],
+            action: `Generating code transform for ${targetMod.path}...`,
+            status: 'in_progress',
+          });
+
+          const resp = await llm.generateTransform({
+            targetPath: targetMod.path,
+            phase: claim.phase,
+            fullSource: targetMod.fullSource,
+            guidance: slice.guidance,
+            calleeSignatures: slice.calleeSignatures,
+            callerSnippets: slice.callerSnippets,
+          });
+
+          writeFileSync(resolve(repoPath, targetMod.path), resp.code, 'utf8');
+          lastSummary = resp.summary;
+        }
+      } catch (err) {
+        generationError = err instanceof Error ? err.message : String(err);
         options.onProgress?.({
           step: stepCount,
           phase: claim.phase,
-          modules: [targetMod.path],
-          action: `Generating code transform for ${targetMod.path}...`,
-          status: 'in_progress',
+          modules: claim.targetPaths,
+          action: `LLM generation failed: ${generationError}`,
+          status: 'error',
+          details: generationError,
         });
-
-        const resp = await llm.generateTransform({
-          targetPath: targetMod.path,
-          phase: claim.phase,
-          fullSource: targetMod.fullSource,
-          guidance: slice.guidance,
-          calleeSignatures: slice.calleeSignatures,
-          callerSnippets: slice.callerSnippets,
-        });
-
-        writeFileSync(resolve(repoPath, targetMod.path), resp.code, 'utf8');
-        lastSummary = resp.summary;
       }
 
       // 5. Gate check and commit node in FalkorDB
@@ -154,7 +169,15 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
         status: 'in_progress',
       });
 
-      let verifyRes = await ops.verifyAndCommitNode(claim.targetPaths, lastSummary);
+      let verifyRes: VerifyResult = generationError
+        ? {
+            ok: false,
+            newStatus: 'PENDING',
+            errors: [`LLM generation error: ${generationError}`],
+            step: stepCount,
+            checkpointTriggered: false,
+          }
+        : await ops.verifyAndCommitNode(claim.targetPaths, lastSummary);
 
       // Self-healing attempt if verification failed
       if (!verifyRes.ok && verifyRes.errors.length) {
@@ -167,20 +190,31 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
           details: verifyRes.errors.join('\n'),
         });
 
-        for (const targetMod of slice.targetModules) {
-          const healedResp = await llm.generateTransform({
-            targetPath: targetMod.path,
-            phase: claim.phase,
-            fullSource: targetMod.fullSource,
-            guidance: slice.guidance,
-            calleeSignatures: slice.calleeSignatures,
-            callerSnippets: slice.callerSnippets,
-            previousErrors: verifyRes.errors,
-          });
-          writeFileSync(resolve(repoPath, targetMod.path), healedResp.code, 'utf8');
+        let healError: string | undefined;
+        try {
+          for (const targetMod of slice.targetModules) {
+            const healedResp = await llm.generateTransform({
+              targetPath: targetMod.path,
+              phase: claim.phase,
+              fullSource: targetMod.fullSource,
+              guidance: slice.guidance,
+              calleeSignatures: slice.calleeSignatures,
+              callerSnippets: slice.callerSnippets,
+              previousErrors: verifyRes.errors,
+            });
+            writeFileSync(resolve(repoPath, targetMod.path), healedResp.code, 'utf8');
+          }
+        } catch (err) {
+          healError = err instanceof Error ? err.message : String(err);
+          verifyRes = {
+            ...verifyRes,
+            errors: [...verifyRes.errors, `Self-heal generation error: ${healError}`],
+          };
         }
 
-        verifyRes = await ops.verifyAndCommitNode(claim.targetPaths, `${lastSummary} (self-healed)`);
+        if (!healError) {
+          verifyRes = await ops.verifyAndCommitNode(claim.targetPaths, `${lastSummary} (self-healed)`);
+        }
       }
 
       if (!verifyRes.ok) {

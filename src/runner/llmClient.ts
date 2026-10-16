@@ -30,8 +30,8 @@ const OPENCODE_ISOLATION_CONFIG = JSON.stringify({
   permission: { '*': 'deny', read: 'allow' },
 });
 
-/** Default subprocess timeout for the `opencode` provider (3 minutes). */
-const DEFAULT_OPENCODE_TIMEOUT_MS = 180_000;
+/** Default subprocess timeout for the `opencode` provider (5 minutes). */
+const DEFAULT_OPENCODE_TIMEOUT_MS = 300_000;
 
 /**
  * Namespaces a bare model id with the `opencode/` provider prefix (e.g.
@@ -79,7 +79,7 @@ export interface LlmClientOptions {
   mockTransforms?: Record<string, LlmResponse>;
   /** SHIM lifecycle style for prompt guidance. Defaults to `in-file-branch`. */
   shimStrategy?: ShimStrategy;
-  /** Subprocess timeout (ms) for the `opencode` provider. Defaults to 180000. */
+  /** Subprocess timeout (ms) for the `opencode` provider. Defaults to 300000. */
   timeoutMs?: number;
 }
 

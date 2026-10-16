@@ -110,7 +110,7 @@ describe('opencode provider configuration', () => {
   });
 
   it('defaults the subprocess timeout and honors an override', () => {
-    assert.equal(new LlmClient({ provider: 'opencode' }).timeoutMs, 180_000);
+    assert.equal(new LlmClient({ provider: 'opencode' }).timeoutMs, 300_000);
     assert.equal(new LlmClient({ provider: 'opencode', timeoutMs: 5_000 }).timeoutMs, 5_000);
   });
 });
