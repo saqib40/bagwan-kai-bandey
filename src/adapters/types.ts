@@ -165,4 +165,10 @@ export interface LanguageAdapter {
     repoRoot: string,
     sourceGlobs: { include: string[]; exclude?: string[] },
   ): Promise<string[]>;
+  /**
+   * Optional: compile a pack AST query against this language's grammar and
+   * return human-readable syntax errors (empty array when the query is valid).
+   * Used by `bkb pack validate` to catch malformed queries ahead of a run.
+   */
+  validateQuery?(queryString: string): Promise<string[]> | string[];
 }

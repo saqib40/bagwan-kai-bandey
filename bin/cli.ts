@@ -14,6 +14,7 @@ import { startMcpServer } from '../src/mcp/server';
 import { adapterRegistry } from '../src/adapters/registry';
 import { loadConfig, type BkbConfig } from '../src/engine/config';
 import { validatePack, loadPack, registerPackDir } from '../src/engine/packLoader';
+import { validatePackQueries } from '../src/engine/packSemantics';
 import { runDiagnostics, formatDoctorReport } from '../src/cli/doctor';
 import { installMcpConfig, formatMcpInstallReport, type McpTarget } from '../src/cli/mcpInstaller';
 import { runInteractiveInit } from '../src/cli/wizard';
@@ -225,15 +226,23 @@ async function main() {
       try {
         const pack = loadPack(packPath);
         const res = validatePack(pack);
-        if (res.valid) {
-          console.error(`[bkb] ✅ Pack "${pack.id}" is structurally valid and ready for use!`);
+        const queries = res.valid
+          ? await validatePackQueries(pack, adapterRegistry)
+          : { valid: true, errors: [] as string[], warnings: [] as string[] };
+        const errors = [...res.errors, ...queries.errors];
+
+        if (errors.length === 0) {
+          console.error(`[bkb] ✅ Pack "${pack.id}" is valid and ready for use!`);
           console.error(`  - Language:        ${pack.language}`);
           console.error(`  - Detection Rules: ${pack.detectionRules.length}`);
+          console.error(`  - Invariants:      ${pack.invariants?.length ?? 0}`);
           console.error(`  - Verification:    ${pack.verification.perStepTypecheckCmd}`);
+          queries.warnings.forEach((w) => console.error(`  ⚠ ${w}`));
           process.exit(0);
         } else {
-          console.error(`[bkb] ❌ Validation failed with ${res.errors.length} error(s):`);
-          res.errors.forEach((e) => console.error(`  - ${e}`));
+          console.error(`[bkb] ❌ Validation failed with ${errors.length} error(s):`);
+          errors.forEach((e) => console.error(`  - ${e}`));
+          queries.warnings.forEach((w) => console.error(`  ⚠ ${w}`));
           process.exit(1);
         }
       } catch (err: any) {

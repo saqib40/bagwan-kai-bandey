@@ -26,6 +26,12 @@ export {
 } from './engine/packLoader';
 export { validatePackSchema } from './engine/packSchema';
 export {
+  validatePackSemantics,
+  validatePackQueries,
+  type SemanticValidationResult,
+  type QueryValidationResult,
+} from './engine/packSemantics';
+export {
   evaluatePackageDetectors,
   formatPackageDetectorAdvisories,
   type PackageDetectorResult,

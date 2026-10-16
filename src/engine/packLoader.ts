@@ -15,6 +15,7 @@ import { resolve, join, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { MigrationPack } from '../adapters/types';
 import { validatePackSchema } from './packSchema';
+import { validatePackSemantics } from './packSemantics';
 
 /**
  * Type-safe helper to define a Migration Pack in TypeScript or JavaScript.
@@ -68,6 +69,11 @@ export function validatePack(pack: any): { valid: boolean; errors: string[] } {
     if (!pack.verification.checkpointTestCmd) {
       errors.push('Missing `verification.checkpointTestCmd`.');
     }
+  }
+
+  // Semantic validation (engine-enforced rules that are not expressible in JSON-Schema).
+  if (errors.length === 0) {
+    errors.push(...validatePackSemantics(pack).errors);
   }
 
   // Deep JSON-Schema validation (enums, nested required fields, additionalProperties).

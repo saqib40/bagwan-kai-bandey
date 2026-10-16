@@ -39,6 +39,27 @@ export abstract class TreeSitterQueryAdapter extends BaseLanguageAdapter {
   /** Extracts exported/universal symbols from a parsed tree. */
   protected abstract extractExportedSymbols(root: TSNode, modulePath: string): UniversalSymbol[];
 
+  /** Representative file path used to resolve a grammar for query validation. */
+  protected probePath(): string {
+    return 'index.ts';
+  }
+
+  /**
+   * Compiles a single tree-sitter query against a representative grammar for
+   * this adapter and returns human-readable syntax errors (empty when valid).
+   */
+  async validateQuery(queryString: string): Promise<string[]> {
+    await this.init();
+    if (!this.parser) return [`${this.constructor.name} is not initialized.`];
+    try {
+      const lang = this.getLanguageForPath(this.probePath());
+      this.getCompiledQuery(lang, queryString);
+      return [];
+    } catch (err) {
+      return [err instanceof Error ? err.message : String(err)];
+    }
+  }
+
   protected getCompiledQuery(lang: Language, queryString: string): Query {
     const key = `${lang.version}:${queryString}`;
     let q = this.queryCache.get(key);
