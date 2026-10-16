@@ -101,11 +101,13 @@ body {
 
 /* Center Inline Progress */
 .header-progress {
-  flex: 1;
-  max-width: 380px;
+  flex: 1 1 240px;
+  max-width: 360px;
+  min-width: 180px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  overflow: hidden;
 }
 
 .progress-track {
@@ -127,24 +129,37 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   font-size: 0.65rem;
   font-family: var(--font-mono);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .step-badge {
   color: #E2E8F0;
-  font-weight: 500;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .percent-badge {
   color: #818CF8;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .flight-badge {
   color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  text-align: right;
+  flex-shrink: 1;
 }
 
 /* Nav Action Buttons */
@@ -553,18 +568,18 @@ body {
 .sidebar-pane {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Card 1: Active Target & Diff (Takes flexible height) */
+/* Card 1: Active Target & Diff */
 .active-diff-card {
   flex: 1 1 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: 240px;
   overflow: hidden;
 }
 
@@ -573,6 +588,7 @@ body {
   align-items: center;
   gap: 8px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .phase-pill {
@@ -589,6 +605,7 @@ body {
 .phase-shim { background: rgba(139, 92, 246, 0.12); color: #C4B5FD; border: 1px solid rgba(139, 92, 246, 0.3); }
 .phase-migrate { background: rgba(59, 130, 246, 0.12); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.3); }
 .phase-deshim { background: rgba(16, 185, 129, 0.12); color: #6EE7B7; border: 1px solid rgba(16, 185, 129, 0.3); }
+.phase-failed { background: rgba(244, 63, 94, 0.15); color: #FDA4AF; border: 1px solid rgba(244, 63, 94, 0.35); }
 
 .diff-file-badge {
   font-size: 0.65rem;
@@ -597,17 +614,34 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 170px;
 }
 
 .target-meta-box {
-  background: #121622;
+  background: #0E121A;
   border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 0.7rem;
-  color: #FDA4AF;
+  border-radius: 5px;
+  padding: 6px 10px;
   margin-bottom: 6px;
   flex-shrink: 0;
+}
+
+.target-meta-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+
+.meta-item .val {
+  color: #E2E8F0;
+  font-weight: 600;
+}
+
+.meta-item .val.phase-highlight {
+  color: #818CF8;
 }
 
 .diff-tabs-bar {
@@ -657,7 +691,7 @@ body {
   font-family: var(--font-mono);
   font-size: 0.71rem;
   line-height: 1.5;
-  min-height: 120px;
+  min-height: 140px;
 }
 
 .target-empty {
@@ -669,6 +703,141 @@ body {
   font-size: 0.75rem;
   text-align: center;
   padding: 16px;
+}
+
+/* Mission Control Deck for Idle Card 1 */
+.mission-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  justify-content: center;
+  padding: 8px 4px;
+}
+
+.mission-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mission-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(94, 106, 210, 0.12);
+  border: 1px solid rgba(94, 106, 210, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mission-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.01em;
+}
+
+.mission-subtitle {
+  font-size: 0.66rem;
+  font-family: var(--font-mono);
+  color: #94A3B8;
+  margin-top: 1px;
+}
+
+.mission-invariants-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.invariant-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(18, 22, 34, 0.65);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  padding: 6px 10px;
+}
+
+.inv-icon {
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.inv-title {
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+.inv-desc {
+  font-size: 0.63rem;
+  color: #94A3B8;
+}
+
+.mission-status-callout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.67rem;
+  font-family: var(--font-mono);
+  color: #C7D2FE;
+  background: rgba(94, 106, 210, 0.08);
+  border: 1px solid rgba(94, 106, 210, 0.22);
+  border-radius: 5px;
+  padding: 6px 10px;
+}
+
+/* Code Preview Bar & Liners */
+.code-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+}
+
+.code-preview-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-phase-chip {
+  color: #818CF8;
+  font-weight: 600;
+}
+
+.preview-path {
+  color: #F8FAFC;
+}
+
+.preview-lines {
+  color: var(--text-dim);
+}
+
+.preview-note {
+  font-size: 0.64rem;
+  color: #34D399;
+}
+
+.code-linenum {
+  display: inline-block;
+  width: 28px;
+  color: #475569;
+  font-size: 0.65rem;
+  user-select: none;
+}
+
+.code-linetext {
+  color: #E2E8F0;
 }
 
 .diff-line {
@@ -721,9 +890,49 @@ body {
   color: #818CF8;
 }
 
-/* Card 2: Verification Gates & Episode Audit (Compact) */
+/* Gate Failure Box */
+.gate-failure-box {
+  background: rgba(244, 63, 94, 0.06);
+  border: 1px solid rgba(244, 63, 94, 0.28);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.failure-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #FB7185;
+}
+
+.failure-desc {
+  font-size: 0.68rem;
+  color: #FDA4AF;
+  line-height: 1.35;
+}
+
+.failure-code {
+  background: #06070B;
+  border: 1px solid rgba(244, 63, 94, 0.2);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  color: #FECDD3;
+  overflow-x: auto;
+  max-height: 200px;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+/* Card 2: Verification Gates & Episode Audit */
 .verify-audit-card {
-  height: 210px;
+  height: 240px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -736,9 +945,18 @@ body {
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 3px;
+}
+
+.gate-pass {
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
   color: #34D399;
+}
+
+.gate-fail {
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: #FB7185;
 }
 
 /* Inline Gates Strip */
@@ -772,6 +990,9 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.text-emerald { color: #34D399 !important; }
+.text-crimson { color: #FB7185 !important; }
+
 .gate-sep {
   color: var(--border-subtle);
 }
@@ -793,11 +1014,39 @@ body {
   border-radius: 2px;
 }
 
-.audit-empty {
-  font-size: 0.7rem;
-  color: var(--text-dim);
+.audit-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   text-align: center;
-  padding: 14px;
+  padding: 12px 16px;
+  gap: 5px;
+}
+
+.audit-empty-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(94, 106, 210, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.audit-empty-title {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+.audit-empty-desc {
+  font-size: 0.64rem;
+  color: #64748B;
+  max-width: 250px;
+  line-height: 1.35;
 }
 
 .audit-item {
@@ -807,25 +1056,130 @@ body {
   background: #11141E;
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 0.68rem;
+  padding: 5px 8px;
+  font-size: 0.67rem;
   font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.audit-item:hover {
+  background: #171C2B;
+  border-color: rgba(94, 106, 210, 0.35);
+}
+
+.audit-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .audit-step {
   font-weight: 600;
   color: #A5B4FC;
+  flex-shrink: 0;
 }
 
 .audit-phase {
+  font-size: 0.6rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
   color: #CBD5E1;
+  flex-shrink: 0;
+}
+
+.audit-path {
+  color: #E2E8F0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
 }
 
 .audit-status {
   font-weight: 600;
+  font-size: 0.63rem;
+  flex-shrink: 0;
 }
+
 .status-SHIMMED { color: #A78BFA; }
 .status-VERIFIED { color: #34D399; }
+.status-CLEAN { color: #6EE7B7; }
+.status-FAILED { color: #FB7185; }
+.status-PENDING { color: #94A3B8; }
+
+/* ─── Toast Notification System ──────────────────────── */
+
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  background: #0F121C;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 8px 12px;
+  min-width: 250px;
+  max-width: 340px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast-item.toast-leave {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-info { border-left: 3px solid #6366F1; }
+.toast-success { border-left: 3px solid #10B981; }
+.toast-error { border-left: 3px solid #F43F5E; }
+.toast-warn { border-left: 3px solid #F59E0B; }
+
+.toast-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.toast-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.toast-msg {
+  font-size: 0.65rem;
+  color: #94A3B8;
+  line-height: 1.35;
+  word-break: break-word;
+}
 
 /* ─── Production Sign-off & Audit Modal ───────────────── */
 
