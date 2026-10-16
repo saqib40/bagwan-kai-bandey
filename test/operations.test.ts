@@ -218,7 +218,7 @@ describe('MigrationOps.getMigrationSlice', () => {
 describe('MigrationOps.simulateBlastRadius', () => {
   it('returns blast radius entries sorted by hops', async () => {
     const client = createMockClient({
-      'IMPORTS*1..6': [
+      'IMPORTS*': [
         { path: 'src/app.ts', status: 'CLEAN', hops: 2, pagerank: 0.5 },
         { path: 'src/routes/users.ts', status: 'PENDING', hops: 1, pagerank: 0.3 },
       ],
