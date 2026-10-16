@@ -148,6 +148,7 @@ For in-depth architectural details, custom framework extensions, and benchmark r
 | Guide | Description |
 |---|---|
 | 📐 **[Architecture & Universal Laws](docs/architecture.md)** | The 3-Layer engine design, The 5 Universal Laws of Topological Migration, and the FalkorDB openCypher graph schema. |
+| 🗺️ **[Multi-Pack Implementation Plan](docs/implementation-plan.md)** | Technical roadmap and architectural specifications for `cjs-to-esm`, `jest-to-vitest`, and `flask-to-fastapi`. |
 | 🔌 **[Extensibility: Custom Packs & Adapters](docs/extensibility.md)** | How to build custom Migration Packs (`defineMigrationPack`), custom Language Adapters (`BaseLanguageAdapter`), and `bkb.config.ts`. |
 | 🤖 **[MCP Server & AI Agent Guide](docs/mcp-guide.md)** | Detailed reference for the 6 MCP tools, manual JSON-RPC configs, and optimal agent prompts. |
 | 📊 **[Benchmarks & Performance](docs/benchmarks.md)** | 150-Module scale evaluation ($< 25\text{ms}$ SLA) and Naive Grep vs. BKB MCP comparison (81% token reduction). |
