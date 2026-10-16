@@ -16,6 +16,19 @@ export interface UniversalSymbol {
   signature: string;
 }
 
+/** Comment tags treated as a dual-signature shim. Packs and prompts must use one of these. */
+export const ACCEPTED_SHIM_MARKERS = ['@bkb-shim', '@shift-shim'] as const;
+
+export function lineHasShimMarker(line: string, marker?: string): boolean {
+  if (marker) return line.includes(marker);
+  return ACCEPTED_SHIM_MARKERS.some((tag) => line.includes(tag));
+}
+
+/** Human-readable list for agent prompts and verify errors. */
+export function shimMarkerList(): string {
+  return '`// @bkb-shim` or `// @shift-shim`';
+}
+
 export interface APIUsage {
   /** Detection rule ID from Migration Pack */
   ruleId: string;

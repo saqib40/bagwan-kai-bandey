@@ -89,6 +89,8 @@ describe('MigrationOps.claimNextLeaf', () => {
     assert.deepEqual(result!.targetPaths, ['src/utils/hash.ts']);
     assert.equal(result!.pendingCallersCount, 0);
     assert.ok(result!.proof.includes('DE_SHIM'));
+    assert.ok(result!.proof.includes('@bkb-shim'));
+    assert.ok(result!.proof.includes('@shift-shim'));
   });
 
   it('claims a leaf target (Pass B) when no de-shim available', async () => {

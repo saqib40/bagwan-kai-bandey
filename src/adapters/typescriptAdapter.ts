@@ -10,12 +10,13 @@ import { join, dirname, resolve, relative, normalize } from 'node:path';
 import { createRequire } from 'node:module';
 import { Parser, Language, Query, type Node as TSNode } from 'web-tree-sitter';
 import ts from 'typescript';
-import type {
-  LanguageAdapter,
-  ParsedModule,
-  UniversalSymbol,
-  APIUsage,
-  MigrationPack,
+import {
+  lineHasShimMarker,
+  type LanguageAdapter,
+  type ParsedModule,
+  type UniversalSymbol,
+  type APIUsage,
+  type MigrationPack,
 } from './types';
 import { BaseLanguageAdapter } from './baseAdapter';
 
@@ -185,7 +186,7 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
 
             const snippet = lines[startRow]?.trim() ?? '';
             const lineContent = lines[startRow] ?? '';
-            const isShimmed = lineContent.includes('// @bkb-shim') || lineContent.includes('// @shift-shim');
+            const isShimmed = lineHasShimMarker(lineContent);
 
             apiUsages.push({
               ruleId: rule.id,
@@ -241,7 +242,7 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
     // 6. Count shim lines
     let shimLineCount = 0;
     for (const l of lines) {
-      if (l.includes('// @bkb-shim') || l.includes('// @shift-shim')) shimLineCount++;
+      if (lineHasShimMarker(l)) shimLineCount++;
     }
 
     return {

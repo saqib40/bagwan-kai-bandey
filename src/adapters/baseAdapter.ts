@@ -9,7 +9,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve, relative, join } from 'node:path';
-import type { LanguageAdapter, ParsedModule, UniversalSymbol, MigrationPack, APIUsage } from './types';
+import { lineHasShimMarker, type LanguageAdapter, type ParsedModule, type UniversalSymbol, type MigrationPack, type APIUsage } from './types';
 
 export abstract class BaseLanguageAdapter implements LanguageAdapter {
   abstract readonly language: string;
@@ -79,10 +79,7 @@ export abstract class BaseLanguageAdapter implements LanguageAdapter {
    * Counts the lines tagged with the dual-compatibility shim marker (`// @bkb-shim` or `// @shift-shim`).
    */
   protected countShimLines(source: string, marker?: string): number {
-    return source.split('\n').filter((l) => {
-      if (marker) return l.includes(marker);
-      return l.includes('@bkb-shim') || l.includes('@shift-shim');
-    }).length;
+    return source.split('\n').filter((l) => lineHasShimMarker(l, marker)).length;
   }
 
   /**

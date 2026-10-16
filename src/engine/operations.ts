@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 import { FalkorClient } from './falkorClient';
 import { tarjanScc } from './scc';
 import { adapterRegistry } from '../adapters/registry';
-import type { MigrationPack, ParsedModule } from '../adapters/types';
+import { shimMarkerList, type MigrationPack, type ParsedModule } from '../adapters/types';
 import * as Q from './queries';
 
 // ─── Result Types ────────────────────────────────────────
@@ -145,7 +145,7 @@ export class MigrationOps {
       lines.push(
         `All upstream callers have been migrated. pending_callers_count = 0.`,
         `Target module(s): ${targetPaths.join(', ')}`,
-        `Action: Remove all // @bkb-shim lines and legacy fallback branches.`,
+        `Action: Remove all ${shimMarkerList()} lines and legacy fallback branches.`,
       );
       return lines.join('\n');
     }
@@ -421,19 +421,19 @@ export class MigrationOps {
         }
         if (shimmed.length > 0) {
           errors.push(
-            `[Step 3] ${parsed.path}: Has ${shimmed.length} shimmed legacy API usage(s) remaining. Remove all @bkb-shim lines for VERIFIED status.`,
+            `[Step 3] ${parsed.path}: Has ${shimmed.length} shimmed legacy API usage(s) remaining. Remove all ${shimMarkerList()} lines for VERIFIED status.`,
           );
         }
         if (parsed.shimLineCount > 0) {
           errors.push(
-            `[Step 3] ${parsed.path}: ${parsed.shimLineCount} lines still contain // @bkb-shim. Remove all for VERIFIED status.`,
+            `[Step 3] ${parsed.path}: ${parsed.shimLineCount} lines still contain ${shimMarkerList()}. Remove all for VERIFIED status.`,
           );
         }
       } else {
         // SHIMMED gate: 0 unshimmed legacy edges
         if (unshimmed.length > 0) {
           errors.push(
-            `[Step 3] ${parsed.path}: Has ${unshimmed.length} unshimmed legacy API usage(s). For SHIMMED status, all legacy lines must have // @bkb-shim.`,
+            `[Step 3] ${parsed.path}: Has ${unshimmed.length} unshimmed legacy API usage(s). For SHIMMED status, all legacy lines must have ${shimMarkerList()}.`,
           );
         }
       }

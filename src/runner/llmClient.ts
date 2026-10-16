@@ -7,6 +7,8 @@
  *  - 'anthropic': Anthropic messages API (claude-3-5-sonnet, etc.)
  */
 
+import { shimMarkerList } from '../adapters/types';
+
 export interface LlmRequest {
   targetPath: string;
   phase: 'MIGRATE' | 'SHIM' | 'DE_SHIM';
@@ -453,9 +455,9 @@ ${req.previousErrors?.length ? `PREVIOUS COMPILATION / INVARIANT ERRORS (Please 
 
 RULES:
 1. Return ONLY valid, compilable code inside a single \`\`\`typescript ... \`\`\` code block.
-2. In Phase "SHIM": Maintain backward compatibility for callers that still pass Express req/res using \`// @bkb-shim\` tags on legacy lines.
+2. In Phase "SHIM": Maintain backward compatibility for callers that still pass Express req/res using ${shimMarkerList()} tags on legacy lines. Both markers are accepted.
 3. In Phase "MIGRATE": Replace internal legacy API usages with modern target framework equivalents.
-4. In Phase "DE_SHIM": Remove all \`// @bkb-shim\` tags and legacy fallback branches entirely.
+4. In Phase "DE_SHIM": Remove all ${shimMarkerList()} tags and legacy fallback branches entirely.
 5. Invariants: Keep all HTTP route paths, parameter names, and HTTP status codes 100% identical.`;
   }
 
