@@ -19,7 +19,7 @@ Standard AI coding agents attempting framework migrations (e.g., Express $\right
 3. **Premature De-Shimming:** Removing backward compatibility wrappers before all upstream callers have migrated causes cascading type failures.
 4. **Token Exhaustion:** Crawling whole repositories with grep consumes tens of thousands of wasted tokens.
 
-**Bagwan Kai Bandey eliminates these failure modes** by governing migrations with an active FalkorDB knowledge graph. It computes mathematically provable callee-first order, groups cycles into atomic batches, and enforces Strangler Fig shims until all callers are safely migrated.
+**Bagwan Kai Bandey eliminates these failure modes** by governing migrations with an active FalkorDB knowledge graph. It computes topological callee-first order (bounded to 15 transitive dependency hops to guarantee sub-25ms graph SLA without combinatorial path explosion), groups cycles into atomic batches, and enforces Strangler Fig shims until all callers are safely migrated.
 
 ---
 

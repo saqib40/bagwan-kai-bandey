@@ -52,6 +52,7 @@ Standard LLM agents fail on migrations because they edit files arbitrarily or to
 - Codebase dependencies form a Directed Acyclic Graph (DAG) when collapsed into SCCs.
 - Migrating a caller before its callees guarantees broken builds because the caller expects target framework signatures that the callee has not yet implemented.
 - Among eligible leaf candidates, BKB prioritizes modules with the highest **PageRank** (most depended upon foundational helpers), minimizing systemic churn early.
+- **Transitive Depth Bound:** Transitive dependency exploration is bounded to 15 hops (`[:IMPORTS*1..15]`) to guarantee sub-25ms graph query execution without exponential path enumeration on dense diamond topologies. Multi-hop blast radius simulation similarly inspects up to 10 reverse hops. For architectures with linear acyclic call depths exceeding 15 tiers, the hop bound is configurable or can be evaluated via frontier BFS.
 
 ### Law 2: Atomic Cycle Collapse (Tarjan SCC Law)
 > *Circular dependencies ($A \leftrightarrow B$ or $A \rightarrow B \rightarrow C \rightarrow A$) cannot be migrated file-by-file.*
