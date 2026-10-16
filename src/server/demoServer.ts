@@ -552,7 +552,18 @@ function parseJsonBody(req: IncomingMessage): Promise<any> {
   });
 }
 
-export function startDemoServer(port = PORT) {
+export function startDemoServer(
+  port = PORT,
+  initialRepo?: string,
+  initialPackId?: string,
+  autoInit = true,
+) {
+  if (initialRepo) {
+    activeRepo = resolve(initialRepo);
+  }
+  if (initialPackId) {
+    activePackId = initialPackId;
+  }
   const publicDir = resolve(WORKSPACE, 'public');
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -1043,8 +1054,8 @@ export function startDemoServer(port = PORT) {
     console.error(`  URL: http://localhost:${port}`);
     console.error(`======================================================\n`);
 
-    // Ensure initial demo state exists
-    if (!existsSync(DEFAULT_TARGET_REPO)) {
+    // Ensure initial demo state exists only when autoInit is enabled and targeting demo sandbox
+    if (autoInit && activeRepo === DEFAULT_TARGET_REPO && !existsSync(DEFAULT_TARGET_REPO)) {
       await resetDemoState();
     }
   });

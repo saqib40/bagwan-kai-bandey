@@ -458,8 +458,8 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
 
   if (command === 'cockpit' || command === 'ui') {
     const port = Number(flags.port ?? process.env.PORT ?? 4200);
-    const repoPath = resolve(String(flags.repo ?? './demo-repo'));
-    const packId = String(flags.pack ?? 'express-to-fastify');
+    const repoPath = resolve(String(flags.repo ?? activeConfig?.defaultRepo ?? './demo-repo'));
+    const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
     const { startDemoServer } = await import('../src/server/demoServer');
 
     console.error(`
@@ -471,20 +471,20 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
 │  Status:     Listening for CLI & MCP Agent Telemetry (SSE)     │
 ╰─────────────────────────────────────────────────────────────────╯
 `);
-    startDemoServer(port);
+    startDemoServer(port, repoPath, packId);
     return;
   }
 
   if (command === 'serve') {
-    const repo = flags.repo ? String(flags.repo) : undefined;
-    const pack = flags.pack ? String(flags.pack) : undefined;
+    const repo = flags.repo ? String(flags.repo) : activeConfig?.defaultRepo;
+    const pack = flags.pack ? String(flags.pack) : activeConfig?.defaultPack;
     await startMcpServer({ defaultRepoPath: repo, defaultPackId: pack });
     return;
   }
 
   if (command === 'rollback') {
-    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve('./demo-repo');
-    const packId = String(flags.pack ?? 'express-to-fastify');
+    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve(activeConfig?.defaultRepo ?? './demo-repo');
+    const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
 
     if (flags.list) {
       const checkpoints = listCheckpoints(repoPath);
@@ -522,8 +522,8 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
   }
 
   if (command === 'run' || command === 'auto') {
-    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve('./demo-repo');
-    const packId = String(flags.pack ?? 'express-to-fastify');
+    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve(activeConfig?.defaultRepo ?? './demo-repo');
+    const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
     const dryRun = Boolean(flags['dry-run'] || flags.dryRun);
     const provider = dryRun ? 'mock' : ((flags.provider ? String(flags.provider) : undefined) as any);
     const model = flags.model ? String(flags.model) : undefined;

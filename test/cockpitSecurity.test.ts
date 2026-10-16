@@ -29,7 +29,7 @@ describe('Cockpit Security & Origin Containment', () => {
 
   test('HTTP requests with untrusted origin or escaping path are blocked', async () => {
     const port = 4289;
-    const server = startDemoServer(port);
+    const server = startDemoServer(port, undefined, undefined, false);
     await new Promise((r) => setTimeout(r, 100));
 
     try {
