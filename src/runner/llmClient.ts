@@ -7,6 +7,8 @@
  *  - 'anthropic': Anthropic messages API (claude-3-5-sonnet, etc.)
  */
 
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { shimMarkerList } from '../adapters/types';
 
 export interface LlmRequest {
@@ -42,6 +44,28 @@ export interface LlmClientOptions {
   language?: string;
   /** Repository root, used to load fixture-local mock transforms (`.bkb-mocks.json`). */
   repoPath?: string;
+  /** Additional/overriding mock transforms, keyed by `"<targetPath>:<phase>"`. */
+  mockTransforms?: Record<string, LlmResponse>;
+}
+
+/**
+ * Loads fixture-local mock transforms from `<repoPath>/.bkb-mocks.json`.
+ * Returns an empty object when the file is absent or malformed.
+ */
+export function loadFixtureMockTransforms(repoPath?: string): Record<string, LlmResponse> {
+  if (!repoPath) return {};
+  const filePath = resolve(repoPath, '.bkb-mocks.json');
+  if (!existsSync(filePath)) return {};
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, LlmResponse>;
+    }
+    return {};
+  } catch (err) {
+    console.error(`[LlmClient] Failed to parse mock transforms at "${filePath}":`, err);
+    return {};
+  }
 }
 
 /** Returns the markdown code-fence aliases accepted for a given language. */
@@ -100,7 +124,7 @@ export function extractCodeFromMarkdown(raw: string, language = 'typescript'): s
 }
 
 // Built-in verified reference implementations for the Express -> Fastify pack (used by 'mock' provider)
-const MOCK_TRANSFORMS: Record<string, LlmResponse> = {
+export const BUILTIN_MOCK_TRANSFORMS: Record<string, LlmResponse> = {
   'src/utils/response.ts:SHIM': {
     code: `import type { FastifyReply } from 'fastify';
 import type { Response } from 'express'; // @bkb-shim
@@ -429,12 +453,18 @@ export class LlmClient {
   readonly apiKey?: string;
   readonly baseUrl?: string;
   readonly language: string;
+  readonly mockTransforms: Record<string, LlmResponse>;
 
   constructor(options: LlmClientOptions = {}) {
     this.provider = options.provider ?? (process.env.OPENAI_API_KEY ? 'openai' : process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'mock');
     this.apiKey = options.apiKey ?? (this.provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY);
     this.baseUrl = options.baseUrl;
     this.language = options.language ?? 'typescript';
+    this.mockTransforms = {
+      ...BUILTIN_MOCK_TRANSFORMS,
+      ...loadFixtureMockTransforms(options.repoPath),
+      ...(options.mockTransforms ?? {}),
+    };
 
     if (this.provider === 'openai') {
       this.model = options.model ?? 'gpt-4o';
@@ -451,14 +481,14 @@ export class LlmClient {
   async generateTransform(request: LlmRequest): Promise<LlmResponse> {
     if (this.provider === 'mock') {
       const key = `${request.targetPath}:${request.phase}`;
-      let entry = MOCK_TRANSFORMS[key];
+      let entry = this.mockTransforms[key];
       if (!entry) {
         if (request.phase === 'MIGRATE') {
-          entry = MOCK_TRANSFORMS[`${request.targetPath}:DE_SHIM`] ?? MOCK_TRANSFORMS[`${request.targetPath}:SHIM`];
+          entry = this.mockTransforms[`${request.targetPath}:DE_SHIM`] ?? this.mockTransforms[`${request.targetPath}:SHIM`];
         } else if (request.phase === 'SHIM') {
-          entry = MOCK_TRANSFORMS[`${request.targetPath}:MIGRATE`];
+          entry = this.mockTransforms[`${request.targetPath}:MIGRATE`];
         } else if (request.phase === 'DE_SHIM') {
-          entry = MOCK_TRANSFORMS[`${request.targetPath}:MIGRATE`];
+          entry = this.mockTransforms[`${request.targetPath}:MIGRATE`];
         }
       }
       if (entry) {

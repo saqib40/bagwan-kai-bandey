@@ -4,10 +4,15 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   extractCodeFromMarkdown,
   fenceAliasesForLanguage,
   canonicalFenceForLanguage,
+  loadFixtureMockTransforms,
+  LlmClient,
 } from '../src/runner/llmClient';
 
 describe('extractCodeFromMarkdown', () => {
@@ -47,5 +52,45 @@ describe('canonicalFenceForLanguage', () => {
     assert.equal(canonicalFenceForLanguage('python'), 'python');
     assert.equal(canonicalFenceForLanguage('javascript'), 'javascript');
     assert.equal(canonicalFenceForLanguage('typescript'), 'typescript');
+  });
+});
+
+describe('fixture mock transforms', () => {
+  it('loads mock transforms from .bkb-mocks.json', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bkb-mocks-'));
+    try {
+      writeFileSync(
+        join(dir, '.bkb-mocks.json'),
+        JSON.stringify({
+          'src/foo.ts:MIGRATE': { code: 'export const foo = 1;\n', summary: 'fixture' },
+        }),
+      );
+
+      const loaded = loadFixtureMockTransforms(dir);
+      assert.equal(loaded['src/foo.ts:MIGRATE'].code, 'export const foo = 1;\n');
+
+      const client = new LlmClient({ provider: 'mock', repoPath: dir });
+      const resp = await client.generateTransform({
+        targetPath: 'src/foo.ts',
+        phase: 'MIGRATE',
+        fullSource: 'module.exports = 1;\n',
+        guidance: '',
+        calleeSignatures: [],
+        callerSnippets: [],
+      });
+      assert.equal(resp.code, 'export const foo = 1;\n');
+      assert.equal(resp.summary, 'fixture');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns an empty object when no fixture file exists', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bkb-mocks-'));
+    try {
+      assert.deepEqual(loadFixtureMockTransforms(dir), {});
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
