@@ -7,6 +7,9 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FalkorClient } from '../src/engine/falkorClient';
 import type { MigrationPack } from '../src/adapters/types';
 import { MigrationOps } from '../src/engine/operations';
@@ -287,5 +290,36 @@ describe('MigrationOps checkpoint gate', () => {
     const result = await ops.runCheckpointGate();
     assert.equal(result.tscPass, true);
     assert.equal(result.testPass, true);
+  });
+});
+
+describe('MigrationOps.verifyAndCommitNode', () => {
+  it('does not rewrite graph edges when typecheck fails', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'bkb-verify-'));
+    mkdirSync(join(repo, 'src'));
+    writeFileSync(join(repo, 'src', 'ok.ts'), 'export const n = 1;\n');
+    const writes: string[] = [];
+    const client = createMockClient();
+    (client as any).query = async (cypher: string) => {
+      writes.push(cypher);
+      return [];
+    };
+    const pack: MigrationPack = {
+      ...MOCK_PACK,
+      invariants: [],
+      detectionRules: [],
+      verification: { ...MOCK_PACK.verification, perStepTypecheckCmd: 'false' },
+    };
+    const ops = new MigrationOps(client, pack, repo);
+    try {
+      const result = await ops.verifyAndCommitNode(['src/ok.ts'], 'attempt');
+      assert.equal(result.ok, false);
+      assert.equal(
+        writes.some((query) => query.includes('DETACH DELETE') || query.includes('MERGE (a)-[:IMPORTS]')),
+        false,
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

@@ -245,7 +245,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
   // ─── 5. verify_and_commit_node (§8.5) ───────────────────
   server.tool(
     'verify_and_commit_node',
-    'Verify migrated module(s) via the strict 4-step sequence (re-parse, Tarjan SCC, Hard Legacy & Shim gate, route invariant check, tsc --noEmit) and record an audit episode.',
+    'Verify migrated module(s) (re-parse, shim gate, route invariant, tsc --noEmit) and only then update FalkorDB edges, SCC, and the audit episode.',
     {
       modulePaths: z.array(z.string()).describe('Array of relative module paths that were modified'),
       agentSummary: z

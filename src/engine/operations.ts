@@ -356,99 +356,16 @@ export class MigrationOps {
       return this.revertAndReturn(modulePaths, errors, 1);
     }
 
-    // Replace outgoing edges in FalkorDB only after syntax checks pass
-    for (const parsed of parsedModules) {
-      const mp = parsed.path;
-      const setsJson = JSON.stringify(parsed.invariantSets);
-      await this.db.query(Q.REPLACE_OUTGOING, {
-        modulePath: mp,
-        currentSetsJson: setsJson,
-        shimLineCount: parsed.shimLineCount,
-      });
-
-      // Re-insert symbols
-      for (const sym of parsed.symbols) {
-        await this.db.query(
-          `MATCH (m:Module {path: $modulePath})
-           MERGE (s:Symbol {id: $id})
-           SET s.module_path = $modulePath, s.name = $name, s.kind = $kind, s.signature = $signature
-           MERGE (m)-[:DECLARES]->(s)`,
-          {
-            modulePath: mp,
-            id: sym.id,
-            name: sym.name,
-            kind: sym.kind,
-            signature: sym.signature,
-          },
-        );
-      }
-
-      // Re-insert import edges
-      for (const target of parsed.imports) {
-        await this.db.query(
-          `MATCH (a:Module {path: $fromPath}), (b:Module {path: $toPath})
-           MERGE (a)-[:IMPORTS]->(b)`,
-          { fromPath: mp, toPath: target },
-        );
-      }
-
-      // Re-insert USES_API edges
-      for (const usage of parsed.apiUsages) {
-        await this.db.query(
-          `MATCH (m:Module {path: $modulePath}), (api:ExternalAPI {id: $ruleId})
-           MERGE (m)-[r:USES_API {line: $line}]->(api)
-           SET r.snippet = $snippet, r.is_shimmed = $isShimmed`,
-          {
-            modulePath: mp,
-            ruleId: usage.ruleId,
-            line: usage.line,
-            snippet: usage.snippet,
-            isShimmed: usage.isShimmed,
-          },
-        );
-      }
-    }
-
-    // ── Step 2: Recompute Tarjan SCCs across the graph ──
-
-    const edgeRows = await this.db.roQuery<{ from: string; to: string[] }>(Q.ALL_IMPORT_EDGES);
-    const adjacency = new Map<string, string[]>();
-    for (const r of edgeRows) {
-      adjacency.set(r.from, (r.to ?? []).filter(Boolean));
-    }
-
-    const sccResult = tarjanScc(adjacency);
-    const sccBatch = [...sccResult.sccOf.entries()].map(([path, sccId]) => ({
-      path,
-      sccId,
-      sccSize: sccResult.members.get(sccId)!.length,
-    }));
-
-    if (sccBatch.length) {
-      await this.db.query(Q.SET_SCCS, { rows: sccBatch });
-    }
-
-    // ── Step 3: Verify Gate & Mutate Status ──
-
-    // 3a. Recompute pending_callers_count for the target SCC
-    const targetSccRow = await this.db.roQuery<any>(
-      `MATCH (m:Module {path: $path}) RETURN m.scc_id AS sccId`,
-      { path: modulePaths[0] },
-    );
-    const sccId = targetSccRow[0]?.sccId;
-
-    const callerInfo = await this.db.roQuery<any>(Q.SCC_PENDING_CALLERS, {
-      sccId,
-      legacyCallers: [...Q.LEGACY_CALLER_STATUSES],
-    });
-    const pendingCallers = Number(callerInfo[0]?.pendingCallers ?? 0);
-
-    // 3b. Get the claimed phase for this module group
+    // Gates run against an in-memory overlay of the new imports. Edges are
+    // written only after syntax, shim, invariant, and typecheck all pass.
     const phaseRow = await this.db.roQuery<any>(
       `MATCH (m:Module {path: $path}) RETURN m.claimed_phase AS phase`,
       { path: modulePaths[0] },
     );
     const claimedPhase: Phase = (phaseRow[0]?.phase as Phase) ?? 'MIGRATE';
+    const preview = await this.previewPendingCallers(parsedModules, modulePaths);
+    const pendingCallers = preview.pendingCallers;
+    const sccId = preview.sccId;
 
     // 3c. Hard Legacy & Shim Gate
     for (const parsed of parsedModules) {
@@ -516,6 +433,8 @@ export class MigrationOps {
       errors.push(`[Step 3] Typecheck failed:\n${tscResult.output}`);
       return this.revertAndReturn(modulePaths, errors, 3);
     }
+
+    await this.commitParsedModules(parsedModules);
 
     // 3f. Determine new status
     let newStatus: string;
@@ -588,6 +507,102 @@ export class MigrationOps {
       checkpointTriggered,
       checkpointResult,
     };
+  }
+
+  private async previewPendingCallers(
+    parsedModules: ParsedModule[],
+    modulePaths: string[],
+  ): Promise<{ pendingCallers: number; sccId: number }> {
+    const edgeRows = await this.db.roQuery<{ from: string; to: string[] }>(Q.ALL_IMPORT_EDGES);
+    const statusRows = await this.db.roQuery<{ path: string; status: string }>(
+      `MATCH (m:Module) RETURN m.path AS path, m.status AS status`,
+    );
+    const adjacency = new Map<string, string[]>();
+    for (const row of edgeRows) {
+      adjacency.set(row.from, (row.to ?? []).filter(Boolean));
+    }
+    for (const parsed of parsedModules) {
+      adjacency.set(parsed.path, parsed.imports);
+    }
+
+    const sccResult = tarjanScc(adjacency);
+    const sccId = sccResult.sccOf.get(modulePaths[0]) ?? 0;
+    const members = new Set(sccResult.members.get(sccId) ?? modulePaths);
+    const legacy = new Set<string>(Q.LEGACY_CALLER_STATUSES);
+    const statusOf = new Map(statusRows.map((row) => [row.path, row.status]));
+    const callers = new Set<string>();
+    for (const [from, tos] of adjacency) {
+      if (sccResult.sccOf.get(from) === sccId) continue;
+      if (!legacy.has(statusOf.get(from) ?? '')) continue;
+      if (tos.some((to) => members.has(to))) callers.add(from);
+    }
+    return { pendingCallers: callers.size, sccId };
+  }
+
+  private async commitParsedModules(parsedModules: ParsedModule[]): Promise<void> {
+    for (const parsed of parsedModules) {
+      const mp = parsed.path;
+      const setsJson = JSON.stringify(parsed.invariantSets);
+      await this.db.query(Q.REPLACE_OUTGOING, {
+        modulePath: mp,
+        currentSetsJson: setsJson,
+        shimLineCount: parsed.shimLineCount,
+      });
+
+      for (const sym of parsed.symbols) {
+        await this.db.query(
+          `MATCH (m:Module {path: $modulePath})
+           MERGE (s:Symbol {id: $id})
+           SET s.module_path = $modulePath, s.name = $name, s.kind = $kind, s.signature = $signature
+           MERGE (m)-[:DECLARES]->(s)`,
+          {
+            modulePath: mp,
+            id: sym.id,
+            name: sym.name,
+            kind: sym.kind,
+            signature: sym.signature,
+          },
+        );
+      }
+
+      for (const target of parsed.imports) {
+        await this.db.query(
+          `MATCH (a:Module {path: $fromPath}), (b:Module {path: $toPath})
+           MERGE (a)-[:IMPORTS]->(b)`,
+          { fromPath: mp, toPath: target },
+        );
+      }
+
+      for (const usage of parsed.apiUsages) {
+        await this.db.query(
+          `MATCH (m:Module {path: $modulePath}), (api:ExternalAPI {id: $ruleId})
+           MERGE (m)-[r:USES_API {line: $line}]->(api)
+           SET r.snippet = $snippet, r.is_shimmed = $isShimmed`,
+          {
+            modulePath: mp,
+            ruleId: usage.ruleId,
+            line: usage.line,
+            snippet: usage.snippet,
+            isShimmed: usage.isShimmed,
+          },
+        );
+      }
+    }
+
+    const edgeRows = await this.db.roQuery<{ from: string; to: string[] }>(Q.ALL_IMPORT_EDGES);
+    const adjacency = new Map<string, string[]>();
+    for (const row of edgeRows) {
+      adjacency.set(row.from, (row.to ?? []).filter(Boolean));
+    }
+    const sccResult = tarjanScc(adjacency);
+    const sccBatch = [...sccResult.sccOf.entries()].map(([path, id]) => ({
+      path,
+      sccId: id,
+      sccSize: sccResult.members.get(id)!.length,
+    }));
+    if (sccBatch.length) {
+      await this.db.query(Q.SET_SCCS, { rows: sccBatch });
+    }
   }
 
   // ─── Checkpoint Gate (§4.4) ───────────────────────────
