@@ -24,6 +24,7 @@ export {
   loadPack,
   loadPackAsync,
 } from './engine/packLoader';
+export { validatePackSchema } from './engine/packSchema';
 export {
   evaluatePackageDetectors,
   formatPackageDetectorAdvisories,

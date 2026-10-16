@@ -14,6 +14,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { MigrationPack } from '../adapters/types';
+import { validatePackSchema } from './packSchema';
 
 /**
  * Type-safe helper to define a Migration Pack in TypeScript or JavaScript.
@@ -66,6 +67,15 @@ export function validatePack(pack: any): { valid: boolean; errors: string[] } {
     }
     if (!pack.verification.checkpointTestCmd) {
       errors.push('Missing `verification.checkpointTestCmd`.');
+    }
+  }
+
+  // Deep JSON-Schema validation (enums, nested required fields, additionalProperties).
+  // Only run once structural gaps are resolved so users see the friendly errors first.
+  if (errors.length === 0) {
+    const schemaResult = validatePackSchema(pack);
+    if (!schemaResult.valid) {
+      errors.push(...schemaResult.errors.map((e) => `[schema] ${e}`));
     }
   }
 
