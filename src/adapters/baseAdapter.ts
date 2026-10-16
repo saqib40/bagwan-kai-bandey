@@ -41,10 +41,13 @@ export abstract class BaseLanguageAdapter implements LanguageAdapter {
     const results: string[] = [];
     const includeExtensions = this.extractExtensions(sourceGlobs.include);
     const excludePatterns = sourceGlobs.exclude ?? ['**/node_modules/**', '**/dist/**', '**/.git/**'];
+    const PRUNED_DIR_NAMES = new Set(['node_modules', '.git', '.bkb', '.shift', 'dist', 'build', '.next', '.cache', 'coverage']);
 
     const traverse = (dir: string) => {
       const entries = readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
+        if (PRUNED_DIR_NAMES.has(entry.name)) continue;
+
         const fullPath = join(dir, entry.name);
         const relPath = relative(repoRoot, fullPath);
 

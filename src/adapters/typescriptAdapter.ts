@@ -104,14 +104,17 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
 
     const includeRegexes = includes.map(globToRegex);
     const excludeRegexes = excludes.map(globToRegex);
+    const PRUNED_DIR_NAMES = new Set(['node_modules', '.git', '.bkb', '.shift', 'dist', 'build', '.next', '.cache', 'coverage']);
 
     const walk = (dir: string) => {
       if (!existsSync(dir)) return;
       const entries = readdirSync(dir);
       for (const entry of entries) {
+        if (PRUNED_DIR_NAMES.has(entry)) continue;
+
         const full = join(dir, entry);
         const rel = relative(repoRoot, full).split('\\').join('/');
-        const isExcluded = excludeRegexes.some((re) => re.test(rel));
+        const isExcluded = excludeRegexes.some((re) => re.test(rel) || re.test(`${rel}/`));
         if (isExcluded) continue;
 
         const stat = statSync(full);
