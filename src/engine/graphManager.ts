@@ -15,6 +15,7 @@ import { adapterRegistry } from '../adapters/registry';
 import type { MigrationPack, ParsedModule } from '../adapters/types';
 import { broadcastLiveEvent } from './telemetry';
 import { getPackSnapshots, normalizeSnapshotOutput } from './snapshots';
+import { evaluatePackageDetectors, formatPackageDetectorAdvisories } from './packageDetectors';
 import * as Q from './queries';
 
 /**
@@ -70,6 +71,11 @@ export class MigrationGraphManager {
     const pack = loadPack(opts.packId);
     const adapter = adapterRegistry.get(pack.language);
     await adapter.init();
+
+    // Advisory package preconditions (pure; never mutates the graph).
+    for (const line of formatPackageDetectorAdvisories(evaluatePackageDetectors(absRepoPath, pack.packageDetectors))) {
+      console.error(`[bkb] ${line}`);
+    }
 
     const ownClient = !opts.client;
     const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? getGraphNameForRepo(absRepoPath) }));

@@ -25,6 +25,11 @@ export {
   loadPackAsync,
 } from './engine/packLoader';
 export {
+  evaluatePackageDetectors,
+  formatPackageDetectorAdvisories,
+  type PackageDetectorResult,
+} from './engine/packageDetectors';
+export {
   defineConfig,
   loadConfig,
   type BkbConfig,
@@ -41,6 +46,7 @@ export {
   type InvariantRule,
   type VerificationSnapshot,
   type SnapshotKind,
+  type PackageDetector,
   type MigrationPack,
 } from './adapters/types';
 export { BaseLanguageAdapter } from './adapters/baseAdapter';

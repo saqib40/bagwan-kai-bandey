@@ -93,6 +93,30 @@ export interface VerificationSnapshot {
   kind: SnapshotKind;
 }
 
+/**
+ * Declarative precondition check against a project manifest (package.json,
+ * pyproject.toml, requirements.txt, go.mod, ...). Detectors are evaluated
+ * against the target repository before a migration begins and surface
+ * advisories/gating signals. They never mutate the graph.
+ */
+export interface PackageDetector {
+  /** Stable detector id (e.g. `express-project`). */
+  id: string;
+  /** Manifest path relative to the repository root (e.g. `package.json`). */
+  file: string;
+  /** Human-readable description of the precondition. */
+  description?: string;
+  /** When true, an unmet detector is reported as a blocking precondition. Defaults to false (advisory). */
+  required?: boolean;
+  /** Package names expected to be present in the manifest. */
+  match: {
+    /** Names belonging to the legacy ecosystem. */
+    legacy?: string[];
+    /** Names belonging to the target ecosystem. */
+    target?: string[];
+  };
+}
+
 export interface MigrationPack {
   $schema?: string;
   id: string;
@@ -108,6 +132,8 @@ export interface MigrationPack {
     legacy: string[];
     target: string[];
   };
+  /** Optional manifest precondition checks (informational/gating only, no graph mutation). */
+  packageDetectors?: PackageDetector[];
   detectionRules: DetectionRule[];
   agentGuidance: Record<string, string>;
   invariants: InvariantRule[];

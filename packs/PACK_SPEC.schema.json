@@ -49,6 +49,29 @@
         "target": { "type": "array", "items": { "type": "string" } }
       }
     },
+    "packageDetectors": {
+      "type": "array",
+      "description": "Manifest precondition checks evaluated against the target repo. Advisory only; never mutates the graph.",
+      "items": {
+        "type": "object",
+        "required": ["id", "file", "match"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "file": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "required": { "type": "boolean" },
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "legacy": { "type": "array", "items": { "type": "string" } },
+              "target": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
     "detectionRules": {
       "type": "array",
       "minItems": 1,
