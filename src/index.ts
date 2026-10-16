@@ -70,6 +70,7 @@ export { getShimStrategy, DEFAULT_SHIM_STRATEGY, RUNTIME_INTEROP_MARKER } from '
 export { BaseLanguageAdapter } from './adapters/baseAdapter';
 export { TreeSitterQueryAdapter } from './adapters/treeSitterAdapter';
 export { TypeScriptAdapter } from './adapters/typescriptAdapter';
+export { PythonAdapter } from './adapters/pythonAdapter';
 export { adapterRegistry, AdapterRegistry } from './adapters/registry';
 
 // Layer 3: MCP Server

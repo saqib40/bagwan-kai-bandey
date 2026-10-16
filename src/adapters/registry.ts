@@ -10,12 +10,14 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { LanguageAdapter } from './types';
 import { TypeScriptAdapter } from './typescriptAdapter';
+import { PythonAdapter } from './pythonAdapter';
 
 export class AdapterRegistry {
   private adapters = new Map<string, LanguageAdapter>();
 
   constructor() {
     this.register(new TypeScriptAdapter());
+    this.register(new PythonAdapter());
   }
 
   /**

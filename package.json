@@ -59,6 +59,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "ajv": "^8.20.0",
     "falkordb": "^6.0.0",
+    "tree-sitter-python": "^0.25.0",
     "tree-sitter-typescript": "^0.23.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
