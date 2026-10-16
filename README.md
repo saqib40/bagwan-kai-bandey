@@ -1,10 +1,11 @@
 # Bagwan Kai Bandey: Graph-Governed Codebase Migration Engine
 
+[![npm version](https://img.shields.io/npm/v/bagwan-kai-bandey.svg?color=cb3837)](https://www.npmjs.com/package/bagwan-kai-bandey)
 [![Powered by FalkorDB](https://img.shields.io/badge/Powered%20by-FalkorDB-purple.svg)](https://www.falkordb.com/)
 [![Protocol: Model Context Protocol](https://img.shields.io/badge/Protocol-MCP-blue.svg)](https://modelcontextprotocol.io/)
-[![Tests: 34/34 Passing](https://img.shields.io/badge/Tests-34%2F34%20Pass-brightgreen.svg)]()
+[![Tests: 38/38 Passing](https://img.shields.io/badge/Tests-38%2F38%20Pass-brightgreen.svg)]()
 [![Typecheck: Clean](https://img.shields.io/badge/Typecheck-tsc%20green-success.svg)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **Universal laws, pluggable packs.** Bagwan Kai Bandey (BKB) is an autonomous, graph-governed migration engine powered by **FalkorDB** that computes callee-first execution order, collapses circular dependencies into atomic batches via Tarjan's SCC algorithm, enforces dual-signature shims with automatic de-shimming, and verifies edge-level invariants—keeping `tsc` green at every single step, test suites green at every checkpoint, and route surfaces 100% identical.
 
@@ -22,35 +23,39 @@ Standard AI coding agents attempting framework migrations (e.g., Express $\right
 
 ---
 
-## ⚡ 3-Minute Quickstart
+## ⚡ Quickstart
 
-### Step 1: Install Dependencies
-Clone the repository and install dependencies:
+### Option 1: Zero-Install via `npx` (Recommended)
+No installation or cloning required. Run instantly across macOS, Linux, and WSL:
+```bash
+# 1. Check environment health (Node, Docker, FalkorDB, Git)
+npx bagwan-kai-bandey doctor
+
+# 2. 1-Click register MCP tools in your favorite editor/agent
+npx bagwan-kai-bandey mcp install opencode   # or: cursor, claude, vscode, windsurf
+
+# 3. Ingest your codebase into FalkorDB
+npx bagwan-kai-bandey init --repo /path/to/your-repo --pack express-to-fastify
+```
+
+### Option 2: Global CLI (`npm i -g`)
+Install once to have the `bkb` command available globally in your shell:
+```bash
+npm install -g bagwan-kai-bandey
+
+# Verify installation
+bkb doctor
+```
+
+### Option 3: From Source (For Contributors & Local Hacking)
 ```bash
 git clone https://github.com/saqib40/bagwan-kai-bandey.git
 cd bagwan-kai-bandey
 npm install
-```
-
-### Step 2: Running BKB (Choose Your Preferred Approach)
-
-#### Option A: Direct Local Execution (Recommended & Bulletproof)
-No global installs, no symlinks, and works identically across macOS, Linux, and WSL:
-```bash
 ./bin/bkb.js doctor
-# or via npm script:
-npm run bkb -- doctor
 ```
 
-#### Option B: Global System CLI (`npm link`)
-To use `bkb` as a standalone global command from any directory:
-```bash
-npm link
-```
-> **Note for Linux / WSL users:** If `bkb: command not found` appears after `npm link`, npm's global bin directory is not in your `$PATH`. Add it by running:
-> ```bash
-> echo 'export PATH="$(npm config get prefix)/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
-> ```
+---
 
 ### Step 3: Start FalkorDB
 ```bash
@@ -62,6 +67,8 @@ docker run -p 6379:6379 -p 3000:3000 -d --name falkordb-bkb-engine falkordb/falk
 Ingest your repository, compute circular dependencies, and snapshot route invariants:
 ```bash
 bkb init --repo /path/to/your-repo --pack express-to-fastify
+# or via npx:
+npx bagwan-kai-bandey init --repo /path/to/your-repo --pack express-to-fastify
 ```
 
 ---
