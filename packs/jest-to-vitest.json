@@ -1,0 +1,72 @@
+{
+  "$schema": "./PACK_SPEC.schema.json",
+  "id": "jest-to-vitest",
+  "name": "Jest to Vitest Migration Pack",
+  "language": "typescript",
+  "shimStrategy": "in-file-branch",
+  "trustedExecutionNote": "Packs execute shell commands (perStepTypecheckCmd, checkpointTestCmd, snapshot commands). Only load trusted packs.",
+  "knownLimitations": [
+    "Vitest and Jest APIs are largely compatible, but `jest.requireActual`, custom transformers, and Jest-specific `testEnvironment` settings have no direct Vitest equivalent and require manual review.",
+    "Test-count parity is verified by executing the runner-agnostic wrapper; tests skipped via `.skip`/`.todo` are not counted as dropped."
+  ],
+  "sourceGlobs": {
+    "include": ["src/**/*.ts", "test/**/*.ts", "tests/**/*.ts"],
+    "exclude": ["**/*.d.ts", "**/node_modules/**", "**/*.config.ts"]
+  },
+  "packages": {
+    "legacy": ["jest", "ts-jest", "@types/jest"],
+    "target": ["vitest"]
+  },
+  "packageDetectors": [
+    {
+      "id": "jest-project",
+      "file": "package.json",
+      "description": "Confirms the target is a Jest (TypeScript) test project.",
+      "required": false,
+      "match": { "legacy": ["jest", "ts-jest", "@types/jest"] }
+    }
+  ],
+  "detectionRules": [
+    {
+      "id": "jest-calls",
+      "description": "Jest API calls: jest.fn(), jest.mock(), jest.spyOn(), jest.clearAllMocks(), jest.useFakeTimers(), and mock lifecycle helpers.",
+      "astQuery": "(call_expression function: (member_expression object: (identifier) @obj (#eq? @obj \"jest\") property: (property_identifier) @prop (#match? @prop \"^(fn|mock|unmock|spyOn|clearAllMocks|resetAllMocks|restoreAllMocks|useFakeTimers|useRealTimers|mockClear|mockReset|mockRestore|requireActual|requireMock|doMock)$\")))"
+    },
+    {
+      "id": "jest-types",
+      "description": "Jest type references: jest.Mock<...>, jest.SpyInstance<...>, jest.MockedFunction<...>.",
+      "astQuery": "(nested_type_identifier module: (identifier) @obj (#eq? @obj \"jest\") name: (type_identifier) @name (#match? @name \"^(Mock|Mocked|MockedFunction|MockedClass|SpyInstance|MockInstance)$\"))"
+    },
+    {
+      "id": "jest-globals-import",
+      "description": "Explicit import from '@jest/globals'.",
+      "astQuery": "(import_statement source: (string (string_fragment) @pkg (#eq? @pkg \"@jest/globals\")))"
+    }
+  ],
+  "agentGuidance": {
+    "MIGRATE": "Replace Jest APIs with Vitest: `jest.fn()` → `vi.fn()`, `jest.mock(path)` → `vi.mock(path)`, `jest.spyOn` → `vi.spyOn`, `jest.useFakeTimers` → `vi.useFakeTimers`. Add `import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'` when those names are used. Replace `jest.Mock<T>`/`jest.SpyInstance<T>` type annotations with `Mock<T>`/`MockInstance<T>` imported from 'vitest'. Remove any `import { ... } from '@jest/globals'`. Do NOT include any `// @bkb-shim` comments.",
+    "SHIM": "This module (typically a shared test helper or mock factory) has unmigrated upstream callers (`pendingCallersCount > 0`). Export a runner-agnostic accessor: `const getMock = () => (typeof globalThis.vi !== 'undefined' ? globalThis.vi : (globalThis as any).jest); // @bkb-shim`. Tag ONLY the legacy `(globalThis as any).jest` fallback line with `// @bkb-shim` so it can be removed during DE_SHIM.",
+    "DE_SHIM": "All upstream callers are now migrated (`pendingCallersCount == 0`). Replace the runner-agnostic `getMock()` accessor with direct `vi` usage and remove every `(globalThis as any).jest` fallback and `// @bkb-shim` comment so the module depends on Vitest only."
+  },
+  "invariants": [
+    {
+      "id": "test-title-surface-preserved",
+      "scope": "per-step",
+      "type": "extracted-set-equality",
+      "description": "Every test/describe title declared in this file must match baseline_sets so no test cases are dropped during migration.",
+      "astExtractor": "(call_expression function: (identifier) @fn (#match? @fn \"^(test|it|describe)$\") arguments: (arguments . (string (string_fragment) @title)))",
+      "format": "{fn} {title}"
+    }
+  ],
+  "verification": {
+    "perStepTypecheckCmd": "npx tsc --noEmit",
+    "checkpointTestCmd": "node scripts/run-tests.mjs",
+    "snapshots": [
+      {
+        "id": "test-counts",
+        "command": "node scripts/test-counts.mjs",
+        "kind": "count"
+      }
+    ]
+  }
+}
