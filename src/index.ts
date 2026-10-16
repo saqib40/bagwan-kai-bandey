@@ -26,6 +26,15 @@ export {
 } from './engine/packLoader';
 export { validatePackSchema } from './engine/packSchema';
 export {
+  RUNTIME_INTEROP_MIN_NODE,
+  parseNodeVersion,
+  compareVersions,
+  isRuntimeInteropSupported,
+  checkRuntimePreflight,
+  assertRuntimeInteropSupport,
+  type RuntimePreflightResult,
+} from './engine/runtimePreflight';
+export {
   validatePackSemantics,
   validatePackQueries,
   type SemanticValidationResult,

@@ -16,6 +16,7 @@ import type { MigrationPack, ParsedModule } from '../adapters/types';
 import { broadcastLiveEvent } from './telemetry';
 import { getPackSnapshots, normalizeSnapshotOutput } from './snapshots';
 import { evaluatePackageDetectors, formatPackageDetectorAdvisories } from './packageDetectors';
+import { assertRuntimeInteropSupport } from './runtimePreflight';
 import * as Q from './queries';
 
 /**
@@ -69,6 +70,7 @@ export class MigrationGraphManager {
   static async initMigrationGraph(opts: InitGraphOptions): Promise<GraphSummary> {
     const absRepoPath = resolve(opts.repoPath);
     const pack = loadPack(opts.packId);
+    assertRuntimeInteropSupport(pack);
     const adapter = adapterRegistry.get(pack.language);
     await adapter.init();
 
