@@ -1,0 +1,75 @@
+{
+  "$schema": "./PACK_SPEC.schema.json",
+  "id": "flask-to-fastapi",
+  "name": "Flask to FastAPI Migration Pack",
+  "language": "python",
+  "shimStrategy": "in-file-branch",
+  "trustedExecutionNote": "Packs execute shell commands (perStepTypecheckCmd, checkpointTestCmd, snapshot commands). Only load trusted packs.",
+  "knownLimitations": [
+    "Flask's thread-local `request`/`g` have no FastAPI analogue; endpoints must accept explicit `Request`/dependency-injected parameters.",
+    "Non-strict typechecking (`mypy --ignore-missing-imports`) is used because Flask lacks complete type stubs, so some type errors may pass through intermediate steps."
+  ],
+  "sourceGlobs": {
+    "include": ["**/*.py"],
+    "exclude": ["**/__pycache__/**", "**/.venv/**", "**/venv/**", "**/.pytest_cache/**", "**/tests/**"]
+  },
+  "packages": {
+    "legacy": ["flask"],
+    "target": ["fastapi"]
+  },
+  "packageDetectors": [
+    {
+      "id": "flask-project",
+      "file": "requirements.txt",
+      "description": "Confirms the target is a Flask (Python) project.",
+      "required": false,
+      "match": { "legacy": ["flask"] }
+    },
+    {
+      "id": "fastapi-target",
+      "file": "requirements.txt",
+      "description": "Reports whether FastAPI is already declared as a target dependency.",
+      "required": false,
+      "match": { "target": ["fastapi"] }
+    }
+  ],
+  "detectionRules": [
+    {
+      "id": "flask-app",
+      "description": "Flask application instantiation: Flask(__name__).",
+      "astQuery": "(call function: (identifier) @fn (#eq? @fn \"Flask\"))"
+    },
+    {
+      "id": "flask-route",
+      "description": "Flask route decorators: @app.route/@app.get/@app.post/@app.put/@app.delete/@app.patch.",
+      "astQuery": "(decorator (call function: (attribute object: (identifier) @obj attribute: (identifier) @attr (#match? @attr \"^(route|get|post|put|delete|patch)$\"))))"
+    },
+    {
+      "id": "flask-request-global",
+      "description": "Import of the thread-local `request` (or `g`) from flask.",
+      "astQuery": "(import_from_statement module_name: (dotted_name (identifier) @mod) (#eq? @mod \"flask\") name: (dotted_name (identifier) @name) (#match? @name \"^(request|g|session)$\"))"
+    },
+    {
+      "id": "flask-helpers",
+      "description": "Flask response/helper calls: jsonify, abort, render_template, make_response, redirect.",
+      "astQuery": "(call function: (identifier) @fn (#match? @fn \"^(jsonify|abort|render_template|make_response|redirect)$\"))"
+    }
+  ],
+  "agentGuidance": {
+    "MIGRATE": "Convert Flask views to FastAPI. Create the app as `app = FastAPI()`. Replace `@app.route(path, methods=[...])` with explicit method decorators `@app.get(path)` / `@app.post(path)` etc. Make view functions `async def` and accept explicit typed parameters (e.g. `user_id: int`, `request: Request`) instead of the thread-local `flask.request`; read query/body via `request.query_params` / `await request.json()`. Replace `jsonify(x)` with returning `x` (or `JSONResponse`), and `abort(code)` with `raise HTTPException(status_code=code)`. Convert `<int:id>` path params to `{id}`. Do NOT include any `# @bkb-shim` comments.",
+    "SHIM": "This module has unmigrated upstream callers (`pendingCallersCount > 0`) and must remain importable while they still call Flask-style functions. Provide a dual-signature helper: accept either the FastAPI `Request`/dependency object or fall back to the Flask thread-local (`flask.request`), tagged with `# @bkb-shim`. Keep both the legacy Flask route handler and the new FastAPI handler available so partial migrations still import and run. Tag ONLY the legacy Flask fallback lines with `# @bkb-shim`.",
+    "DE_SHIM": "All upstream callers are now migrated (`pendingCallersCount == 0`). Remove every `flask.request`/`g` fallback and every `# @bkb-shim` comment so the module uses pure FastAPI (`Request`, `HTTPException`, typed parameters) throughout."
+  },
+  "invariants": [],
+  "verification": {
+    "perStepTypecheckCmd": "python3 -m mypy --ignore-missing-imports .",
+    "checkpointTestCmd": "python3 -m pytest -q",
+    "snapshots": [
+      {
+        "id": "route-surface",
+        "command": "python3 scripts/dump_routes.py",
+        "kind": "set"
+      }
+    ]
+  }
+}
