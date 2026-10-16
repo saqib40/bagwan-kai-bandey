@@ -256,14 +256,17 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
     'Verify migrated module(s) via the strict 4-step sequence (re-parse, Tarjan SCC, Hard Legacy & Shim gate, route invariant check, tsc --noEmit) and record an audit episode.',
     {
       modulePaths: z.array(z.string()).describe('Array of relative module paths that were modified'),
-      agentSummary: z.string().describe('Summary of the changes made by the agent for the audit trail'),
+      agentSummary: z
+        .string()
+        .optional()
+        .describe('Summary of the changes made by the agent for the audit trail'),
       repoPath: z.string().optional().describe('Target repository path (defaults to initialized repo)'),
       packId: z.string().optional().describe('Pack identifier (defaults to initialized pack)'),
     },
     async ({ modulePaths, agentSummary, repoPath, packId }) => {
       try {
         const ops = await getOps(repoPath, packId);
-        const result = await ops.verifyAndCommitNode(modulePaths, agentSummary);
+        const result = await ops.verifyAndCommitNode(modulePaths, agentSummary ?? '');
 
         return {
           content: [

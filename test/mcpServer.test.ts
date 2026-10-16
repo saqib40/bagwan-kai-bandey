@@ -14,6 +14,29 @@ const repoPath = resolve(import.meta.dirname, '../demo-repo');
 const packId = 'express-to-fastify';
 const testGraphName = 'shift_mcp_test';
 
+test('verify_and_commit_node accepts a call that omits agentSummary', async () => {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createShiftMcpServer({
+    defaultRepoPath: repoPath,
+    defaultPackId: packId,
+    graphName: testGraphName,
+  });
+  await server.connect(serverTransport);
+  const client = new Client({ name: 'test-agent', version: '1.0.0' }, { capabilities: {} });
+  await client.connect(clientTransport);
+
+  try {
+    const { tools } = await client.listTools();
+    const verify = tools.find((t) => t.name === 'verify_and_commit_node');
+    const required = (verify?.inputSchema as { required?: string[] } | undefined)?.required ?? [];
+    assert.ok(required.includes('modulePaths'));
+    assert.equal(required.includes('agentSummary'), false);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
 test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async () => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
