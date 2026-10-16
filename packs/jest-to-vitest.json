@@ -10,7 +10,7 @@
     "Test-count parity is verified by executing the runner-agnostic wrapper; tests skipped via `.skip`/`.todo` are not counted as dropped."
   ],
   "sourceGlobs": {
-    "include": ["src/**/*.ts", "test/**/*.ts", "tests/**/*.ts"],
+    "include": ["test/**/*.ts", "tests/**/*.ts"],
     "exclude": ["**/*.d.ts", "**/node_modules/**", "**/*.config.ts"]
   },
   "packages": {
