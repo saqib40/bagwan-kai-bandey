@@ -1,5 +1,9 @@
 node_modules/
 demo-repo/node_modules/
+demo-repo-flask/.venv/
+.venv/
+__pycache__/
+.pytest_cache/
 .shift/
 .bkb/
 .vscode/

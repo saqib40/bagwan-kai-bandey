@@ -7,6 +7,7 @@
   "trustedExecutionNote": "Packs execute shell commands (perStepTypecheckCmd, checkpointTestCmd, snapshot commands). Only load trusted packs.",
   "knownLimitations": [
     "Flask's thread-local `request`/`g` have no FastAPI analogue; endpoints must accept explicit `Request`/dependency-injected parameters.",
+    "Route detection matches Flask's `@app.route(...)`; the `@app.get`/`@app.post` method shortcuts are indistinguishable from FastAPI's decorators at the AST level and are intentionally excluded so migrated code is not flagged as legacy.",
     "Non-strict typechecking (`mypy --ignore-missing-imports`) is used because Flask lacks complete type stubs, so some type errors may pass through intermediate steps."
   ],
   "sourceGlobs": {
@@ -41,8 +42,8 @@
     },
     {
       "id": "flask-route",
-      "description": "Flask route decorators: @app.route/@app.get/@app.post/@app.put/@app.delete/@app.patch.",
-      "astQuery": "(decorator (call function: (attribute object: (identifier) @obj attribute: (identifier) @attr (#match? @attr \"^(route|get|post|put|delete|patch)$\"))))"
+      "description": "Flask route decorators: @app.route(...) (including method-scoped variants). Deliberately excludes @app.get/@app.post because that AST shape is shared with the FastAPI target and would flag migrated code.",
+      "astQuery": "(decorator (call function: (attribute object: (identifier) @obj attribute: (identifier) @attr (#eq? @attr \"route\"))))"
     },
     {
       "id": "flask-request-global",

@@ -1,0 +1,18 @@
+{
+  "app.py:MIGRATE": {
+    "code": "from fastapi import FastAPI, Request\n\nfrom routes import paths\nfrom services import catalog, orders\nfrom utils.response import bad_request, created, not_found, ok\n\napp = FastAPI()\n\n\n@app.get(paths.HEALTH)\ndef health():\n    return ok({\"status\": \"healthy\"})\n\n\n@app.get(paths.PRODUCTS)\ndef list_products():\n    return ok(catalog.list_products())\n\n\n@app.get(paths.PRODUCTS + \"/{product_id}\")\ndef get_product(product_id: int):\n    product = catalog.get_product(product_id)\n    if product is None:\n        return not_found(\"Product not found\")\n    return ok(product)\n\n\n@app.get(paths.ORDERS)\ndef list_orders(limit: int = 10):\n    return ok(orders.list_orders(limit))\n\n\n@app.post(paths.ORDERS)\nasync def create_order(request: Request):\n    payload = await request.json()\n    if \"product_id\" not in payload:\n        return bad_request(\"product_id is required\")\n    order = orders.create_order(payload[\"product_id\"])\n    return created(order)\n",
+    "summary": "Migrate Flask app to FastAPI"
+  },
+  "utils/response.py:MIGRATE": {
+    "code": "from typing import Any\n\nfrom fastapi.responses import JSONResponse\n\n\ndef ok(data: Any) -> JSONResponse:\n    return JSONResponse({\"ok\": True, \"data\": data})\n\n\ndef created(data: Any) -> JSONResponse:\n    return JSONResponse({\"ok\": True, \"data\": data}, status_code=201)\n\n\ndef bad_request(message: str) -> JSONResponse:\n    return JSONResponse({\"ok\": False, \"error\": message}, status_code=400)\n\n\ndef not_found(message: str) -> JSONResponse:\n    return JSONResponse({\"ok\": False, \"error\": message}, status_code=404)\n",
+    "summary": "Migrate response helpers to FastAPI"
+  },
+  "utils/response.py:SHIM": {
+    "code": "from typing import Any\n\nfrom fastapi.responses import JSONResponse\n\n\ndef ok(data: Any) -> JSONResponse:\n    return JSONResponse({\"ok\": True, \"data\": data})  # @bkb-shim\n\n\ndef created(data: Any) -> JSONResponse:\n    return JSONResponse({\"ok\": True, \"data\": data}, status_code=201)\n\n\ndef bad_request(message: str) -> JSONResponse:\n    return JSONResponse({\"ok\": False, \"error\": message}, status_code=400)\n\n\ndef not_found(message: str) -> JSONResponse:\n    return JSONResponse({\"ok\": False, \"error\": message}, status_code=404)\n",
+    "summary": "Interop shim for response helpers"
+  },
+  "utils/response.py:DE_SHIM": {
+    "code": "from typing import Any\n\nfrom fastapi.responses import JSONResponse\n\n\ndef ok(data: Any) -> JSONResponse:\n    return JSONResponse({\"ok\": True, \"data\": data})\n\n\ndef created(data: Any) -> JSONResponse:\n    return JSONResponse({\"ok\": True, \"data\": data}, status_code=201)\n\n\ndef bad_request(message: str) -> JSONResponse:\n    return JSONResponse({\"ok\": False, \"error\": message}, status_code=400)\n\n\ndef not_found(message: str) -> JSONResponse:\n    return JSONResponse({\"ok\": False, \"error\": message}, status_code=404)\n",
+    "summary": "Drop shim markers from response helpers"
+  }
+}
