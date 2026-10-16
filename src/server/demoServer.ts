@@ -17,8 +17,8 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
-import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { resolve, join, extname, basename, relative, isAbsolute } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, readdirSync, statSync, realpathSync } from 'node:fs';
+import { resolve, join, extname, basename, relative, isAbsolute, dirname } from 'node:path';
 import { ensureFalkorDB } from '../engine/docker';
 import { FalkorClient } from '../engine/falkorClient';
 import { MigrationGraphManager, getGraphNameForRepo as getEngineGraphName } from '../engine/graphManager';
@@ -30,8 +30,51 @@ import * as Q from '../engine/queries';
 export function isPathContained(rootDir: string, targetPath: string): boolean {
   const resolvedRoot = resolve(rootDir);
   const resolvedTarget = resolve(rootDir, targetPath);
+
+  // 1. Lexical containment check
   const rel = relative(resolvedRoot, resolvedTarget);
-  return !rel.startsWith('..') && !isAbsolute(rel);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    return false;
+  }
+
+  // 2. Symlink-aware realpath check
+  try {
+    const rootReal = existsSync(resolvedRoot) ? realpathSync(resolvedRoot) : resolvedRoot;
+    let targetReal: string;
+    if (existsSync(resolvedTarget)) {
+      targetReal = realpathSync(resolvedTarget);
+    } else {
+      let curr = resolvedTarget;
+      const parts: string[] = [];
+      while (curr && !existsSync(curr)) {
+        const parent = dirname(curr);
+        if (parent === curr) break;
+        parts.unshift(basename(curr));
+        curr = parent;
+      }
+      const ancestorReal = existsSync(curr) ? realpathSync(curr) : curr;
+      targetReal = parts.length > 0 ? join(ancestorReal, ...parts) : ancestorReal;
+    }
+
+    const relReal = relative(rootReal, targetReal);
+    if (relReal.startsWith('..') || isAbsolute(relReal)) {
+      // Allow if resolving inside an intentionally symlinked node_modules under rootDir
+      const nodeModulesPath = join(resolvedRoot, 'node_modules');
+      if (existsSync(nodeModulesPath)) {
+        try {
+          const nmReal = realpathSync(nodeModulesPath);
+          const relNm = relative(nmReal, targetReal);
+          if (!relNm.startsWith('..') && !isAbsolute(relNm)) {
+            return true;
+          }
+        } catch {}
+      }
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function isOriginAllowed(origin?: string): boolean {
@@ -49,6 +92,8 @@ const WORKSPACE = resolve(import.meta.dirname, '../..');
 const SOURCE_REPO = resolve(WORKSPACE, 'demo-repo');
 const DEFAULT_TARGET_REPO = resolve(WORKSPACE, 'scratch/cockpit-demo-repo');
 const DEFAULT_PACK_ID = 'express-to-fastify';
+
+export const allowedWorkspaceRoots: string[] = [WORKSPACE, process.cwd()];
 
 export function getGraphNameForRepo(repoPath: string): string {
   if (repoPath === DEFAULT_TARGET_REPO) {
@@ -559,7 +604,17 @@ export function startDemoServer(
   autoInit = true,
 ) {
   if (initialRepo) {
-    activeRepo = resolve(initialRepo);
+    const resolvedInitial = resolve(initialRepo);
+    activeRepo = resolvedInitial;
+    if (!allowedWorkspaceRoots.includes(resolvedInitial)) {
+      allowedWorkspaceRoots.push(resolvedInitial);
+    }
+  }
+  if (process.env.BKB_WORKSPACE_ROOT) {
+    const envRoot = resolve(process.env.BKB_WORKSPACE_ROOT);
+    if (!allowedWorkspaceRoots.includes(envRoot)) {
+      allowedWorkspaceRoots.push(envRoot);
+    }
   }
   if (initialPackId) {
     activePackId = initialPackId;
@@ -703,6 +758,16 @@ export function startDemoServer(
           }
           if (!existsSync(targetPath) || !statSync(targetPath).isDirectory()) {
             sendJson(res, { error: `Invalid repository path: ${body.repoPath}` }, 400);
+            return;
+          }
+          const isContained = allowedWorkspaceRoots.some(
+            (root) => isPathContained(root, targetPath) || resolve(targetPath) === resolve(root),
+          );
+          const isSystemPath =
+            /^\/(etc|usr|bin|sbin|var|dev|proc|sys|System|Library|Windows)($|\/)/i.test(targetPath) ||
+            resolve(targetPath) === resolve('/');
+          if (!isContained || isSystemPath) {
+            sendJson(res, { error: 'Access denied: target repository is not within an allow-listed workspace root' }, 403);
             return;
           }
           activeRepo = targetPath;

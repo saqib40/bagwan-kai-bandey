@@ -1,6 +1,8 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { isPathContained, isOriginAllowed, startDemoServer } from '../src/server/demoServer';
 
 describe('Cockpit Security & Origin Containment', () => {
@@ -27,6 +29,29 @@ describe('Cockpit Security & Origin Containment', () => {
     assert.strictEqual(isOriginAllowed('invalid-origin'), false);
   });
 
+  test('isPathContained rejects symlinks that point outside root', () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'bkb-sec-'));
+    try {
+      const outsideDir = mkdtempSync(join(tmpdir(), 'bkb-outside-'));
+      const symlinkPath = join(tempRoot, 'outside-link');
+      symlinkSync(outsideDir, symlinkPath);
+
+      // Symlink pointing outside must be rejected
+      assert.strictEqual(isPathContained(tempRoot, 'outside-link'), false);
+
+      // Intentionally symlinked node_modules must be allowed
+      const nmTarget = join(outsideDir, 'node_modules');
+      mkdirSync(nmTarget, { recursive: true });
+      const nmSymlink = join(tempRoot, 'node_modules');
+      symlinkSync(nmTarget, nmSymlink);
+      assert.strictEqual(isPathContained(tempRoot, 'node_modules/package.json'), true);
+
+      rmSync(outsideDir, { recursive: true, force: true });
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('HTTP requests with untrusted origin or escaping path are blocked', async () => {
     const port = 4289;
     const server = startDemoServer(port, undefined, undefined, false);
@@ -50,6 +75,16 @@ describe('Cockpit Security & Origin Containment', () => {
       // 3. Traversal on /api/file with ../ blocked with 403
       const dotRes = await fetch(`http://127.0.0.1:${port}/api/file?path=../../package.json`);
       assert.strictEqual(dotRes.status, 403);
+
+      // 4. POST /api/target escaping workspace root blocked with 403
+      const targetRes = await fetch(`http://127.0.0.1:${port}/api/target`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoPath: '/' }),
+      });
+      assert.strictEqual(targetRes.status, 403);
+      const targetJson = await targetRes.json() as any;
+      assert.strictEqual(targetJson.error, 'Access denied: target repository is not within an allow-listed workspace root');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
