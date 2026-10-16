@@ -44,12 +44,19 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
 
   let activeRepoPath = resolve(options.defaultRepoPath ?? './demo-repo');
   let activePackId = options.defaultPackId ?? 'express-to-fastify';
-  const activeGraphName = options.graphName ?? getGraphNameForRepo(activeRepoPath);
   let activeClient: FalkorClient | null = options.client ?? null;
 
-  async function getClient(): Promise<FalkorClient> {
-    if (!activeClient) {
-      activeClient = await FalkorClient.connect({ graphName: activeGraphName });
+  function getGraphName(repoPath: string): string {
+    return options.graphName ?? getGraphNameForRepo(repoPath);
+  }
+
+  async function getClient(repoPath = activeRepoPath): Promise<FalkorClient> {
+    const targetGraph = getGraphName(repoPath);
+    if (!activeClient || activeClient.graphName !== targetGraph) {
+      if (activeClient && !options.client) {
+        await activeClient.close().catch(() => {});
+      }
+      activeClient = options.client ?? (await FalkorClient.connect({ graphName: targetGraph }));
     }
     return activeClient;
   }
@@ -58,8 +65,8 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
   const origClose = server.close.bind(server);
   server.close = async () => {
     await origClose();
-    if (activeClient) {
-      await activeClient.close();
+    if (activeClient && !options.client) {
+      await activeClient.close().catch(() => {});
       activeClient = null;
     }
   };
@@ -68,8 +75,8 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
   async function getOps(targetRepo?: string, targetPack?: string): Promise<MigrationOps> {
     const repo = resolve(targetRepo ?? activeRepoPath);
     const pack = targetPack ?? activePackId;
-    const client = await getClient();
-    const mgr = await MigrationGraphManager.create(repo, pack, { graphName: activeGraphName, client });
+    const client = await getClient(repo);
+    const mgr = await MigrationGraphManager.create(repo, pack, { graphName: client.graphName, client });
     return new MigrationOps(mgr.db, mgr.pack, mgr.repoPath);
   }
 
@@ -89,11 +96,11 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         activeRepoPath = resolvedRepo;
         activePackId = packId;
 
-        const client = await getClient();
+        const client = await getClient(resolvedRepo);
         const summary = await MigrationGraphManager.initMigrationGraph({
           repoPath: resolvedRepo,
           packId,
-          graphName: activeGraphName,
+          graphName: client.graphName,
           client,
           reset: reset ?? false,
         });
