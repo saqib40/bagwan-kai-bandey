@@ -98,8 +98,6 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                   summary,
                   nextAction: 'Call claim_next_leaf to claim the first unblocked module or cycle.',
                 },
-                null,
-                2,
               ),
             },
           ],
@@ -140,8 +138,6 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                     message: 'No unblocked modules remaining to claim. Migration may be complete!',
                     statusCounts: counts,
                   },
-                  null,
-                  2,
                 ),
               },
             ],
@@ -164,8 +160,6 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                   proof: claim.proof,
                   nextAction: `Do NOT explore other files. Call get_migration_slice with modulePaths=${JSON.stringify(claim.targetPaths)} and phase="${claim.phase}" to get the complete disk source and callee/caller context.`,
                 },
-                null,
-                2,
               ),
             },
           ],
@@ -198,7 +192,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(slice, null, 2),
+              text: JSON.stringify(slice),
             },
           ],
         };
@@ -235,8 +229,6 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                   impactedCount: blast.length,
                   impactedModules: blast,
                 },
-                null,
-                2,
               ),
             },
           ],
@@ -272,7 +264,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(result, null, 2),
+              text: JSON.stringify(result),
             },
           ],
           isError: !result.ok,
@@ -345,8 +337,6 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                   episodes: trail.episodes,
                   reportMarkdown,
                 },
-                null,
-                2,
               ),
             },
           ],
