@@ -72,6 +72,18 @@ export function validatePack(pack: any): { valid: boolean; errors: string[] } {
   return { valid: errors.length === 0, errors };
 }
 
+const registeredPackDirs: string[] = [];
+
+/**
+ * Registers an additional directory to search when resolving migration packs.
+ */
+export function registerPackDir(dir: string): void {
+  const resolved = resolve(dir);
+  if (!registeredPackDirs.includes(resolved)) {
+    registeredPackDirs.push(resolved);
+  }
+}
+
 /**
  * Resolves candidate file paths for a pack identifier or path.
  */
@@ -81,6 +93,7 @@ function getPackCandidates(packIdOrPath: string, searchDirs: string[] = []): str
   const builtInPacksDir = resolve(import.meta.dirname, '../../packs');
   const allDirs = [
     ...searchDirs,
+    ...registeredPackDirs,
     ...envDirs,
     builtInPacksDir,
     join(process.cwd(), 'packs'),
@@ -130,19 +143,9 @@ export function loadPack(packIdOrPath: string, searchDirs: string[] = []): Migra
 
   const ext = extname(foundPath);
   if (ext === '.ts' || ext === '.js' || ext === '.mjs') {
-    // For TS/JS packs loaded synchronously, try require or throw informative message
-    try {
-      // Dynamic fallback for CJS/transpiled environments
-      const raw = readFileSync(foundPath, 'utf8');
-      if (raw.includes('defineMigrationPack') || raw.includes('export default')) {
-        // Evaluate with jiti or throw asking for loadPackAsync
-        throw new Error(
-          `Migration pack "${foundPath}" is a TypeScript/ESM module. Use loadPackAsync() or provide a .json pack.`,
-        );
-      }
-    } catch (e: any) {
-      if (e.message.includes('loadPackAsync')) throw e;
-    }
+    throw new Error(
+      `Migration pack "${foundPath}" is a TypeScript/JavaScript module. Use loadPackAsync() or provide a .json pack.`,
+    );
   }
 
   try {

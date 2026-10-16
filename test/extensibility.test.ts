@@ -188,4 +188,47 @@ describe('BKB Configuration System', () => {
     const cfg = await loadConfig('/tmp');
     assert.equal(cfg, null);
   });
+
+  test('loadConfig registers packDirs and allows resolving custom packs', async () => {
+    const scratchDir = resolve(import.meta.dirname, '../scratch/test-packdir-config');
+    const customPackDir = join(scratchDir, 'my-packs');
+    mkdirSync(customPackDir, { recursive: true });
+
+    const packFile = join(customPackDir, 'custom-addon.json');
+    const customPack = {
+      id: 'custom-addon',
+      name: 'Custom Addon Pack',
+      language: 'typescript',
+      sourceGlobs: { include: ['src/**/*.ts'] },
+      packages: { legacy: ['old-lib'], target: ['new-lib'] },
+      detectionRules: [{ id: 'rule-1', description: 'desc', astQuery: '(id)' }],
+      agentGuidance: { MIGRATE: 'guide' },
+      invariants: [],
+      verification: {
+        perStepTypecheckCmd: 'true',
+        checkpointTestCmd: 'true',
+        routeSnapshotCmd: 'true',
+      },
+    };
+    writeFileSync(packFile, JSON.stringify(customPack, null, 2));
+
+    const configFile = join(scratchDir, 'bkb.config.json');
+    writeFileSync(configFile, JSON.stringify({
+      packDirs: ['./my-packs'],
+      defaultPack: 'custom-addon',
+    }));
+
+    try {
+      const cfg = await loadConfig(scratchDir);
+      assert.ok(cfg !== null);
+      assert.equal(cfg.defaultPack, 'custom-addon');
+
+      // Now loadPack('custom-addon') should resolve cleanly
+      const resolvedPack = loadPack('custom-addon');
+      assert.equal(resolvedPack.id, 'custom-addon');
+      assert.equal(resolvedPack.name, 'Custom Addon Pack');
+    } finally {
+      if (existsSync(scratchDir)) rmSync(scratchDir, { recursive: true, force: true });
+    }
+  });
 });

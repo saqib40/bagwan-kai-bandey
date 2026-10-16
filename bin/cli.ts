@@ -12,8 +12,8 @@ import { MigrationGraphManager } from '../src/engine/graphManager';
 import { MigrationOps } from '../src/engine/operations';
 import { startMcpServer } from '../src/mcp/server';
 import { adapterRegistry } from '../src/adapters/registry';
-import { loadConfig } from '../src/engine/config';
-import { validatePack, loadPack } from '../src/engine/packLoader';
+import { loadConfig, type BkbConfig } from '../src/engine/config';
+import { validatePack, loadPack, registerPackDir } from '../src/engine/packLoader';
 import { runDiagnostics, formatDoctorReport } from '../src/cli/doctor';
 import { installMcpConfig, formatMcpInstallReport, type McpTarget } from '../src/cli/mcpInstaller';
 import { runInteractiveInit } from '../src/cli/wizard';
@@ -121,10 +121,13 @@ function parseArgs(args: string[]) {
   return { command: positional[0] ?? 'help', subCommand: positional[1], arg: positional[2], positional, flags, multiFlags };
 }
 
+let activeConfig: BkbConfig | null = null;
+
 async function createOps(flags: Record<string, string | boolean>): Promise<MigrationOps> {
-  const repoPath = resolve(String(flags.repo ?? './demo-repo'));
-  const packId = String(flags.pack ?? 'express-to-fastify');
-  const mgr = await MigrationGraphManager.create(repoPath, packId);
+  const repoPath = resolve(String(flags.repo ?? activeConfig?.defaultRepo ?? './demo-repo'));
+  const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
+  const graphName = typeof flags.graph === 'string' ? flags.graph : activeConfig?.falkor?.graphName;
+  const mgr = await MigrationGraphManager.create(repoPath, packId, { graphName });
   return new MigrationOps(mgr.db, mgr.pack, mgr.repoPath);
 }
 
@@ -139,9 +142,16 @@ async function main() {
 
   // 1. Load project config if present (e.g. bkb.config.ts or shift.config.ts)
   try {
-    await loadConfig();
+    const targetDir = typeof flags.repo === 'string' ? resolve(String(flags.repo)) : process.cwd();
+    activeConfig = await loadConfig(targetDir);
   } catch (err) {
     console.error('[bkb] Warning: Failed to load config:', err);
+  }
+
+  // 1.5. Register custom pack directory if passed via --pack-dir
+  if (flags['pack-dir'] || flags.packDir) {
+    const customPackDir = resolve(String(flags['pack-dir'] || flags.packDir));
+    registerPackDir(customPackDir);
   }
 
   // 2. Register custom adapter if passed via --adapter
@@ -302,13 +312,13 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     let reset = flags.reset !== undefined ? Boolean(flags.reset) : undefined;
 
     if (flags.interactive || (!flags.repo && !flags.pack && process.stdin.isTTY && flags.reset === undefined)) {
-      const wizardRes = await runInteractiveInit(repoPath ?? './demo-repo');
+      const wizardRes = await runInteractiveInit(repoPath ?? activeConfig?.defaultRepo ?? './demo-repo');
       repoPath = wizardRes.repoPath;
       packId = wizardRes.packId;
       reset = wizardRes.reset;
     } else {
-      repoPath = repoPath ?? './demo-repo';
-      packId = packId ?? 'express-to-fastify';
+      repoPath = repoPath ?? activeConfig?.defaultRepo ?? './demo-repo';
+      packId = packId ?? activeConfig?.defaultPack ?? 'express-to-fastify';
       reset = reset ?? false;
     }
 

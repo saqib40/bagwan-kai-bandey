@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { LanguageAdapter } from '../adapters/types';
 import { adapterRegistry } from '../adapters/registry';
+import { registerPackDir } from './packLoader';
 
 export interface BkbConfig {
   /**
@@ -110,6 +111,14 @@ export async function loadConfig(repoRoot = process.cwd()): Promise<BkbConfig | 
       } else if (typeof item === 'object' && item && 'language' in item) {
         adapterRegistry.register(item);
       }
+    }
+  }
+
+  // Register any custom pack directories declared in config
+  if (config.packDirs && Array.isArray(config.packDirs)) {
+    for (const dir of config.packDirs) {
+      const absDir = resolve(repoRoot, dir);
+      registerPackDir(absDir);
     }
   }
 
