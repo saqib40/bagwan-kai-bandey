@@ -1,0 +1,11 @@
+{
+  "name": "bkb-demo-repo-cjs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CommonJS fixture used as the BKB cjs-to-esm migration target. Intentionally omits a `type` field so ambiguous .js files are detected by syntax.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/smoke.mjs",
+    "exports": "node scripts/dump-exports.mjs"
+  }
+}

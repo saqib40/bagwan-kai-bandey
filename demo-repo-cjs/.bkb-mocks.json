@@ -1,0 +1,98 @@
+{
+  "src/utils/hash.js:MIGRATE": {
+    "code": "export function shortHash(input) {\n  const text = String(input ?? '');\n  let h = 0;\n  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;\n  return h.toString(16).padStart(8, '0');\n}\n",
+    "summary": "Migrate src/utils/hash.js to pure ESM"
+  },
+  "src/utils/hash.js:DE_SHIM": {
+    "code": "export function shortHash(input) {\n  const text = String(input ?? '');\n  let h = 0;\n  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;\n  return h.toString(16).padStart(8, '0');\n}\n",
+    "summary": "De-shim src/utils/hash.js (remove interop marker)"
+  },
+  "src/utils/hash.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nexport function shortHash(input) {\n  const text = String(input ?? '');\n  let h = 0;\n  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;\n  return h.toString(16).padStart(8, '0');\n}\n",
+    "summary": "Interop shim for src/utils/hash.js"
+  },
+  "src/utils/format.js:MIGRATE": {
+    "code": "export function formatLine(parts) {\n  return (Array.isArray(parts) ? parts : [String(parts ?? '')]).join(':');\n}\n",
+    "summary": "Migrate src/utils/format.js to pure ESM"
+  },
+  "src/utils/format.js:DE_SHIM": {
+    "code": "export function formatLine(parts) {\n  return (Array.isArray(parts) ? parts : [String(parts ?? '')]).join(':');\n}\n",
+    "summary": "De-shim src/utils/format.js (remove interop marker)"
+  },
+  "src/utils/format.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nexport function formatLine(parts) {\n  return (Array.isArray(parts) ? parts : [String(parts ?? '')]).join(':');\n}\n",
+    "summary": "Interop shim for src/utils/format.js"
+  },
+  "src/services/ledger.js:MIGRATE": {
+    "code": "import { shortHash } from '../utils/hash.js';\n\nconst entries = [];\n\nexport function record(actor, action) {\n  const entry = {\n    id: entries.length + 1,\n    actor: String(actor ?? 'anon'),\n    action: String(action ?? 'noop'),\n    tag: shortHash(action),\n  };\n  entries.push(entry);\n  return entry;\n}\n\nexport function list() {\n  return entries.slice();\n}\n",
+    "summary": "Migrate src/services/ledger.js to pure ESM"
+  },
+  "src/services/ledger.js:DE_SHIM": {
+    "code": "import { shortHash } from '../utils/hash.js';\n\nconst entries = [];\n\nexport function record(actor, action) {\n  const entry = {\n    id: entries.length + 1,\n    actor: String(actor ?? 'anon'),\n    action: String(action ?? 'noop'),\n    tag: shortHash(action),\n  };\n  entries.push(entry);\n  return entry;\n}\n\nexport function list() {\n  return entries.slice();\n}\n",
+    "summary": "De-shim src/services/ledger.js (remove interop marker)"
+  },
+  "src/services/ledger.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nimport { shortHash } from '../utils/hash.js';\n\nconst entries = [];\n\nexport function record(actor, action) {\n  const entry = {\n    id: entries.length + 1,\n    actor: String(actor ?? 'anon'),\n    action: String(action ?? 'noop'),\n    tag: shortHash(action),\n  };\n  entries.push(entry);\n  return entry;\n}\n\nexport function list() {\n  return entries.slice();\n}\n",
+    "summary": "Interop shim for src/services/ledger.js"
+  },
+  "src/services/audit.js:MIGRATE": {
+    "code": "import { list } from './ledger.js';\nimport { formatLine } from '../utils/format.js';\n\nexport function summarize() {\n  return list().map((e) => formatLine([e.actor, e.action]));\n}\n",
+    "summary": "Migrate src/services/audit.js to pure ESM"
+  },
+  "src/services/audit.js:DE_SHIM": {
+    "code": "import { list } from './ledger.js';\nimport { formatLine } from '../utils/format.js';\n\nexport function summarize() {\n  return list().map((e) => formatLine([e.actor, e.action]));\n}\n",
+    "summary": "De-shim src/services/audit.js (remove interop marker)"
+  },
+  "src/services/audit.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nimport { list } from './ledger.js';\nimport { formatLine } from '../utils/format.js';\n\nexport function summarize() {\n  return list().map((e) => formatLine([e.actor, e.action]));\n}\n",
+    "summary": "Interop shim for src/services/audit.js"
+  },
+  "src/services/cycleA.js:MIGRATE": {
+    "code": "import { labelB } from './cycleB.js';\n\nexport function labelA() {\n  return 'A>' + labelB();\n}\n",
+    "summary": "Migrate src/services/cycleA.js to pure ESM"
+  },
+  "src/services/cycleA.js:DE_SHIM": {
+    "code": "import { labelB } from './cycleB.js';\n\nexport function labelA() {\n  return 'A>' + labelB();\n}\n",
+    "summary": "De-shim src/services/cycleA.js (remove interop marker)"
+  },
+  "src/services/cycleA.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nimport { labelB } from './cycleB.js';\n\nexport function labelA() {\n  return 'A>' + labelB();\n}\n",
+    "summary": "Interop shim for src/services/cycleA.js"
+  },
+  "src/services/cycleB.js:MIGRATE": {
+    "code": "import { labelA } from './cycleA.js';\n\nexport function labelB() {\n  return 'B';\n}\n\nexport function echoA() {\n  return labelA();\n}\n",
+    "summary": "Migrate src/services/cycleB.js to pure ESM"
+  },
+  "src/services/cycleB.js:DE_SHIM": {
+    "code": "import { labelA } from './cycleA.js';\n\nexport function labelB() {\n  return 'B';\n}\n\nexport function echoA() {\n  return labelA();\n}\n",
+    "summary": "De-shim src/services/cycleB.js (remove interop marker)"
+  },
+  "src/services/cycleB.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nimport { labelA } from './cycleA.js';\n\nexport function labelB() {\n  return 'B';\n}\n\nexport function echoA() {\n  return labelA();\n}\n",
+    "summary": "Interop shim for src/services/cycleB.js"
+  },
+  "src/routes/api.js:MIGRATE": {
+    "code": "import { record, list } from '../services/ledger.js';\nimport { summarize } from '../services/audit.js';\n\nconst routes = [\n  { method: 'GET', path: '/ledger', handler: () => list() },\n  { method: 'POST', path: '/ledger', handler: (input) => record('cli', input) },\n  { method: 'GET', path: '/audit', handler: () => summarize() },\n];\n\nexport function find(method, path) {\n  return routes.find((r) => r.method === method && r.path === path);\n}\n\nexport { routes };\n",
+    "summary": "Migrate src/routes/api.js to pure ESM"
+  },
+  "src/routes/api.js:DE_SHIM": {
+    "code": "import { record, list } from '../services/ledger.js';\nimport { summarize } from '../services/audit.js';\n\nconst routes = [\n  { method: 'GET', path: '/ledger', handler: () => list() },\n  { method: 'POST', path: '/ledger', handler: (input) => record('cli', input) },\n  { method: 'GET', path: '/audit', handler: () => summarize() },\n];\n\nexport function find(method, path) {\n  return routes.find((r) => r.method === method && r.path === path);\n}\n\nexport { routes };\n",
+    "summary": "De-shim src/routes/api.js (remove interop marker)"
+  },
+  "src/routes/api.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nimport { record, list } from '../services/ledger.js';\nimport { summarize } from '../services/audit.js';\n\nconst routes = [\n  { method: 'GET', path: '/ledger', handler: () => list() },\n  { method: 'POST', path: '/ledger', handler: (input) => record('cli', input) },\n  { method: 'GET', path: '/audit', handler: () => summarize() },\n];\n\nexport function find(method, path) {\n  return routes.find((r) => r.method === method && r.path === path);\n}\n\nexport { routes };\n",
+    "summary": "Interop shim for src/routes/api.js"
+  },
+  "src/index.js:MIGRATE": {
+    "code": "import { shortHash } from './utils/hash.js';\nimport { formatLine } from './utils/format.js';\nimport { record, list } from './services/ledger.js';\nimport { summarize } from './services/audit.js';\nimport { labelA } from './services/cycleA.js';\nimport { labelB, echoA } from './services/cycleB.js';\nimport { find } from './routes/api.js';\n\nexport function main() {\n  const route = find('GET', '/ledger');\n  return { route: route ? route.path : null, label: labelA(), tag: shortHash('main') };\n}\n\nexport { shortHash, formatLine, record, list, summarize, labelA, labelB, echoA, find };\n",
+    "summary": "Migrate src/index.js to pure ESM"
+  },
+  "src/index.js:DE_SHIM": {
+    "code": "import { shortHash } from './utils/hash.js';\nimport { formatLine } from './utils/format.js';\nimport { record, list } from './services/ledger.js';\nimport { summarize } from './services/audit.js';\nimport { labelA } from './services/cycleA.js';\nimport { labelB, echoA } from './services/cycleB.js';\nimport { find } from './routes/api.js';\n\nexport function main() {\n  const route = find('GET', '/ledger');\n  return { route: route ? route.path : null, label: labelA(), tag: shortHash('main') };\n}\n\nexport { shortHash, formatLine, record, list, summarize, labelA, labelB, echoA, find };\n",
+    "summary": "De-shim src/index.js (remove interop marker)"
+  },
+  "src/index.js:SHIM": {
+    "code": "// @bkb-shim: esm-runtime-interop\nimport { shortHash } from './utils/hash.js';\nimport { formatLine } from './utils/format.js';\nimport { record, list } from './services/ledger.js';\nimport { summarize } from './services/audit.js';\nimport { labelA } from './services/cycleA.js';\nimport { labelB, echoA } from './services/cycleB.js';\nimport { find } from './routes/api.js';\n\nexport function main() {\n  const route = find('GET', '/ledger');\n  return { route: route ? route.path : null, label: labelA(), tag: shortHash('main') };\n}\n\nexport { shortHash, formatLine, record, list, summarize, labelA, labelB, echoA, find };\n",
+    "summary": "Interop shim for src/index.js"
+  }
+}
