@@ -5,17 +5,6 @@
 import { FalkorDB } from 'falkordb';
 import type Graph from 'falkordb/dist/src/graph';
 
-// Suppress unhandled 'error' events on FalkorDB instances when no custom error handler is attached.
-// In Node.js, EventEmitters throw an unhandled error crash if an 'error' event is emitted with 0 listeners.
-// This prevents SocketClosedUnexpectedlyError from crashing the process during Docker/WSL bootstrapping.
-const origEmit = FalkorDB.prototype.emit;
-FalkorDB.prototype.emit = function (event: string | symbol, ...args: any[]): boolean {
-  if (event === 'error' && this.listenerCount('error') === 0) {
-    return false;
-  }
-  return origEmit.apply(this, [event, ...args] as any);
-};
-
 export type Params = Record<string, unknown>;
 
 export class FalkorClient {

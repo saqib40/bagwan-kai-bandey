@@ -9,7 +9,7 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, relative, resolve, isAbsolute } from 'node:path';
 import { FalkorClient } from './falkorClient';
 import { tarjanScc } from './scc';
 import { adapterRegistry } from '../adapters/registry';
@@ -275,7 +275,7 @@ export class MigrationOps {
     // Full source + baseline_sets for target modules
     const targetModules = await Promise.all(
       modulePaths.map(async (path) => {
-        const fullPath = resolve(this.repoPath, path);
+        const fullPath = this.resolveInsideRepo(path);
         let fullSource: string;
         try {
           fullSource = readFileSync(fullPath, 'utf8');
@@ -330,7 +330,8 @@ export class MigrationOps {
       );
       for (const c of callers) {
         try {
-          const callerSource = readFileSync(resolve(this.repoPath, c.callerPath), 'utf8');
+          const callerPath = this.resolveInsideRepo(c.callerPath);
+          const callerSource = readFileSync(callerPath, 'utf8');
           const lines = callerSource.split('\n');
           // Extract import lines and usage lines referencing the target module
           const baseName = mp.replace(/.*\//, '').replace(/\.[^/.]+$/, '');
@@ -457,7 +458,7 @@ export class MigrationOps {
     const root = resolve(this.repoPath);
     const abs = resolve(root, relPath);
     const rel = relative(root, abs);
-    if (!rel || rel.startsWith('..')) {
+    if (!rel || rel.startsWith('..') || isAbsolute(rel)) {
       throw new Error(`Path escapes the repository: ${relPath}`);
     }
     return abs;
