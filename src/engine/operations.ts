@@ -99,6 +99,9 @@ export class MigrationOps {
   // ─── claim_next_leaf (§8.2) ────────────────────────────
 
   async claimNextLeaf(): Promise<ClaimResult | null> {
+    const reclaimed = await this.reclaimInProgress();
+    if (reclaimed) return reclaimed;
+
     const params = {
       blocking: [...Q.BLOCKING_STATUSES],
       legacyCallers: [...Q.LEGACY_CALLER_STATUSES],
@@ -135,6 +138,47 @@ export class MigrationOps {
       pendingCallersCount: Number(c.pendingCallersCount),
       pendingCallerPaths,
       proof,
+    };
+  }
+
+  private async reclaimInProgress(): Promise<ClaimResult | null> {
+    const rows = await this.db.query<{
+      path: string;
+      sccId: number;
+      phase: string | null;
+      pagerank: number;
+    }>(Q.RECLAIM_IN_PROGRESS);
+    if (!rows.length) return null;
+
+    const sccId = Number(rows[0].sccId);
+    const cluster = rows.filter((row) => Number(row.sccId) === sccId);
+    const targetPaths = cluster.map((row) => row.path).filter(Boolean);
+    if (!targetPaths.length) return null;
+
+    const stored = cluster
+      .map((row) => row.phase)
+      .find((phase): phase is Phase => phase === 'MIGRATE' || phase === 'SHIM' || phase === 'DE_SHIM');
+
+    const callerInfo = await this.db.roQuery<{ pendingCallers: number; callerPaths: string[] }>(
+      Q.SCC_PENDING_CALLERS,
+      { sccId, legacyCallers: [...Q.LEGACY_CALLER_STATUSES] },
+    );
+    const pendingCallerPaths = Array.isArray(callerInfo[0]?.callerPaths) ? callerInfo[0].callerPaths : [];
+    const pendingCallersCount = Number(callerInfo[0]?.pendingCallers ?? pendingCallerPaths.length);
+    const phase: Phase = stored ?? (pendingCallersCount > 0 ? 'SHIM' : 'MIGRATE');
+
+    if (!stored) {
+      await this.db.query(Q.SET_CLAIMED_PHASE, { paths: targetPaths, phase });
+    }
+
+    return {
+      phase,
+      sccId,
+      allClusterPaths: targetPaths,
+      targetPaths,
+      pendingCallersCount,
+      pendingCallerPaths,
+      proof: await this.buildProof(targetPaths, phase),
     };
   }
 

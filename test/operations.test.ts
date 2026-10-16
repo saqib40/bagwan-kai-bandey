@@ -93,13 +93,31 @@ describe('MigrationOps.claimNextLeaf', () => {
     assert.ok(result!.proof.includes('@shift-shim'));
   });
 
+  it('reclaims an in-progress module instead of claiming a new leaf', async () => {
+    const client = createMockClient({
+      'reclaim-active-claim': [
+        { path: 'src/utils/response.ts', sccId: 2, phase: 'SHIM', pagerank: 0.4 },
+      ],
+      pendingCallers: [{ pendingCallers: 1, callerPaths: ['src/app.ts'] }],
+    });
+    const ops = new MigrationOps(client, MOCK_PACK, '/tmp/test-repo');
+
+    const result = await ops.claimNextLeaf();
+    assert.notEqual(result, null);
+    assert.equal(result!.phase, 'SHIM');
+    assert.equal(result!.sccId, 2);
+    assert.deepEqual(result!.targetPaths, ['src/utils/response.ts']);
+    assert.deepEqual(result!.pendingCallerPaths, ['src/app.ts']);
+  });
+
   it('claims a leaf target (Pass B) when no de-shim available', async () => {
     let callCount = 0;
     const client = createMockClient();
     (client as any).query = async (cypher: string) => {
       callCount++;
-      if (callCount === 1) return []; // de-shim pass empty
-      if (callCount === 2) {
+      if (callCount === 1) return []; // no in-progress claim
+      if (callCount === 2) return []; // de-shim pass empty
+      if (callCount === 3) {
         return [
           {
             phase: 'MIGRATE',
@@ -126,8 +144,9 @@ describe('MigrationOps.claimNextLeaf', () => {
     const client = createMockClient();
     (client as any).query = async () => {
       callCount++;
-      if (callCount === 1) return []; // de-shim pass empty
-      if (callCount === 2) {
+      if (callCount === 1) return []; // no in-progress claim
+      if (callCount === 2) return []; // de-shim pass empty
+      if (callCount === 3) {
         return [
           {
             phase: 'SHIM',

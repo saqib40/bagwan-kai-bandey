@@ -53,6 +53,12 @@ SET m.scc_id = row.sccId, m.scc_size = row.sccSize`;
  * (sum of peers), otherwise a cycle member whose only caller is its peer would
  * trigger a premature de-shim of the cluster.
  */
+export const RECLAIM_IN_PROGRESS = `
+/* reclaim-active-claim */
+MATCH (m:Module {status: 'IN_PROGRESS'})
+RETURN m.path AS path, m.scc_id AS sccId, m.claimed_phase AS phase, m.pagerank AS pagerank
+ORDER BY m.pagerank DESC, m.path ASC`;
+
 export const CLAIM_DESHIM = `
 MATCH (m:Module {status: 'SHIMMED'})
 WITH DISTINCT m.scc_id AS sccId
