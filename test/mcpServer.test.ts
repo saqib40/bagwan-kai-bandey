@@ -31,6 +31,10 @@ test('verify_and_commit_node accepts a call that omits agentSummary', async () =
     const required = (verify?.inputSchema as { required?: string[] } | undefined)?.required ?? [];
     assert.ok(required.includes('modulePaths'));
     assert.equal(required.includes('agentSummary'), false);
+    const instructions = client.getInstructions() ?? '';
+    assert.match(instructions, /claim_next_leaf/);
+    assert.match(instructions, /get_migration_slice/);
+    assert.match(instructions, /verify_and_commit_node/);
   } finally {
     await client.close();
     await server.close();

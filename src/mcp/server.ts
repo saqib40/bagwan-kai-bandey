@@ -27,10 +27,21 @@ export interface BkbServerOptions {
 export type ShiftServerOptions = BkbServerOptions;
 
 export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
-  const server = new McpServer({
-    name: 'bkb-migration-engine',
-    version: '0.1.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'bkb-migration-engine',
+      version: '0.1.0',
+    },
+    {
+      instructions: [
+        'Migrate one claimed batch at a time. Do not grep, search, or open other files.',
+        'Loop: claim_next_leaf, then get_migration_slice with the returned targetPaths and phase, edit only those files, then verify_and_commit_node with the same paths.',
+        'claim_next_leaf returns an in-progress batch again if verify was skipped. Do not start a different file.',
+        'Call init_migration_graph once. Omit reset unless the graph should be dropped.',
+        'Do not call simulate_blast_radius or get_migration_audit_trail inside the edit loop.',
+      ].join(' '),
+    },
+  );
 
   let activeRepoPath = resolve(options.defaultRepoPath ?? './demo-repo');
   let activePackId = options.defaultPackId ?? 'express-to-fastify';
