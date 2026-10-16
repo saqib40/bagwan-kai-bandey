@@ -15,10 +15,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const cliTs = join(__dirname, 'cli.ts');
 const localTsx = join(__dirname, '../node_modules/.bin/tsx');
 
-let cmd = 'node';
+let tsxEntry = '';
+try {
+  const tsxPkgUrl = import.meta.resolve('tsx/package.json');
+  const tsxPkgPath = fileURLToPath(tsxPkgUrl);
+  tsxEntry = join(dirname(tsxPkgPath), 'dist/cli.mjs');
+} catch {}
+
+let cmd = process.execPath;
 let args = [];
 
-if (existsSync(localTsx)) {
+if (tsxEntry && existsSync(tsxEntry)) {
+  cmd = process.execPath;
+  args = [tsxEntry, cliTs, ...process.argv.slice(2)];
+} else if (existsSync(localTsx)) {
   cmd = localTsx;
   args = [cliTs, ...process.argv.slice(2)];
 } else {

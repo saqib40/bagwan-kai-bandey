@@ -1,9 +1,8 @@
 {
   "name": "bagwan-kai-bandey",
   "version": "0.1.0",
-  "private": true,
-  "type": "module",
   "description": "Bagwan Kai Bandey (BKB): graph-governed codebase migration engine powered by FalkorDB.",
+  "type": "module",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
@@ -11,9 +10,17 @@
     "./pack": "./src/engine/packLoader.ts"
   },
   "bin": {
-    "bkb": "./bin/bkb.js",
-    "shift": "./bin/bkb.js"
+    "bkb": "bin/bkb.js",
+    "shift": "bin/bkb.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "packs",
+    "public",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "bkb": "node ./bin/bkb.js",
     "shift": "node ./bin/bkb.js",
@@ -23,8 +30,31 @@
     "validate:cypher": "tsx scripts/validate-cypher.ts",
     "benchmark": "tsx scripts/benchmark-scale.ts",
     "demo": "tsx src/server/demoServer.ts",
-    "start": "node ./bin/bkb.js"
+    "start": "node ./bin/bkb.js",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
+  "keywords": [
+    "falkordb",
+    "graph",
+    "codebase-migration",
+    "mcp",
+    "model-context-protocol",
+    "refactoring",
+    "fastify",
+    "express",
+    "ast",
+    "strangler-fig"
+  ],
+  "author": "Saqib Hussain",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saqib40/bagwan-kai-bandey.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saqib40/bagwan-kai-bandey/issues"
+  },
+  "homepage": "https://github.com/saqib40/bagwan-kai-bandey#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "falkordb": "^6.0.0",
