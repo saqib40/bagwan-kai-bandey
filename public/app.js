@@ -1040,6 +1040,13 @@ function handleObserverMode(mode) {
   }
 
   if (mode === 'observer') {
+    // Immediate refresh on entering observer mode
+    fetchGraphData().then((topology) => {
+      updateNetworkTopology(topology.modules);
+      updateStatusCounts(topology.statusCounts);
+    }).catch(() => {});
+
+    // Passive fallback polling in addition to SSE
     observerInterval = setInterval(async () => {
       try {
         const topology = await fetchGraphData();
@@ -1049,6 +1056,140 @@ function handleObserverMode(mode) {
         // Silent poll error
       }
     }, 2000);
+  }
+}
+
+// ── Real-Time CLI & MCP Live SSE Telemetry Stream ─────────
+
+function initLiveStream() {
+  const syncBadge = document.getElementById('sync-status-badge');
+  const syncText = document.getElementById('sync-text');
+
+  function updateSyncStatus(connected) {
+    if (!syncBadge || !syncText) return;
+    if (connected) {
+      syncBadge.classList.remove('disconnected');
+      syncText.textContent = 'CLI Sync Live';
+    } else {
+      syncBadge.classList.add('disconnected');
+      syncText.textContent = 'CLI Sync Offline';
+    }
+  }
+
+  function flashSyncBadge() {
+    if (!syncBadge) return;
+    syncBadge.classList.add('flash');
+    setTimeout(() => syncBadge.classList.remove('flash'), 400);
+  }
+
+  try {
+    const es = new EventSource('/api/events');
+    es.onopen = () => {
+      updateSyncStatus(true);
+    };
+    es.onmessage = async (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        await handleLiveTelemetryEvent(event, flashSyncBadge);
+      } catch (err) {
+        console.error('Failed to parse live telemetry event:', err);
+      }
+    };
+    es.onerror = () => {
+      updateSyncStatus(false);
+    };
+  } catch (err) {
+    updateSyncStatus(false);
+  }
+}
+
+async function handleLiveTelemetryEvent(event, flashBadge) {
+  if (event.type === 'connected') {
+    return;
+  }
+
+  if (typeof flashBadge === 'function') flashBadge();
+
+  // If repo switched in CLI, reload system info and re-render topology
+  if (event.repoPath && currentAppInfo && event.repoPath !== currentAppInfo.currentRepo) {
+    await loadSystemInfo();
+    const fresh = await fetchGraphData();
+    initNetwork(fresh.modules, fresh.edges);
+    updateStatusCounts(fresh.statusCounts);
+    return;
+  }
+
+  if (event.type === 'init') {
+    await loadSystemInfo();
+    const fresh = await fetchGraphData();
+    initNetwork(fresh.modules, fresh.edges);
+    updateStatusCounts(fresh.statusCounts);
+    return;
+  }
+
+  if (event.type === 'claim') {
+    if (event.targetPaths?.length && nodesDataSet) {
+      event.targetPaths.forEach((path) => {
+        nodesDataSet.update({
+          id: path,
+          color: { border: '#3B82F6', background: 'rgba(59, 130, 246, 0.25)' },
+          borderWidth: 3,
+        });
+      });
+      const names = event.targetPaths.map((p) => p.split('/').pop()).join(', ');
+      const milestone = document.getElementById('flight-milestone');
+      if (milestone) milestone.textContent = `Claimed: ${names} (${event.phase || 'MIGRATE'})`;
+    }
+    return;
+  }
+
+  if (event.type === 'verify') {
+    const fresh = await fetchGraphData();
+    updateNetworkTopology(fresh.modules);
+    updateStatusCounts(fresh.statusCounts);
+    currentStepNumber = event.step || currentStepNumber + 1;
+    renderTimelineStrip(currentStepNumber, currentAppInfo?.checkpoints || []);
+
+    const names = (event.targetPaths || []).map((p) => p.split('/').pop()).join(', ');
+    const milestone = document.getElementById('flight-milestone');
+    if (milestone) milestone.textContent = `Verified: ${names} [${event.status || 'VERIFIED'}]`;
+    return;
+  }
+
+  if (event.type === 'failure') {
+    if (event.targetPaths?.length && nodesDataSet) {
+      event.targetPaths.forEach((path) => {
+        nodesDataSet.update({
+          id: path,
+          color: { border: '#F43F5E', background: 'rgba(244, 63, 94, 0.25)' },
+          borderWidth: 3,
+        });
+      });
+      const firstErr = (event.errors && event.errors[0]) || 'Verification failed';
+      const milestone = document.getElementById('flight-milestone');
+      if (milestone) milestone.textContent = `Gate Failed: ${firstErr.split('\n')[0]}`;
+    }
+    return;
+  }
+
+  if (event.type === 'rollback') {
+    const fresh = await fetchGraphData();
+    updateNetworkTopology(fresh.modules);
+    updateStatusCounts(fresh.statusCounts);
+    await loadSystemInfo();
+    const milestone = document.getElementById('flight-milestone');
+    if (milestone) milestone.textContent = `Rolled back to checkpoint step-${event.step}`;
+    return;
+  }
+
+  if (event.type === 'complete') {
+    const fresh = await fetchGraphData();
+    updateNetworkTopology(fresh.modules);
+    updateStatusCounts(fresh.statusCounts);
+    const milestone = document.getElementById('flight-milestone');
+    if (milestone) milestone.textContent = 'Migration Complete (100%)';
+    showVictoryModal();
+    return;
   }
 }
 
@@ -1189,6 +1330,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
     document.getElementById('btn-modal-replay')?.addEventListener('click', resetCodebase);
     document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
+
+    // Connect real-time CLI/MCP event synchronization
+    initLiveStream();
   } catch (err) {
     console.error('Failed to initialize Cockpit:', err);
   }

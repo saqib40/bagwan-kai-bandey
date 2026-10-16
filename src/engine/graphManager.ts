@@ -12,6 +12,7 @@ import { tarjanScc } from './scc';
 import { loadPack } from './packLoader';
 import { adapterRegistry } from '../adapters/registry';
 import type { MigrationPack, ParsedModule } from '../adapters/types';
+import { broadcastLiveEvent } from './telemetry';
 import * as Q from './queries';
 
 export interface InitGraphOptions {
@@ -226,6 +227,12 @@ export class MigrationGraphManager {
       const countMap = new Map(counts.map((r) => [r.status, Number(r.n)]));
 
       const baselineRoutes = JSON.parse(baselineRoutesJson);
+
+      broadcastLiveEvent({
+        type: 'init',
+        repoPath: absRepoPath,
+        packId: pack.id,
+      });
 
       return {
         repoPath: absRepoPath,

@@ -18,7 +18,7 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, readdirSync } from 'node:fs';
-import { resolve, join, extname } from 'node:path';
+import { resolve, join, extname, basename } from 'node:path';
 import { ensureFalkorDB } from '../engine/docker';
 import { FalkorClient } from '../engine/falkorClient';
 import { MigrationGraphManager } from '../engine/graphManager';
@@ -31,8 +31,13 @@ const PORT = Number(process.env.PORT ?? 4200);
 const WORKSPACE = resolve(import.meta.dirname, '../..');
 const SOURCE_REPO = resolve(WORKSPACE, 'demo-repo');
 const DEFAULT_TARGET_REPO = resolve(WORKSPACE, 'scratch/cockpit-demo-repo');
-const GRAPH_NAME = process.env.BKB_GRAPH ?? 'bkb_cockpit';
 const DEFAULT_PACK_ID = 'express-to-fastify';
+
+export function getGraphNameForRepo(repoPath: string): string {
+  if (process.env.BKB_GRAPH) return process.env.BKB_GRAPH;
+  if (repoPath === DEFAULT_TARGET_REPO) return 'bkb_cockpit';
+  return 'bkb_' + basename(repoPath).replace(/[^a-zA-Z0-9_]/g, '_');
+}
 
 // ── Dynamic Server State ─────────────────────────────────
 let activeRepo = DEFAULT_TARGET_REPO;
@@ -40,6 +45,20 @@ let activePackId = DEFAULT_PACK_ID;
 let activeMode: 'canned' | 'llm' | 'observer' = 'canned';
 let activeProvider: 'mock' | 'ollama' | 'openai' | 'anthropic' = 'mock';
 let activeModel = 'qwen2.5-coder:latest';
+
+// ── Real-Time SSE Event Bus ──────────────────────────────
+const sseClients = new Set<ServerResponse>();
+
+export function broadcastSse(data: Record<string, unknown>): void {
+  const message = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(message);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
 
 // Pre-defined code states for the 11 migration steps (exact code verified in Milestone 3)
 const STEP_CODE_STATES: Record<string, Record<string, string>> = {
@@ -378,9 +397,13 @@ let dbClient: FalkorClient | null = null;
 let currentOps: MigrationOps | null = null;
 
 async function getClient(): Promise<FalkorClient> {
-  if (!dbClient) {
+  const expectedGraph = getGraphNameForRepo(activeRepo);
+  if (!dbClient || dbClient.graphName !== expectedGraph) {
+    if (dbClient) {
+      await dbClient.close().catch(() => {});
+    }
     await ensureFalkorDB();
-    dbClient = await FalkorClient.connect({ graphName: GRAPH_NAME });
+    dbClient = await FalkorClient.connect({ graphName: expectedGraph });
   }
   return dbClient;
 }
@@ -389,7 +412,7 @@ async function getOps(): Promise<MigrationOps> {
   if (!currentOps) {
     const client = await getClient();
     const mgr = await MigrationGraphManager.create(activeRepo, activePackId, {
-      graphName: GRAPH_NAME,
+      graphName: getGraphNameForRepo(activeRepo),
       client,
     });
     currentOps = new MigrationOps(mgr.db, mgr.pack, mgr.repoPath);
@@ -416,7 +439,7 @@ async function resetDemoState() {
   await MigrationGraphManager.initMigrationGraph({
     repoPath: DEFAULT_TARGET_REPO,
     packId: DEFAULT_PACK_ID,
-    graphName: GRAPH_NAME,
+    graphName: getGraphNameForRepo(DEFAULT_TARGET_REPO),
     client,
     reset: true,
   });
@@ -525,7 +548,53 @@ export function startDemoServer(port = PORT) {
     const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
     const pathname = url.pathname;
 
-    // ── API Endpoints ──
+    // ── Real-Time Synchronization Endpoints ──
+
+    // SSE Stream for connected browser tabs
+    if (pathname === '/api/events' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'connected',
+          activeRepo,
+          activePackId,
+          graphName: getGraphNameForRepo(activeRepo),
+        })}\n\n`,
+      );
+      sseClients.add(res);
+
+      req.on('close', () => {
+        sseClients.delete(res);
+      });
+      return;
+    }
+
+    // Ingest event broadcast from CLI or MCP Server process
+    if (pathname === '/api/broadcast' && req.method === 'POST') {
+      try {
+        const event = (await parseJsonBody(req)) as Record<string, any>;
+        if (event.repoPath && resolve(event.repoPath) !== activeRepo) {
+          activeRepo = resolve(event.repoPath);
+          if (event.packId) activePackId = event.packId;
+          if (dbClient) {
+            await dbClient.close().catch(() => {});
+            dbClient = null;
+          }
+          currentOps = null;
+        }
+
+        broadcastSse(event);
+        sendJson(res, { ok: true, clientCount: sseClients.size });
+      } catch (err: any) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
 
     // 1. System Info & Configuration Status
     if (pathname === '/api/info' && req.method === 'GET') {
@@ -547,12 +616,14 @@ export function startDemoServer(port = PORT) {
           currentRepo: activeRepo,
           displayRepo: activeRepo === DEFAULT_TARGET_REPO ? 'demo-repo (Sandbox)' : activeRepo,
           isDemoRepo: activeRepo === DEFAULT_TARGET_REPO,
+          graphName: getGraphNameForRepo(activeRepo),
           currentPackId: activePackId,
           mode: activeMode,
           provider: activeProvider,
           model: activeModel,
           availablePacks,
           checkpoints,
+          sseClientsCount: sseClients.size,
         });
       } catch (err: any) {
         sendJson(res, { error: err.message }, 500);
@@ -597,7 +668,7 @@ export function startDemoServer(port = PORT) {
             await MigrationGraphManager.initMigrationGraph({
               repoPath: activeRepo,
               packId: activePackId,
-              graphName: GRAPH_NAME,
+              graphName: getGraphNameForRepo(activeRepo),
               client,
               reset: true,
             });
@@ -632,7 +703,7 @@ export function startDemoServer(port = PORT) {
           await MigrationGraphManager.initMigrationGraph({
             repoPath: activeRepo,
             packId: activePackId,
-            graphName: GRAPH_NAME,
+            graphName: getGraphNameForRepo(activeRepo),
             client,
             reset: true,
           });
@@ -870,7 +941,7 @@ export function startDemoServer(port = PORT) {
     if (pathname === '/api/rollback' && req.method === 'POST') {
       try {
         const body = await parseJsonBody(req);
-        const result = await rollbackToCheckpoint(activeRepo, activePackId, body.step, GRAPH_NAME);
+        const result = await rollbackToCheckpoint(activeRepo, activePackId, body.step, getGraphNameForRepo(activeRepo));
         currentOps = null;
         const topology = await getGraphTopology();
         sendJson(res, {

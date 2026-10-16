@@ -36,6 +36,7 @@ Usage:
   bkb verify --repo <path> --pack <id> --module <path> [--summary <text>]
   bkb audit --repo <path> --pack <id> [--checkpoint]
   bkb serve [--repo <path>] [--pack <id>]
+  bkb cockpit [--port <port>] [--repo <path>] [--pack <id>]
   bkb pack init <pack-id> [--lang <language>]
   bkb pack validate <path>
   bkb adapter init <language>
@@ -46,6 +47,7 @@ Commands:
   mcp install    1-Click install BKB MCP server config into Cursor, Claude, VS Code, Windsurf, or OpenCode
   init           Initialize the migration graph in FalkorDB (interactive wizard if -i)
   run, auto      Autonomously execute the migration loop (claim -> slice -> transform -> verify)
+  cockpit, ui    Start the live visual migration flight deck (browser GUI with real-time SSE sync)
   rollback       Rollback source files and FalkorDB graph to a previous checkpoint (or latest)
   claim          Claim the next unblocked leaf / SCC for migration
   slice          Get the migration slice (source, 1-hop context) for claimed modules
@@ -442,6 +444,25 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       console.error('[bkb] Audit trail failed:', err);
       process.exit(1);
     }
+  }
+
+  if (command === 'cockpit' || command === 'ui') {
+    const port = Number(flags.port ?? process.env.PORT ?? 4200);
+    const repoPath = resolve(String(flags.repo ?? './demo-repo'));
+    const packId = String(flags.pack ?? 'express-to-fastify');
+    const { startDemoServer } = await import('../src/server/demoServer');
+
+    console.error(`
+╭─────────────────────────────────────────────────────────────────╮
+│  Bagwan Kai Bandey — Migration Cockpit Flight Deck             │
+│  Live URL:   http://localhost:${port}                             │
+│  Target:     ${repoPath}
+│  Pack:       ${packId}
+│  Status:     Listening for CLI & MCP Agent Telemetry (SSE)     │
+╰─────────────────────────────────────────────────────────────────╯
+`);
+    startDemoServer(port);
+    return;
   }
 
   if (command === 'serve') {

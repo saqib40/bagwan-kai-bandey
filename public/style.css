@@ -1495,3 +1495,64 @@ body {
   font-size: 0.7rem;
 }
 
+/* ── Live CLI & MCP Sync Status Badge ── */
+.sync-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: #34D399;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  padding: 4px 9px;
+  border-radius: 999px;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.sync-status-badge.disconnected {
+  color: var(--text-dim);
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.22);
+}
+
+.sync-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10B981;
+  display: inline-block;
+  transition: background-color 0.2s ease;
+}
+
+.sync-status-badge.disconnected .sync-indicator {
+  background: #F43F5E;
+}
+
+.sync-indicator.pulse {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: sync-pulse 2s infinite;
+}
+
+.sync-status-badge.flash {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.6);
+  transform: scale(1.05);
+}
+
+@keyframes sync-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}

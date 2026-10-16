@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, cpSync, rmSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { MigrationGraphManager } from '../engine/graphManager';
+import { broadcastLiveEvent } from '../engine/telemetry';
 
 export interface CheckpointInfo {
   step: number;
@@ -120,6 +121,13 @@ export async function rollbackToCheckpoint(
       message: `Disk restored to step-${targetStep}, but graph re-sync failed: ${err.message}`,
     };
   }
+
+  broadcastLiveEvent({
+    type: 'rollback',
+    repoPath: absRepo,
+    packId,
+    step: targetStep,
+  });
 
   return {
     ok: true,

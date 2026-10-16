@@ -14,6 +14,7 @@ import { FalkorClient } from './falkorClient';
 import { tarjanScc } from './scc';
 import { adapterRegistry } from '../adapters/registry';
 import { shimMarkerList, type MigrationPack, type ParsedModule } from '../adapters/types';
+import { broadcastLiveEvent } from './telemetry';
 import * as Q from './queries';
 
 // ─── Result Types ────────────────────────────────────────
@@ -194,6 +195,14 @@ export class MigrationOps {
     if (!stored) {
       await this.db.query(Q.SET_CLAIMED_PHASE, { paths: targetPaths, phase });
     }
+
+    broadcastLiveEvent({
+      type: 'claim',
+      repoPath: this.repoPath,
+      packId: this.pack.id,
+      targetPaths,
+      phase,
+    });
 
     return {
       phase,
@@ -410,6 +419,11 @@ export class MigrationOps {
 
   private async toWorkItem(claim: ClaimResult | null): Promise<AdvanceResult> {
     if (!claim || !claim.targetPaths.length) {
+      broadcastLiveEvent({
+        type: 'complete',
+        repoPath: this.repoPath,
+        packId: this.pack.id,
+      });
       return { done: true, message: 'No unblocked modules remaining. Migration is complete.' };
     }
     const slice = await this.getMigrationSlice(claim.targetPaths, claim.phase);
@@ -564,7 +578,8 @@ export class MigrationOps {
     // 3e. Run whole-project typecheck
     const tscResult = this.runCommand(this.pack.verification.perStepTypecheckCmd);
     if (!tscResult.ok) {
-      errors.push(`[Step 3] Typecheck failed:\n${tscResult.output}`);
+      const trimmedOutput = tscResult.output.split('\n').slice(0, 20).join('\n');
+      errors.push(`[Step 3] Typecheck failed:\n${trimmedOutput}`);
       return this.revertAndReturn(modulePaths, errors, 3);
     }
 
@@ -632,6 +647,17 @@ export class MigrationOps {
       checkpointTriggered = true;
       checkpointResult = await this.runCheckpointGate();
     }
+
+    broadcastLiveEvent({
+      type: 'verify',
+      repoPath: this.repoPath,
+      packId: this.pack.id,
+      targetPaths: modulePaths,
+      status: newStatus,
+      step: stepNum,
+      phase: claimedPhase,
+      agentSummary,
+    });
 
     return {
       ok: true,
@@ -887,6 +913,15 @@ export class MigrationOps {
         { path: mp, status: revertStatus },
       );
     }
+
+    broadcastLiveEvent({
+      type: 'failure',
+      repoPath: this.repoPath,
+      packId: this.pack.id,
+      targetPaths: modulePaths,
+      errors,
+      step: failedAtStep,
+    });
 
     return {
       ok: false,
