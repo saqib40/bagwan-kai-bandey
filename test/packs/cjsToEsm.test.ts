@@ -8,15 +8,18 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, mkdirSync, cpSync, rmSync, symlinkSync, readdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { loadPack, validatePack } from '../../src/engine/packLoader';
 import { validatePackQueries } from '../../src/engine/packSemantics';
 import { adapterRegistry } from '../../src/adapters/registry';
 import { getShimStrategy, RUNTIME_INTEROP_MARKER } from '../../src/adapters/types';
+import { runAutonomousMigration } from '../../src/runner/autonomousRunner';
+import { checkPortReachable } from '../../src/cli/doctor';
 
 const PACK_PATH = resolve(import.meta.dirname, '../../packs/cjs-to-esm.json');
 const FIXTURE = resolve(import.meta.dirname, '../../demo-repo-cjs');
+const WORKSPACE = resolve(import.meta.dirname, '../..');
 
 const BASELINE_SURFACE = [
   'echoA=function:string',
@@ -100,5 +103,70 @@ describe('demo-repo-cjs fixture', () => {
     const ruleIds = new Set(parsed.apiUsages.map((u) => u.ruleId));
     assert.ok(ruleIds.has('cjs-require'));
     assert.ok(ruleIds.has('cjs-module-exports'));
+  });
+});
+
+describe('cjs-to-esm autonomous migration (requires FalkorDB)', () => {
+  it('migrates demo-repo-cjs from 100% CommonJS to 100% ESM', async (t) => {
+    if (!(await checkPortReachable(6379))) {
+      t.skip('FalkorDB is not reachable on :6379');
+      return;
+    }
+
+    const target = resolve(WORKSPACE, 'scratch/cjs-e2e');
+    rmSync(target, { recursive: true, force: true });
+    mkdirSync(target, { recursive: true });
+    cpSync(join(FIXTURE, 'src'), join(target, 'src'), { recursive: true });
+    cpSync(join(FIXTURE, 'scripts'), join(target, 'scripts'), { recursive: true });
+    cpSync(join(FIXTURE, 'package.json'), join(target, 'package.json'));
+    cpSync(join(FIXTURE, 'tsconfig.json'), join(target, 'tsconfig.json'));
+    cpSync(join(FIXTURE, '.bkb-mocks.json'), join(target, '.bkb-mocks.json'));
+    symlinkSync(join(WORKSPACE, 'node_modules'), join(target, 'node_modules'), 'junction');
+
+    const baselineSurface = execSync('node scripts/dump-exports.mjs', { cwd: target, encoding: 'utf8' }).trim();
+
+    try {
+      const res = await runAutonomousMigration({
+        repoPath: target,
+        packId: 'cjs-to-esm',
+        provider: 'mock',
+        graphName: 'bkb_cjs_e2e_test',
+        reset: true,
+        maxSteps: 60,
+      });
+
+      assert.equal(res.ok, true, res.error ?? 'migration should succeed');
+      assert.equal(res.migratedModules, 8);
+      assert.equal(res.checkpointPassed, true);
+      assert.equal(res.routeParity, true);
+
+      // 1. No CommonJS syntax remains anywhere in src.
+      const sources: string[] = [];
+      const walk = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else if (entry.name.endsWith('.js')) sources.push(full);
+        }
+      };
+      walk(join(target, 'src'));
+      assert.equal(sources.length, 8);
+      for (const file of sources) {
+        const code = readFileSync(file, 'utf8');
+        assert.doesNotMatch(code, /require\(/, `${file} still uses require()`);
+        assert.doesNotMatch(code, /module\.exports/, `${file} still uses module.exports`);
+        assert.doesNotMatch(code, /@bkb-shim/, `${file} still contains a shim marker`);
+      }
+
+      // 2. Runtime export surface is unchanged from the CommonJS baseline.
+      const migratedSurface = execSync('node scripts/dump-exports.mjs', { cwd: target, encoding: 'utf8' }).trim();
+      assert.equal(migratedSurface, baselineSurface);
+
+      // 3. Checkpoint smoke test passes on the migrated repo.
+      const smoke = execSync('node scripts/smoke.mjs', { cwd: target, encoding: 'utf8' }).trim();
+      assert.equal(smoke, 'smoke ok');
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
   });
 });
