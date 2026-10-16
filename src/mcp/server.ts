@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ensureFalkorDB } from '../engine/docker';
-import { MigrationGraphManager } from '../engine/graphManager';
+import { MigrationGraphManager, getGraphNameForRepo } from '../engine/graphManager';
 import { MigrationOps, type Phase } from '../engine/operations';
 
 import { FalkorClient } from '../engine/falkorClient';
@@ -44,7 +44,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
 
   let activeRepoPath = resolve(options.defaultRepoPath ?? './demo-repo');
   let activePackId = options.defaultPackId ?? 'express-to-fastify';
-  const activeGraphName = options.graphName ?? process.env.BKB_GRAPH ?? process.env.SHIFT_GRAPH ?? 'bkb';
+  const activeGraphName = options.graphName ?? getGraphNameForRepo(activeRepoPath);
   let activeClient: FalkorClient | null = options.client ?? null;
 
   async function getClient(): Promise<FalkorClient> {

@@ -6,7 +6,8 @@
  */
 
 import { execSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { resolve, basename } from 'node:path';
+import { createHash } from 'node:crypto';
 import { FalkorClient } from './falkorClient';
 import { tarjanScc } from './scc';
 import { loadPack } from './packLoader';
@@ -14,6 +15,19 @@ import { adapterRegistry } from '../adapters/registry';
 import type { MigrationPack, ParsedModule } from '../adapters/types';
 import { broadcastLiveEvent } from './telemetry';
 import * as Q from './queries';
+
+/**
+ * Returns an isolated FalkorDB graph name unique to the specified repository.
+ * Respects explicit BKB_GRAPH or SHIFT_GRAPH overrides when set.
+ */
+export function getGraphNameForRepo(repoPath: string): string {
+  if (process.env.BKB_GRAPH) return process.env.BKB_GRAPH;
+  if (process.env.SHIFT_GRAPH) return process.env.SHIFT_GRAPH;
+  const abs = resolve(repoPath);
+  const dirName = basename(abs).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+  const hash = createHash('sha256').update(abs).digest('hex').slice(0, 8);
+  return `bkb_${dirName}_${hash}`;
+}
 
 export interface InitGraphOptions {
   repoPath: string;
@@ -43,7 +57,7 @@ export class MigrationGraphManager {
   static async create(repoPath: string, packId: string, opts: { graphName?: string; client?: FalkorClient } = {}): Promise<MigrationGraphManager> {
     const absRepoPath = resolve(repoPath);
     const pack = loadPack(packId);
-    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? 'bkb' }));
+    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? getGraphNameForRepo(absRepoPath) }));
     return new MigrationGraphManager(client, pack, absRepoPath);
   }
 
@@ -57,7 +71,7 @@ export class MigrationGraphManager {
     await adapter.init();
 
     const ownClient = !opts.client;
-    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? 'bkb' }));
+    const client = opts.client ?? (await FalkorClient.connect({ graphName: opts.graphName ?? getGraphNameForRepo(absRepoPath) }));
 
     try {
       if (opts.reset) {
@@ -83,6 +97,18 @@ export class MigrationGraphManager {
         baselineRoutesJson = JSON.stringify(Array.isArray(parsedRoutes) ? parsedRoutes.sort() : []);
       } catch (err) {
         console.error('[bkb] Warning: Failed to run routeSnapshotCmd:', err);
+      }
+
+      // Safety check: verify existing graph does not belong to a different repo
+      if (!opts.reset) {
+        const existingMeta = await client.roQuery<{ repoPath: string }>(
+          `MATCH (meta:MigrationMeta) RETURN meta.repo_path AS repoPath LIMIT 1`
+        ).catch(() => []);
+        if (existingMeta.length > 0 && existingMeta[0].repoPath && resolve(existingMeta[0].repoPath) !== absRepoPath) {
+          throw new Error(
+            `Graph "${client.graphName}" contains state for "${existingMeta[0].repoPath}", not "${absRepoPath}". Pass --reset or use a distinct graph.`
+          );
+        }
       }
 
       // 3. Upsert singleton :MigrationMeta node

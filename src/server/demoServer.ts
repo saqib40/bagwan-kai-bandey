@@ -21,7 +21,7 @@ import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, ex
 import { resolve, join, extname, basename, relative, isAbsolute } from 'node:path';
 import { ensureFalkorDB } from '../engine/docker';
 import { FalkorClient } from '../engine/falkorClient';
-import { MigrationGraphManager } from '../engine/graphManager';
+import { MigrationGraphManager, getGraphNameForRepo as getEngineGraphName } from '../engine/graphManager';
 import { MigrationOps, type Phase } from '../engine/operations';
 import { LlmClient } from '../runner/llmClient';
 import { saveCheckpoint, listCheckpoints, rollbackToCheckpoint } from '../runner/rollback';
@@ -51,9 +51,10 @@ const DEFAULT_TARGET_REPO = resolve(WORKSPACE, 'scratch/cockpit-demo-repo');
 const DEFAULT_PACK_ID = 'express-to-fastify';
 
 export function getGraphNameForRepo(repoPath: string): string {
-  if (process.env.BKB_GRAPH) return process.env.BKB_GRAPH;
-  if (repoPath === DEFAULT_TARGET_REPO) return 'bkb_cockpit';
-  return 'bkb';
+  if (repoPath === DEFAULT_TARGET_REPO) {
+    return process.env.BKB_GRAPH ?? 'bkb_cockpit';
+  }
+  return getEngineGraphName(repoPath);
 }
 
 // ── Dynamic Server State ─────────────────────────────────
