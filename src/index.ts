@@ -55,7 +55,9 @@ export {
   type SnapshotKind,
   type PackageDetector,
   type MigrationPack,
+  type ShimStrategy,
 } from './adapters/types';
+export { getShimStrategy, DEFAULT_SHIM_STRATEGY, RUNTIME_INTEROP_MARKER } from './adapters/types';
 export { BaseLanguageAdapter } from './adapters/baseAdapter';
 export { TreeSitterQueryAdapter } from './adapters/treeSitterAdapter';
 export { TypeScriptAdapter } from './adapters/typescriptAdapter';
@@ -83,6 +85,7 @@ export {
   type LlmResponse,
   extractCodeFromMarkdown,
   loadFixtureMockTransforms,
+  shimRuleForStrategy,
 } from './runner/llmClient';
 export {
   saveCheckpoint,

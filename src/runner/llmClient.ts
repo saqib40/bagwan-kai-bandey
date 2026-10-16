@@ -9,7 +9,12 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { shimMarkerList } from '../adapters/types';
+import {
+  shimMarkerList,
+  DEFAULT_SHIM_STRATEGY,
+  RUNTIME_INTEROP_MARKER,
+  type ShimStrategy,
+} from '../adapters/types';
 
 export interface LlmRequest {
   targetPath: string;
@@ -46,6 +51,24 @@ export interface LlmClientOptions {
   repoPath?: string;
   /** Additional/overriding mock transforms, keyed by `"<targetPath>:<phase>"`. */
   mockTransforms?: Record<string, LlmResponse>;
+  /** SHIM lifecycle style for prompt guidance. Defaults to `in-file-branch`. */
+  shimStrategy?: ShimStrategy;
+}
+
+/**
+ * Returns the phase-2 (`SHIM`) prompt rule for a pack's shim strategy.
+ */
+export function shimRuleForStrategy(strategy: ShimStrategy): string {
+  if (strategy === 'runtime-interop') {
+    return (
+      `In Phase "SHIM": emit pure target-module syntax (no dual syntax in one file). ` +
+      `Preserve every CommonJS export shape: a callable/default \`module.exports = X\` becomes ` +
+      `\`export default X\` plus \`export { X as "module.exports" }\`; named exports become ` +
+      `\`export const <name>\`. Tag the module with a \`// ${RUNTIME_INTEROP_MARKER}\` comment. ` +
+      `Forbidden: top-level await, dynamic/conditional exports, and post-conversion \`module.exports\` reassignment.`
+    );
+  }
+  return `In Phase "SHIM": Maintain backward compatibility for callers that still use the legacy API using ${shimMarkerList()} tags on legacy lines. Both markers are accepted.`;
 }
 
 /**
@@ -453,6 +476,7 @@ export class LlmClient {
   readonly apiKey?: string;
   readonly baseUrl?: string;
   readonly language: string;
+  readonly shimStrategy: ShimStrategy;
   readonly mockTransforms: Record<string, LlmResponse>;
 
   constructor(options: LlmClientOptions = {}) {
@@ -460,6 +484,7 @@ export class LlmClient {
     this.apiKey = options.apiKey ?? (this.provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY);
     this.baseUrl = options.baseUrl;
     this.language = options.language ?? 'typescript';
+    this.shimStrategy = options.shimStrategy ?? DEFAULT_SHIM_STRATEGY;
     this.mockTransforms = {
       ...BUILTIN_MOCK_TRANSFORMS,
       ...loadFixtureMockTransforms(options.repoPath),
@@ -536,7 +561,7 @@ ${req.previousErrors?.length ? `PREVIOUS COMPILATION / INVARIANT ERRORS (Please 
 
 RULES:
 1. Return ONLY valid, compilable ${displayLanguage(this.language)} code inside a single \`\`\`${fence} ... \`\`\` code block.
-2. In Phase "SHIM": Maintain backward compatibility for callers that still use the legacy API using ${shimMarkerList()} tags on legacy lines. Both markers are accepted.
+2. ${shimRuleForStrategy(this.shimStrategy)}
 3. In Phase "MIGRATE": Replace internal legacy API usages with modern target framework equivalents.
 4. In Phase "DE_SHIM": Remove all ${shimMarkerList()} tags and legacy fallback branches entirely.
 5. Invariants: Preserve all exported names, public symbols, route paths, parameter names, and HTTP status codes exactly as required by the migration pack's invariants.`;

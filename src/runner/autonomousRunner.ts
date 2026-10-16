@@ -78,7 +78,11 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
 
   const mgr = await MigrationGraphManager.create(repoPath, packId, { graphName, client });
   const ops = new MigrationOps(mgr.db, mgr.pack, mgr.repoPath);
-  const llm = new LlmClient({ ...options, language: options.language ?? mgr.pack.language });
+  const llm = new LlmClient({
+    ...options,
+    language: options.language ?? mgr.pack.language,
+    shimStrategy: options.shimStrategy ?? mgr.pack.shimStrategy,
+  });
 
   let stepCount = 0;
   const migratedSet = new Set<string>();

@@ -76,6 +76,24 @@ export interface InvariantRule {
   format?: string;
 }
 
+/**
+ * How a pack realizes the SHIM → DE_SHIM lifecycle (plan decision D1).
+ *  - `in-file-branch`: dual-runtime branches in one file, tagged with shim markers.
+ *  - `runtime-interop`: module-system migration where a file becomes pure target
+ *    syntax and CJS callers rely on `require(esm)` (Node >= 22.12).
+ */
+export type ShimStrategy = 'in-file-branch' | 'runtime-interop';
+
+export const DEFAULT_SHIM_STRATEGY: ShimStrategy = 'in-file-branch';
+
+/** Shim marker used by `runtime-interop` packs to tag temporarily-shimmed modules. */
+export const RUNTIME_INTEROP_MARKER = '@bkb-shim: esm-runtime-interop';
+
+/** Returns the pack's shim strategy, defaulting to `in-file-branch`. */
+export function getShimStrategy(pack: { shimStrategy?: ShimStrategy }): ShimStrategy {
+  return pack.shimStrategy ?? DEFAULT_SHIM_STRATEGY;
+}
+
 /** Kinds of global verification snapshot comparison. */
 export type SnapshotKind = 'set' | 'count' | 'exact';
 
@@ -122,6 +140,8 @@ export interface MigrationPack {
   id: string;
   name: string;
   language: string;
+  /** SHIM lifecycle style. Defaults to `in-file-branch`. */
+  shimStrategy?: ShimStrategy;
   trustedExecutionNote?: string;
   knownLimitations?: string[];
   sourceGlobs: {

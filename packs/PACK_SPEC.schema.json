@@ -19,6 +19,11 @@
       "minLength": 1,
       "description": "Language adapter identifier (e.g. \"typescript\", \"python\")."
     },
+    "shimStrategy": {
+      "type": "string",
+      "enum": ["in-file-branch", "runtime-interop"],
+      "description": "SHIM lifecycle style. `in-file-branch` (default) uses dual-runtime branches; `runtime-interop` targets module-system migrations requiring require(esm)."
+    },
     "trustedExecutionNote": { "type": "string" },
     "knownLimitations": {
       "type": "array",
