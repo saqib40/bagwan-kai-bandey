@@ -81,7 +81,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
     {
       repoPath: z.string().describe('Path to the target repository (relative or absolute)'),
       packId: z.string().describe('Pack identifier (e.g. "express-to-fastify") or path to pack JSON'),
-      reset: z.boolean().optional().default(true).describe('Whether to drop the graph before ingest (default: true)'),
+      reset: z.boolean().optional().default(false).describe('Drop the graph before ingest. Default false so a repeated init does not wipe progress.'),
     },
     async ({ repoPath, packId, reset }) => {
       try {
@@ -96,7 +96,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
           packId,
           graphName: activeGraphName,
           client,
-          reset: reset ?? true,
+          reset: reset ?? false,
         });
 
         return {

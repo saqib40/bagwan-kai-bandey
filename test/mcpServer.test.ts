@@ -31,6 +31,10 @@ test('verify_and_commit_node accepts a call that omits agentSummary', async () =
     const required = (verify?.inputSchema as { required?: string[] } | undefined)?.required ?? [];
     assert.ok(required.includes('modulePaths'));
     assert.equal(required.includes('agentSummary'), false);
+    const init = tools.find((t) => t.name === 'init_migration_graph');
+    const resetDefault = (init?.inputSchema as { properties?: { reset?: { default?: boolean } } } | undefined)
+      ?.properties?.reset?.default;
+    assert.equal(resetDefault, false);
     const instructions = client.getInstructions() ?? '';
     assert.match(instructions, /claim_next_leaf/);
     assert.match(instructions, /get_migration_slice/);

@@ -307,7 +307,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     } else {
       repoPath = repoPath ?? './demo-repo';
       packId = packId ?? 'express-to-fastify';
-      reset = reset ?? true;
+      reset = reset ?? false;
     }
 
     const absRepoPath = resolve(repoPath);
