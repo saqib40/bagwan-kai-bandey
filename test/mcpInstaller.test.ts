@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -8,12 +8,15 @@ import {
   generateOpencodeConfig,
   installMcpConfig,
   formatMcpInstallReport,
+  buildOpencodeAddCommand,
 } from '../src/cli/mcpInstaller';
 
 test('bkb mcp install: generates valid server configuration', () => {
   const config = generateServerConfig('/path/to/cli.ts', '/my/repo', 'express-to-fastify');
-  assert.equal(config.command, 'tsx');
+  assert.equal(config.command, 'npx');
   assert.deepEqual(config.args, [
+    '-y',
+    'tsx',
     '/path/to/cli.ts',
     'serve',
     '--repo',
@@ -21,6 +24,14 @@ test('bkb mcp install: generates valid server configuration', () => {
     '--pack',
     'express-to-fastify',
   ]);
+});
+
+test('bkb mcp install: quotes opencode arguments that contain spaces', () => {
+  const command = buildOpencodeAddCommand(['npx', '-y', 'tsx', '/path/My Repo/cli.ts', 'serve']);
+  assert.equal(
+    command,
+    "opencode mcp add bkb -- npx -y tsx '/path/My Repo/cli.ts' serve",
+  );
 });
 
 test('bkb mcp install: generates valid opencode configuration', () => {
@@ -59,7 +70,9 @@ test('bkb mcp install: installs into custom workspace directory idempotently', a
 
     const content = JSON.parse(readFileSync(expectedFile, 'utf8'));
     assert.ok(content.mcpServers?.bkb);
-    assert.equal(content.mcpServers.bkb.command, 'tsx');
+    assert.equal(content.mcpServers.bkb.command, 'npx');
+    assert.equal(content.mcpServers.bkb.args[0], '-y');
+    assert.equal(content.mcpServers.bkb.args[1], 'tsx');
 
     // Second run: test idempotency
     const rerun = await installMcpConfig('vscode', {
@@ -124,6 +137,27 @@ test('bkb mcp install: installs opencode config into custom workspace directory 
     const report = formatMcpInstallReport(results);
     assert.ok(report.includes('1-Click MCP Setup'));
     assert.ok(report.includes('[OPENCODE]'));
+  } finally {
+    rmSync(scratchDir, { recursive: true, force: true });
+  }
+});
+
+test('bkb mcp install: does not overwrite a config it cannot parse', async () => {
+  const scratchDir = mkdtempSync(join(tmpdir(), 'bkb-mcp-jsonc-'));
+  const configPath = join(scratchDir, '.vscode', 'mcp.json');
+  const original = '{\n  // comment\n  "mcpServers": {}\n}\n';
+
+  try {
+    mkdirSync(join(scratchDir, '.vscode'), { recursive: true });
+    writeFileSync(configPath, original);
+
+    const results = await installMcpConfig('vscode', {
+      cliPath: '/test/bin/cli.ts',
+      workspaceRoot: scratchDir,
+    });
+
+    assert.equal(results[0]?.status, 'failed');
+    assert.equal(readFileSync(configPath, 'utf8'), original);
   } finally {
     rmSync(scratchDir, { recursive: true, force: true });
   }

@@ -69,9 +69,37 @@ export function getMcpConfigPath(
   }
 }
 
+export function shellQuote(arg: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)) return arg;
+  return `'${arg.replace(/'/g, `'\\''`)}'`;
+}
+
+export function buildOpencodeAddCommand(args: string[]): string {
+  return `opencode mcp add bkb -- ${args.map(shellQuote).join(' ')}`;
+}
+
+function readJsonConfig(
+  configPath: string,
+): { ok: true; value: Record<string, any>; isNew: boolean } | { ok: false; message: string } {
+  if (!existsSync(configPath)) return { ok: true, value: {}, isNew: true };
+  try {
+    const value = JSON.parse(readFileSync(configPath, 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return { ok: false, message: `Refusing to overwrite non-object config at ${configPath}` };
+    }
+    return { ok: true, value, isNew: false };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      message: `Refusing to overwrite unparseable config at ${configPath}: ${message}`,
+    };
+  }
+}
+
 export function generateServerConfig(cliPath: string, repoPath?: string, packId?: string) {
   const resolvedCli = resolve(cliPath);
-  const args = [resolvedCli, 'serve'];
+  const args = ['-y', 'tsx', resolvedCli, 'serve'];
   if (repoPath) {
     args.push('--repo', resolve(repoPath));
   }
@@ -80,7 +108,7 @@ export function generateServerConfig(cliPath: string, repoPath?: string, packId?
   }
 
   return {
-    command: 'tsx',
+    command: 'npx',
     args,
   };
 }
@@ -166,7 +194,7 @@ export async function installMcpConfig(
           if (options.repoPath) args.push('--repo', resolve(options.repoPath));
           if (options.packId) args.push('--pack', options.packId);
 
-          execSync(`opencode mcp add bkb -- ${args.join(' ')}`, { stdio: 'pipe' });
+          execSync(buildOpencodeAddCommand(args), { stdio: 'pipe' });
 
           results.push({
             target: t,
@@ -181,17 +209,19 @@ export async function installMcpConfig(
             mkdirSync(parentDir, { recursive: true });
           }
 
-          let existing: Record<string, any> = {};
-          let isNew = true;
-
-          if (existsSync(configPath)) {
-            isNew = false;
-            try {
-              existing = JSON.parse(readFileSync(configPath, 'utf8'));
-            } catch {
-              existing = {};
-            }
+          const loaded = readJsonConfig(configPath);
+          if (!loaded.ok) {
+            results.push({
+              target: t,
+              configPath,
+              status: 'failed',
+              message: loaded.message,
+              serverKey: 'bkb',
+            });
+            continue;
           }
+          const existing = loaded.value;
+          const isNew = loaded.isNew;
 
           if (!existing.mcp || typeof existing.mcp !== 'object') existing.mcp = {};
           if (!existing.mcp.servers || typeof existing.mcp.servers !== 'object') existing.mcp.servers = {};
@@ -236,18 +266,19 @@ export async function installMcpConfig(
         mkdirSync(parentDir, { recursive: true });
       }
 
-      let existing: Record<string, any> = {};
-      let isNew = true;
-
-      if (existsSync(configPath)) {
-        isNew = false;
-        try {
-          const raw = readFileSync(configPath, 'utf8');
-          existing = JSON.parse(raw);
-        } catch {
-          existing = {};
-        }
+      const loaded = readJsonConfig(configPath);
+      if (!loaded.ok) {
+        results.push({
+          target: t,
+          configPath,
+          status: 'failed',
+          message: loaded.message,
+          serverKey: 'bkb',
+        });
+        continue;
       }
+      const existing = loaded.value;
+      const isNew = loaded.isNew;
 
       if (!existing.mcpServers || typeof existing.mcpServers !== 'object') {
         existing.mcpServers = {};
