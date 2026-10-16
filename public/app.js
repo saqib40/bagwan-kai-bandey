@@ -787,7 +787,13 @@ function renderSingleFileDiff(f) {
 }
 
 function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ── openCypher Query Stream Terminal ──────────────────────
@@ -923,16 +929,17 @@ function renderAuditTrail(episodes) {
   feed.innerHTML = sorted
     .map((ep) => {
       const paths = (ep.modules || []).map((m) => m.replace(/^src\//, '')).join(', ');
+      const rawModulePaths = (ep.modules || []).join(',');
       const phaseStr = ep.phase || 'MIGRATE';
-      const statusClass = ep.newStatus || 'VERIFIED';
+      const statusClass = (ep.newStatus || 'VERIFIED').replace(/[^A-Za-z0-9_-]/g, '');
       return `
-        <div class="audit-item" onclick="inspectEpisodeFiles('${escapeHtml((ep.modules || []).join(','))}')" title="Click to inspect module in viewer">
+        <div class="audit-item" data-modules="${escapeHtml(rawModulePaths)}" title="Click to inspect module in viewer">
           <div class="audit-item-left">
             <span class="audit-step">#${ep.step}</span>
             <span class="audit-phase">${escapeHtml(phaseStr)}</span>
             <span class="audit-path" title="${escapeHtml(paths)}">${escapeHtml(paths)}</span>
           </div>
-          <div class="audit-status status-${statusClass}">${escapeHtml(statusClass)}</div>
+          <div class="audit-status status-${statusClass}">${escapeHtml(ep.newStatus || 'VERIFIED')}</div>
         </div>
       `;
     })
@@ -1159,13 +1166,13 @@ async function openNodeInspector(nodeId) {
     const callersList = document.getElementById('drawer-callers-list');
     document.getElementById('drawer-callers-count').textContent = data.callers?.length ?? 0;
     callersList.innerHTML = data.callers?.length
-      ? data.callers.map((c) => `<span class="jump-chip" onclick="jumpToNode('${c.path}')">${c.path.replace(/^src\//, '')}</span>`).join('')
+      ? data.callers.map((c) => `<span class="jump-chip" data-node-path="${escapeHtml(c.path)}">${escapeHtml(c.path.replace(/^src\//, ''))}</span>`).join('')
       : '<span style="color: #64748B; font-size: 0.7rem;">None (Root entrypoint)</span>';
 
     const calleesList = document.getElementById('drawer-callees-list');
     document.getElementById('drawer-callees-count').textContent = data.callees?.length ?? 0;
     calleesList.innerHTML = data.callees?.length
-      ? data.callees.map((c) => `<span class="jump-chip" onclick="jumpToNode('${c.path}')">${c.path.replace(/^src\//, '')}</span>`).join('')
+      ? data.callees.map((c) => `<span class="jump-chip" data-node-path="${escapeHtml(c.path)}">${escapeHtml(c.path.replace(/^src\//, ''))}</span>`).join('')
       : '<span style="color: #64748B; font-size: 0.7rem;">None (Leaf module)</span>';
 
     const blastList = document.getElementById('drawer-blast-list');
@@ -1173,7 +1180,7 @@ async function openNodeInspector(nodeId) {
     blastList.innerHTML = data.blastRadius?.length
       ? data.blastRadius.map((b) => `
           <div class="blast-row">
-            <span class="jump-chip" onclick="jumpToNode('${b.callerPath}')">${b.callerPath.replace(/^src\//, '')}</span>
+            <span class="jump-chip" data-node-path="${escapeHtml(b.callerPath)}">${escapeHtml(b.callerPath.replace(/^src\//, ''))}</span>
             <span class="hop-badge">${b.hops} Hop${b.hops > 1 ? 's' : ''}</span>
           </div>
         `).join('')
@@ -1679,6 +1686,24 @@ function setupDrawerTabs() {
   document.getElementById('btn-close-drawer')?.addEventListener('click', closeNodeInspector);
 }
 
+function setupDelegatedClickHandlers() {
+  document.addEventListener('click', (e) => {
+    // 1. Jump chip click in node inspector drawer
+    const chip = e.target.closest('.jump-chip');
+    if (chip && chip.dataset.nodePath) {
+      jumpToNode(chip.dataset.nodePath);
+      return;
+    }
+
+    // 2. Audit feed item click to inspect episode modules
+    const auditItem = e.target.closest('.audit-item');
+    if (auditItem && auditItem.dataset.modules) {
+      inspectEpisodeFiles(auditItem.dataset.modules);
+      return;
+    }
+  });
+}
+
 // ── Application Bootstrapper ──────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -1688,6 +1713,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     setupCypherDrawer();
     setupSettingsModal();
     setupDrawerTabs();
+    setupDelegatedClickHandlers();
     await loadSystemInfo();
     renderMissionDeck();
     await loadAuditTrail();
