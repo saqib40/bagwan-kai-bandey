@@ -32,6 +32,12 @@ We formalize `shimStrategy` in the pack definition:
 - **`runtime-interop`** (*For module system migrations like `cjs-to-esm`*):
   - In Node $\ge 22.12$, CommonJS callers can synchronously `require()` ES modules that do not contain Top-Level Await (TLA).
   - When a leaf module transitions to ESM, it exports pure ESM syntax, tagged with an interop marker `// @bkb-shim: esm-runtime-interop`.
+  - **Export-shape preservation is mandatory.** Because `require(esm)` returns the *module namespace object* (not the `default` export), the shim must map every CJS export to an ESM form that preserves call-site shape:
+    - `module.exports = X` (callable/default) $\rightarrow$ `export default X` **plus** `export { X as "module.exports" }`, so Node's named-export interop makes bare `require()` return `X` rather than `{ default: X }`.
+    - `exports.a = ...` / `module.exports.a = ...` $\rightarrow$ `export const a = ...`, preserving destructuring (`const { a } = require(...)`).
+    - `module.exports = { a, b }` $\rightarrow$ `export { a, b }`.
+  - The `export-surface` snapshot MUST validate call shape (invoke callable/default exports), not only export *names*; a name-only comparison passes while runtime calls break.
+  - **Forbidden in shimmed/interop modules:** Top-Level Await, dynamic/conditional exports, and post-conversion `module.exports` reassignment. These are recorded as pack `knownLimitations`.
   - Node $\ge 22.12$ is verified via an engine preflight check.
   - At `DE_SHIM`, all upstream callers have transitioned to `import`, and the interop comment is removed.
 
@@ -114,9 +120,13 @@ flowchart TD
    - Add `.cjs` and `.mjs` to `TypeScriptAdapter` resolution extensions (`src/adapters/typescriptAdapter.ts:340`).
 6. **Execution Robustness**:
    - Support `verification.timeoutMs` in packs to allow test runners like Vitest and Pytest sufficient execution time.
+7. **Shared Tree-Sitter Query Adapter**:
+   - Extract `TreeSitterQueryAdapter extends BaseLanguageAdapter` into `src/adapters/treeSitterAdapter.ts` (query cache, `getCompiledQuery`, detection-rule evaluation, invariant extraction, line formatting).
+   - Refactor `TypeScriptAdapter` to extend it as a thin grammar/resolver subclass. This is a pure, behaviour-preserving refactor: it must land before any Python work and keep the existing suites green.
 
 #### Verification Criteria
-- All 55 existing tests continue to pass.
+- The **zero-Docker** test subset passes (every suite except the FalkorDB-dependent `initMigrationGraph`, `runner`, `e2eDryRun`, and `benchmark` tests). The full `npm test` run requires a live FalkorDB and is out of scope for CI.
+- The `TypeScriptAdapter` refactor onto `TreeSitterQueryAdapter` is behaviour-preserving (`typescriptAdapter`, `operations`, and `extensibility` suites stay green).
 - Unit tests verify that `extractCodeFromMarkdown` handles ````python```` fences and that snapshot comparisons skip cleanly when no snapshots are configured.
 
 ---
@@ -125,12 +135,14 @@ flowchart TD
 *Establishes declarative package detection and strict CLI validation.*
 
 #### Deliverables
-1. **Package Detectors**:
+1. **Package Detectors (precondition checks, no graph mutation)**:
    - Add `packageDetectors: { id: string; file: string; match: { legacy?: string[]; target?: string[] } }[]` to `PACK_SPEC.schema.json`.
-   - Wire `graphManager` to parse project manifests (e.g. `package.json`, `pyproject.toml`) and create external package dependency nodes in FalkorDB.
+   - Parse project manifests (e.g. `package.json`, `pyproject.toml`) and surface matches as pack preconditions/advisories (e.g. "this repository uses Jest/Flask") for gating, diagnostics, and cockpit display.
+   - **Must not create graph nodes.** Synthesising `:Module` nodes or `IMPORTS` edges to packages would perturb `CLAIM_LEAF`, `pending_callers_count`, `BLAST_RADIUS`, and `RECOMPUTE_DEGREES`. If package nodes are ever needed for visualisation, they must use a separate `:Package` label with no `IMPORTS` edges and be excluded from status/degree recomputation — deferred until a pack demonstrably requires it.
 2. **Schema & Semantic Validation**:
-   - Create `bkb pack validate <path>` command using Ajv against `PACK_SPEC.schema.json`.
+   - Create `bkb pack validate <path>` command using Ajv (new runtime dependency) against `PACK_SPEC.schema.json`.
    - Add semantic validators: ensure commands are non-empty, reject checkpoint-scope invariants with an actionable hint to use snapshots, and verify AST query syntax.
+   - AST-query validation is grammar-specific: only compile queries when `adapterRegistry.has(pack.language)`. For languages with no registered adapter (e.g. `python` before M4), emit a warning and skip query compilation rather than failing.
 3. **Migrate Built-in Pack**:
    - Update `packs/express-to-fastify.json` to conform to the new schema.
 
@@ -157,15 +169,18 @@ flowchart TD
      - `SHIM`: Retain pure ESM exports with top-level `// @bkb-shim: esm-runtime-interop` comment.
      - `DE_SHIM`: Prune `// @bkb-shim` comments once callers have converted to `import`.
    - **Snapshots**:
-     - `export-surface`: runs `node scripts/dump-exports.mjs` (`kind: "set"`).
+     - `export-surface`: runs `node scripts/dump-exports.mjs` (`kind: "set"`), validating both export **names and call shape** (invoking callable/default exports).
 2. **Preflight Node Version Gate**:
    - Validates that runtime Node is $\ge 22.12.0$ for native synchronous `require(esm)`.
 3. **Demo Fixture (`demo-repo-cjs`)**:
    - 8 modules: foundational utilities, circular service dependencies, domain routes, and entrypoint.
    - Configured with `"allowJs": true` in `tsconfig.json`.
    - Includes `.bkb-mocks.json` for deterministic E2E runner tests.
-4. **Automated Test Suite**:
+4. **Export Snapshot Script (`scripts/dump-exports.mjs`)**:
+   - Dynamically imports each migrated module's entry/exported surface and emits a sorted JSON array of export names; additionally invokes default/callable exports so namespace-vs-callable shape regressions are caught.
+5. **Automated Test Suite**:
    - `test/packs/cjsToEsm.test.ts`: validates AST queries, topological claim order, and full autonomous migration loop.
+   - Records the `runtime-interop` constraints (no TLA, no dynamic exports) as pack `knownLimitations`.
 
 #### Verification Criteria
 - Autonomous runner migrates `demo-repo-cjs` from 100% CJS to 100% ESM.
@@ -189,11 +204,13 @@ flowchart TD
      - `MIGRATE`: Replace `jest.mock()` with `vi.mock()`, import `{ describe, it, expect, vi } from 'vitest'`.
      - `DE_SHIM`: Remove `(globalThis as any).jest` fallbacks and `@bkb-shim` comments.
    - **Snapshots**:
-     - `test-counts`: runs a script parsing test runner output and emits `{ suites: N, tests: M }` (`kind: "count"`).
+     - `test-counts`: a script that parses **both** Jest output (baseline, captured at init) and Vitest output (checkpoint) and emits `{ suites: N, tests: M }` (`kind: "count"`).
 2. **Demo Fixture (`demo-repo-jest`)**:
    - Express/TypeScript test suite featuring unit tests, shared mock factories, and integration tests.
-3. **Automated Test Suite**:
-   - `test/packs/jestToVitest.test.ts`: executes migration loop and runs `npx vitest run`.
+3. **Runner-Agnostic Test Command**:
+   - `checkpointTestCmd` must be a wrapper that selects the runner from `package.json` (Jest before migration, Vitest after). Early checkpoints may still contain Jest-only files, so a bare `npx vitest run` would fail mid-migration.
+4. **Automated Test Suite**:
+   - `test/packs/jestToVitest.test.ts`: executes migration loop and runs the runner-agnostic test command.
 
 #### Verification Criteria
 - All `jest.*` references converted to `vi.*`.
@@ -204,17 +221,16 @@ flowchart TD
 ### Milestone M4: Python Language Adapter Foundation
 
 #### Deliverables
-1. **Tree-Sitter Base Extraction**:
-   - Implement `TreeSitterQueryAdapter extends BaseLanguageAdapter` in `src/adapters/treeSitterAdapter.ts`.
-   - Refactor `TypeScriptAdapter` to extend `TreeSitterQueryAdapter` (ensuring 100% backwards compatibility).
-2. **Python Adapter Implementation (`PythonAdapter`)**:
-   - Integrates `tree-sitter-python.wasm`.
+1. **Python Adapter Implementation (`PythonAdapter`)**:
+   - Add the `tree-sitter-python` grammar dependency (or vendor `tree-sitter-python.wasm`) and load it through the M0 `TreeSitterQueryAdapter`.
+   - Extends `TreeSitterQueryAdapter` (delivered in M0) as a thin grammar/resolver subclass — no query-engine duplication.
+   - Register the adapter: `AdapterRegistry` currently registers only `TypeScriptAdapter` (`src/adapters/registry.ts:18`), so add an explicit `register(new PythonAdapter())` (or a `language` $\rightarrow$ adapter bootstrap) so `adapterRegistry.get('python')` resolves.
    - Implements Python file discovery (`.py`, excluding `__pycache__`, `.venv`, `venv`, `.pytest_cache`).
    - Implements Python import resolution:
      - Dotted absolute imports (`import app.services.users` $\rightarrow$ `app/services/users.py`).
      - Relative package imports (`from .utils import response_json`).
    - Extracts Python universal symbols (functions, classes, decorated methods).
-3. **Automated Test Suite**:
+2. **Automated Test Suite**:
    - `test/adapters/pythonAdapter.test.ts`: verifies AST parsing, import edge discovery, symbol extraction, and Tarjan SCC cycle detection on Python code.
 
 #### Verification Criteria
@@ -242,6 +258,7 @@ flowchart TD
    - **Snapshots**:
      - `route-surface`: runs `python scripts/dump_routes.py` (`kind: "set"`).
 2. **Route Canonicalizer Algorithm (`scripts/dump_routes.py`)**:
+   - Framework-agnostic: detects whether the target is the Flask app (baseline, captured at init) or the FastAPI app (checkpoint) and enumerates routes accordingly, so one script serves both baseline capture and comparison.
    - Normalizes path parameter formats: Flask `<int:id>` $\rightarrow$ `{id}`.
    - Normalizes trailing slashes (except root `/`).
    - Excludes default `/static` endpoints.
@@ -252,6 +269,7 @@ flowchart TD
    - Preflight helper skips or warns if `python3` or `pytest` are not installed on host.
 4. **Demo Fixture (`demo-repo-flask`)**:
    - 7-file Python application: `app.py`, `routes/`, `services/`, `utils/`, with `pytest` suite.
+   - Ships its own dependency manifest and interpreter strategy (venv or documented requirements); the preflight helper skips the fixture's E2E test when `python3`/`pytest` or the required packages are unavailable.
 5. **Automated Test Suite**:
    - `test/packs/flaskToFastapi.test.ts`: runs autonomous migration loop with injected mocks.
 
@@ -301,6 +319,13 @@ To prevent tests from hanging in CI or on machines without Docker:
 - **Pack Runner E2E Tests**: Use `createMockClient(...)` to simulate FalkorDB graph operations in-process, or pass `autoInit: false` where server instantiation is required.
 - **Execution Timeouts**: All asynchronous runner tests define explicit timeouts (`timeoutMs: 30000`).
 
+### Dual-Framework Gate Policy
+Baselines are captured at `init` while gates run at checkpoints, so a pack's snapshot and test commands execute against **two** frameworks over a single run and must not assume the post-migration framework when first invoked:
+- **`jest-to-vitest`**: the `test-counts` snapshot parses both Jest and Vitest output; `checkpointTestCmd` is a runner-selecting wrapper.
+- **`flask-to-fastapi`**: `dump_routes.py` detects Flask vs FastAPI and canonicalizes both.
+
+Any command that runs at both `init` and checkpoint must be framework-agnostic by construction.
+
 ---
 
 ## 5. Risk Register & Mitigations
@@ -309,6 +334,8 @@ To prevent tests from hanging in CI or on machines without Docker:
 |---|---|---|
 | **Node.js `< 22.12` running `cjs-to-esm`** | High | Add engine preflight check asserting `process.versions.node >= 22.12`. Fail fast with an actionable error. |
 | **Undecidable dynamic CJS exports** | Medium | `export-surface` AST rule is best-effort; the runtime export snapshot (`scripts/dump-exports.mjs`) is the authoritative gate. |
+| **`require(esm)` namespace-shape break** (`const f = require('./f')` becomes `f.default`) | High | Enforce the D1 export-shape mapping (`export { X as "module.exports" }` for callable defaults, named exports otherwise); validate call shape in `export-surface`, not just names. |
+| **Early-checkpoint framework mismatch** (Jest/Vitest, Flask/FastAPI) | Medium | Dual-framework snapshot + test wrappers (see §4 Dual-Framework Gate Policy). |
 | **`mypy --strict` failing on intermediate Python steps** | High | Configure `perStepTypecheckCmd` with non-strict flags (`mypy --ignore-missing-imports` or `pyright`). |
 | **Flask vs. FastAPI route format discrepancies** | High | Implement deterministic route canonicalizer in `dump_routes.py` normalizing `<type:param>` to `{param}`. |
 | **Test runner timeout during `checkpointTestCmd`** | Medium | Support `verification.timeoutMs` in pack schema; default Vitest/Pytest to 30s. |
