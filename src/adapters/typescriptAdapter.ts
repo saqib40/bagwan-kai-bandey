@@ -337,7 +337,7 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
 
       if (candidateBases.length === 0) continue;
 
-      const extensions = ['', '.ts', '.tsx', '.d.ts', '.js', '.mjs', '/index.ts', '/index.tsx', '/index.js'];
+      const extensions = ['', '.ts', '.tsx', '.d.ts', '.js', '.mjs', '.cjs', '/index.ts', '/index.tsx', '/index.js', '/index.mjs', '/index.cjs'];
       let found = false;
 
       for (const candidateBase of candidateBases) {
@@ -368,7 +368,13 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
             assumed = assumedTs;
           }
         }
-        if (!assumed.endsWith('.ts') && !assumed.endsWith('.tsx') && !assumed.endsWith('.js')) {
+        if (
+          !assumed.endsWith('.ts') &&
+          !assumed.endsWith('.tsx') &&
+          !assumed.endsWith('.js') &&
+          !assumed.endsWith('.mjs') &&
+          !assumed.endsWith('.cjs')
+        ) {
           assumed += '.ts';
         }
         resolvedSet.add(assumed);

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve, join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { TypeScriptAdapter } from '../src/adapters/typescriptAdapter';
 import type { MigrationPack } from '../src/adapters/types';
 
@@ -76,6 +77,25 @@ test('TypeScriptAdapter resolves ESM .js imports to existing .ts files', async (
 
   assert.ok(parsed.imports.includes('src/utils/response.ts'));
   assert.ok(parsed.imports.includes('src/utils/hash.ts'));
+});
+
+test('TypeScriptAdapter resolves relative .cjs and .mjs imports', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bkb-cjs-esm-'));
+  try {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'src/legacy.cjs'), 'module.exports = { value: 1 };\n');
+    writeFileSync(join(dir, 'src/modern.mjs'), 'export const value = 2;\n');
+
+    const adapter = new TypeScriptAdapter();
+    await adapter.init();
+    const source = `import legacy from "./legacy.cjs";\nimport { value } from "./modern.mjs";`;
+    const parsed = await adapter.parseModule(dir, 'src/main.ts', source, pack);
+
+    assert.ok(parsed.imports.includes('src/legacy.cjs'));
+    assert.ok(parsed.imports.includes('src/modern.mjs'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('TypeScriptAdapter resolves path aliases and baseUrl from tsconfig.json', async () => {
