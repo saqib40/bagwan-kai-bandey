@@ -15,27 +15,26 @@ While synthetic fixtures (`demo-repo`, `demo-repo-cjs`, `demo-repo-jest`, `demo-
 To prevent token exhaustion, long execution stalls, or combinatorial graph explosion, candidate repositories must satisfy five strict criteria:
 
 1. **Module Count (10–35 source files):** Sufficiently complex to exercise multi-tier dependencies; small enough to migrate within bounded time and token budgets.
+   - *Sub-10 Module Smoke-Test Exception:* Micro-libraries with 2–8 modules (such as `is-plain-obj` or `node-glob`) are permitted as rapid Phase 1–2 smoke targets to verify export shapes and CJS interop without long execution times.
 2. **Pre-Existing Passing Tests:** Must have a working, reproducible automated test suite (`npm test`, `pytest`, etc.) at baseline before migration begins.
-3. **Topological Depth:** Must contain distinct architectural layers (leaf utilities $\rightarrow$ services/models $\rightarrow$ controllers/routes $\rightarrow$ entrypoint).
-4. **Deterministic Version Pinning:** Every repository is pinned to an exact release tag or commit SHA.
+3. **Topological Depth:** Must contain distinct architectural layers (leaf utilities → services/models → controllers/routes → entrypoint).
+4. **Deterministic Version Pinning:** Every repository is pinned to an exact release tag or default branch commit (verify at checkout).
 5. **Workspace Isolation:** All repositories are cloned exclusively into the git-ignored `scratch/` directory and never committed to BKB's source tree.
 
 ---
 
 ## 2. Complete Open-Source Repository Catalog
 
-All options across all four migration packs are detailed below.
-
 ### 2.1 Pack: `express-to-fastify` (TypeScript / JavaScript)
 
-#### Option A: `gothinkster/node-express-realworld-example-app` (Primary — REST Architecture)
+#### Option A (Primary — Real REST API): `gothinkster/node-express-realworld-example-app`
 - **Repository URL:** `https://github.com/gothinkster/node-express-realworld-example-app`
-- **Pinned Commit:** `b24b896` (or `master` branch)
+- **Pinned Ref:** Branch `master` (verify commit at checkout)
 - **Language / Runtime:** JavaScript (Node.js)
 - **Module Count:** ~18 files (`routes/api/`, `models/`, `config/`, `app.js`)
 - **Baseline Test Command:** `npm test` (Mocha/Supertest)
 - **Architectural Highlights:**
-  - Standard "Conduit" RealWorld backend specification.
+  - Standard "Conduit" RealWorld backend specification (pure JSON REST API).
   - Multi-tier router structure: `routes/index.js` mounts sub-routers (`/api/users`, `/api/articles`, `/api/tags`).
   - Middleware: JWT authentication (`express-jwt`), Mongoose schema validation, centralized error handler.
 - **What it Validates:**
@@ -43,74 +42,69 @@ All options across all four migration packs are detailed below.
   - Middleware conversion (`req.payload`, `res.json()`, `res.status()`).
   - Route-surface parity snapshot matching.
 
-#### Option B: `microsoft/TypeScript-Node-Starter` (Alternative — TypeScript Native)
-- **Repository URL:** `https://github.com/microsoft/TypeScript-Node-Starter`
-- **Pinned Commit:** `7c06159` (or `master` branch)
+#### Option B (Secondary — Ingestion & Strict Typecheck Target): `microsoft/TypeScript-Node-Starter`
+- **Repository URL:** `https://github.com/microsoft/TypeScript-Node-Starter` *(Note: Archived by Microsoft)*
+- **Pinned Ref:** Branch `master` (verify commit at checkout)
 - **Language / Runtime:** TypeScript (Node.js)
 - **Module Count:** ~14 TypeScript files in `src/` (`controllers/`, `models/`, `config/`, `app.ts`, `server.ts`)
 - **Baseline Test Command:** `npm test` (Jest/Supertest)
 - **Architectural Highlights:**
   - Microsoft's official starter for Express and TypeScript.
-  - Strict typing: Uses `@types/express` (`Request`, `Response`, `NextFunction`).
-  - Clean controller layer (`user.ts`, `api.ts`, `contact.ts`).
+  - Uses `@types/express` (`Request`, `Response`, `NextFunction`).
+  - *Caveat:* Contains server-rendered Pug templates, session cookies, and Lusca CSRF; serves primarily as a Phase 1–2 AST ingestion, import resolution, and strict TypeScript compiler (`tsc --noEmit`) verification target.
 - **What it Validates:**
-  - Strict TypeScript compiler verification (`tsc --noEmit`) throughout every intermediate migration step.
-  - Type-safe route handler conversions to Fastify `FastifyRequest` / `FastifyReply`.
+  - Strict TypeScript compiler verification throughout intermediate migration steps.
 
 ---
 
 ### 2.2 Pack: `flask-to-fastapi` (Python)
 
-#### Option A: `pallets/flask` Tutorial App (`flaskr`) (Primary — Clean & Official)
+#### Option A (Primary — Real REST API): `gothinkster/flask-realworld-example-app`
+- **Repository URL:** `https://github.com/gothinkster/flask-realworld-example-app`
+- **Pinned Ref:** Branch `master` (verify commit at checkout)
+- **Language / Runtime:** Python 3.10+
+- **Module Count:** ~16 Python files (`conduit/user/`, `conduit/articles/`, `conduit/profile/`, `conduit/app.py`)
+- **Baseline Test Command:** `pytest`
+- **Architectural Highlights:**
+  - RealWorld specification with SQLAlchemy ORM, marshmallow schemas, and JWT extensions (pure JSON REST API).
+  - Nested blueprint routes, relational data models, user profiles, comments, and tagging.
+- **What it Validates:**
+  - Thread-local global unnesting: replacing `flask.request` and `flask.g` with explicit dependency injection (`Depends`) and typed Pydantic models.
+  - Multi-tier service and model import graph traversal via `PythonAdapter`.
+  - Route canonicalizer (`dump_routes.py`) parity against the `pytest` suite.
+
+#### Option B (Secondary — Ingestion & Blueprint Smoke Target): `pallets/flask` Tutorial App (`flaskr`)
 - **Repository URL:** `https://github.com/pallets/flask` (path: `examples/tutorial`)
-- **Pinned Tag:** `3.0.3` (or `main` branch)
+- **Pinned Tag:** `3.0.3` (or branch `main`)
 - **Language / Runtime:** Python 3.10+
 - **Module Count:** ~7 Python files (`flaskr/__init__.py`, `flaskr/db.py`, `flaskr/auth.py`, `flaskr/blog.py`, plus tests)
 - **Baseline Test Command:** `pytest` (100% test coverage)
 - **Architectural Highlights:**
   - Official reference application authored and maintained by the Pallets core team.
-  - Blueprint-driven architecture (`auth.py`, `blog.py`) registered via application factory pattern.
-  - Authentication session decorators (`@login_required`), SQLite database interactions.
+  - *Caveat:* Server-rendered HTML app using Jinja templates, form POSTs, session cookies, and SQLite. FastAPI does not directly replace Jinja form rendering; this app serves as a Phase 1–2 AST ingestion, blueprint discovery, and import graph smoke test rather than an active REST migration target.
 - **What it Validates:**
-  - Python AST parsing and import graph construction via `PythonAdapter`.
-  - Converting Flask Blueprint routing to FastAPI `APIRouter`.
-  - Route canonicalizer (`dump_routes.py`) parity against `pytest`.
-
-#### Option B: `gothinkster/flask-realworld-example-app` (Alternative — Full REST API)
-- **Repository URL:** `https://github.com/gothinkster/flask-realworld-example-app`
-- **Pinned Commit:** `master` branch
-- **Language / Runtime:** Python 3.10+
-- **Module Count:** ~16 Python files (`conduit/user/`, `conduit/articles/`, `conduit/profile/`, `conduit/app.py`)
-- **Baseline Test Command:** `pytest`
-- **Architectural Highlights:**
-  - RealWorld specification with SQLAlchemy ORM and JWT extensions.
-  - Nested blueprint routes, relational data models, user profiles, comments, and tagging.
-- **What it Validates:**
-  - Thread-local global unnesting: replacing `flask.request` and `flask.g` with explicit dependency injection (`Depends`) and typed Pydantic models.
-  - Multi-tier service and model import graph traversal.
+  - Python AST parsing, Blueprint registration, and `PythonAdapter` import graph construction.
 
 ---
 
-### 2.3 Pack: `cjs-to-esm` (CommonJS $\rightarrow$ Pure ES Modules)
+### 2.3 Pack: `cjs-to-esm` (CommonJS → Pure ES Modules)
 
-#### Option A: `isaacs/node-glob` (Primary — Cyclic & High Complexity)
+#### Option A (Primary — High Complexity): `isaacs/node-glob`
 - **Repository URL:** `https://github.com/isaacs/node-glob`
-- **Pinned Tag:** `v7.2.3` (Legacy CommonJS branch)
-- **Language / Runtime:** JavaScript (CommonJS, Node $\ge 22.12$)
-- **Module Count:** ~6 source files (`glob.js`, `sync.js`, `common.js`)
+- **Pinned Tag:** `v7.2.3` (verify tag at checkout; legacy CommonJS branch)
+- **Language / Runtime:** JavaScript (CommonJS, Node ≥ 22.12)
+- **Module Count:** ~6 source files (`glob.js`, `sync.js`, `common.js`, `has-magic.js`)
 - **Baseline Test Command:** `npm test`
 - **Architectural Highlights:**
   - The canonical file-system globbing utility for Node.js.
-  - Features real mutual/circular helper dependencies between `glob.js` and `sync.js`.
-  - Heavy usage of `module.exports = function glob(...)` and `__dirname`.
+  - Multi-file CommonJS architecture with callable `module.exports = function glob(...)` and `__dirname`.
 - **What it Validates:**
-  - Tarjan SCC cycle grouping on real-world Node.js code.
-  - Node $\ge 22.12$ synchronous `require(esm)` runtime interop.
-  - Preservation of callable export shapes (`dump-exports.mjs`) when converting from `module.exports = fn` to `export default fn` + `export { fn as "module.exports" }`.
+  - `runtime-interop` shim strategy under Node ≥ 22.12 synchronous `require(esm)`.
+  - Export surface preservation and callable function shapes (`scripts/dump-exports.mjs`).
 
-#### Option B: `sindresorhus/is-plain-obj` (Alternative — Rapid Leaf Verification)
+#### Option B (Secondary — Micro Smoke Target): `sindresorhus/is-plain-obj`
 - **Repository URL:** `https://github.com/sindresorhus/is-plain-obj`
-- **Pinned Tag:** `v2.1.0` (Legacy CJS release before ESM conversion)
+- **Pinned Tag:** `v2.1.0` (verify tag at checkout; legacy CJS release before ESM conversion)
 - **Language / Runtime:** JavaScript (CommonJS)
 - **Module Count:** 2 files (`index.js`, `index.d.ts`)
 - **Baseline Test Command:** `npm test`
@@ -123,51 +117,51 @@ All options across all four migration packs are detailed below.
 
 ### 2.4 Pack: `jest-to-vitest` (Testing Frameworks)
 
-#### Option A: `typicode/lowdb` (Primary — Real Testing Patterns)
-- **Repository URL:** `https://github.com/typicode/lowdb`
-- **Pinned Tag:** `v1.0.0` (CommonJS/Jest release)
+#### Option A (Primary — Real Jest Suite): `hagopj13/node-express-boilerplate`
+- **Repository URL:** `https://github.com/hagopj13/node-express-boilerplate`
+- **Pinned Ref:** Branch `master` (verify commit at checkout)
 - **Language / Runtime:** JavaScript / Node.js
-- **Module Count:** ~8 test files in `test/`
-- **Baseline Test Command:** `npm test` (Jest)
+- **Module Count:** ~12 test files (`tests/unit/`, `tests/integration/`)
+- **Baseline Test Command:** `npm test` (Jest: `jest -i --colors --verbose --detectOpenHandles`)
 - **Architectural Highlights:**
-  - Widely-used embedded JSON database.
-  - Tests include mock disk adapters, custom spies (`jest.fn()`), and lifecycle hooks (`beforeEach`, `afterEach`).
+  - Production-ready Express boilerplate with a comprehensive, genuine Jest test suite.
+  - Tests utilize `jest.fn()`, mocks, `describe`/`it`/`expect`, and Supertest integration tests.
 - **What it Validates:**
-  - In-place conversion of test assertions and spies: `jest.fn()` $\rightarrow$ `vi.fn()`, `jest.spyOn()` $\rightarrow$ `vi.spyOn()`.
+  - Converting Jest APIs and spies: `jest.fn()` → `vi.fn()`, `jest.spyOn()` → `vi.spyOn()`, `jest.mock()` → `vi.mock()`.
   - Runner-agnostic execution wrapper (`run-tests.mjs`) selecting Jest initially, then Vitest post-migration.
   - Test-count snapshot invariance (`test-counts.mjs`) proving 100% of test cases pass without dropped tests.
 
-#### Option B: `microsoft/TypeScript-Node-Starter` Test Suite (Alternative — Combined Express + Jest)
-- **Repository URL:** `https://github.com/microsoft/TypeScript-Node-Starter` (path: `test/`)
-- **Pinned Commit:** `7c06159`
-- **Language / Runtime:** TypeScript + Jest
-- **Module Count:** ~6 test files (`user.test.ts`, `api.test.ts`, `contact.test.ts`)
+#### Option B (Secondary — TypeScript Jest Suite): `microsoft/TypeScript-Node-Starter` (path: `test/`)
+- **Repository URL:** `https://github.com/microsoft/TypeScript-Node-Starter` *(Reuses repository from §2.1 B)*
+- **Pinned Ref:** Branch `master`
+- **Language / Runtime:** TypeScript + Jest (`ts-jest`)
+- **Module Count:** ~6 test files (`test/user.test.ts`, `test/api.test.ts`, `test/contact.test.ts`)
 - **Baseline Test Command:** `npm test`
 - **Architectural Highlights:**
-  - Integration test suite combining Supertest HTTP assertions with Jest mocks.
+  - Integration test suite combining Supertest HTTP assertions with Jest mocks under TypeScript.
 - **What it Validates:**
-  - Combined migration workflow: testing `jest-to-vitest` on a real TypeScript Express application suite.
+  - Converting TypeScript-annotated Jest tests and types (`Mock`, `MockInstance`) to Vitest equivalents.
 
 ---
 
 ## 3. Comparison Matrix
 
-| Target Repository | Migration Pack | Language | Module Count | Pre-existing Tests | Primary Architectural Goal |
+| Target Repository | Migration Pack | Language | Module Count | Pre-existing Tests | Primary Testing Goal |
 |---|---|---|---|---|---|
-| **`node-express-realworld`** | `express-to-fastify` | JavaScript | 18 | Supertest/Mocha | Router tree unnesting & middleware |
-| **`TypeScript-Node-Starter`** | `express-to-fastify` | TypeScript | 14 | Jest/Supertest | Strict `tsc` compiler gate preservation |
-| **`flaskr` (Pallets)** | `flask-to-fastapi` | Python | 7 | Pytest (100%) | Blueprint unnesting & route canonicalizer |
-| **`flask-realworld`** | `flask-to-fastapi` | Python | 16 | Pytest | Thread-local unnesting (`request` $\rightarrow$ `Depends`) |
-| **`node-glob@v7`** | `cjs-to-esm` | JavaScript (CJS) | 6 | Tap/Node | Tarjan cycle handling & callable exports |
+| **`node-express-realworld`** | `express-to-fastify` | JavaScript | 18 | Supertest/Mocha | Router tree unnesting & middleware (Primary REST) |
+| **`TypeScript-Node-Starter`** | `express-to-fastify` | TypeScript | 14 | Jest/Supertest | Strict `tsc` compiler gate preservation (Archived) |
+| **`flask-realworld`** | `flask-to-fastapi` | Python | 16 | Pytest | Thread-local unnesting (`request` → `Depends`) (Primary REST) |
+| **`flaskr` (Pallets)** | `flask-to-fastapi` | Python | 7 | Pytest (100%) | Blueprint unnesting & AST ingestion smoke |
+| **`node-glob@v7`** | `cjs-to-esm` | JavaScript (CJS) | 6 | Tap/Node | Callable export shapes & runtime interop |
 | **`is-plain-obj@v2`** | `cjs-to-esm` | JavaScript (CJS) | 2 | Ava/Node | Rapid export-shape smoke test |
-| **`lowdb@v1`** | `jest-to-vitest` | JavaScript | 8 | Jest | Mock spies (`vi.fn()`) & test-count snapshot |
-| **`TypeScript-Node-Starter (test/)`** | `jest-to-vitest` | TypeScript | 6 | Jest | TypeScript type conversions (`MockInstance`) |
+| **`node-express-boilerplate`** | `jest-to-vitest` | JavaScript | 12 | Jest | Genuine Jest mocks (`vi.fn()`) & test-count snapshot |
+| **`TypeScript-Node-Starter (test/)`** | `jest-to-vitest` | TypeScript | 6 | Jest (`ts-jest`) | TypeScript type conversions (`MockInstance`) |
 
 ---
 
 ## 4. Step-by-Step Execution Protocol
 
-Testing any open-source repository follows an orderly 4-phase protocol.
+Testing an open-source repository follows an orderly 4-phase protocol.
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -187,25 +181,25 @@ Testing any open-source repository follows an orderly 4-phase protocol.
    ```bash
    git clone --depth 1 <REPO_URL> scratch/<REPO_NAME>
    cd scratch/<REPO_NAME>
-   git checkout <PINNED_TAG_OR_COMMIT>
+   # Optional: git checkout <PINNED_REF>
    ```
 
 2. **Install dependencies and verify baseline:**
    ```bash
    # For Node.js / TypeScript projects:
    npm install
-   npm test   # Verify tests pass 100% at baseline before touching code
+   npm test   # Must pass 100% at baseline before touching code
 
    # For Python projects:
    python3 -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
-   pytest     # Verify baseline passes
+   pytest     # Must pass 100% at baseline
    ```
 
 3. **Ingest codebase into FalkorDB:**
    ```bash
-   bkb init --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --reset
+   ./bin/bkb.js init --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --reset
    ```
 
 4. **Verify Ingestion Quality:**
@@ -220,8 +214,10 @@ Testing any open-source repository follows an orderly 4-phase protocol.
 
 Run the autonomous runner in dry-run simulation mode:
 ```bash
-bkb run --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --dry-run
+./bin/bkb.js run --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --dry-run
 ```
+
+> **Important Caveat:** `bkb run --dry-run` uses the `mock` provider, which returns the original source code unchanged for any module without a matching entry in `.bkb-mocks.json`. Phase 2 validates the graph planner, Tarjan SCC grouping, and the topological claim schedule only — no real code transformations occur unless a real LLM provider (`ollama`, `anthropic`, `openai`) is configured.
 
 **Verification Checklist:**
 - [ ] Does BKB compute a strict callee-first order (leaf utility modules claimed first, root entrypoints claimed last)?
@@ -238,19 +234,21 @@ Once Phases 1 and 2 pass cleanly, execute the actual code transformations using 
 #### Option A: Via AI Agent (Cursor / Claude / OpenCode with MCP)
 1. Register BKB MCP tools in your editor:
    ```bash
-   bkb mcp install cursor   # or: opencode, claude, vscode, windsurf
+   ./bin/bkb.js mcp install opencode   # or: cursor, claude, vscode, windsurf
    ```
 2. Prompt the agent in chat:
-   > *"Migrate this repository using BKB MCP tools. Always start by calling `bkb_claim_module`, inspect the slice signatures and pack guidance, apply transformations, and call `bkb_verify_step`. If any compiler gate (`tsc` / `mypy`) fails, fix the types before proceeding. Monitor the live sync cockpit at http://localhost:4200."*
+   > *"Migrate this repository using BKB MCP tools. Always start by calling `advance_migration` (which atomically claims the next unblocked module and returns slice guidance in one call). Apply edits, and call `advance_migration` or `verify_and_commit_node` to commit. You can also inspect `simulate_blast_radius` or use `claim_next_leaf` + `get_migration_slice` individually if needed. If any compiler gate (`tsc` / `mypy`) fails, fix the types before proceeding. Monitor the live sync cockpit at http://localhost:4200."*
+
+   *(Registered MCP tools in `src/mcp/server.ts`: `init_migration_graph`, `advance_migration`, `claim_next_leaf`, `get_migration_slice`, `simulate_blast_radius`, `verify_and_commit_node`, `get_migration_audit_trail`)*.
 
 #### Option B: Autonomous CLI Runner
 ```bash
 # Using a local, zero-cost model via Ollama:
-bkb run --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --provider ollama --model qwen2.5-coder:latest
+./bin/bkb.js run --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --provider ollama --model qwen2.5-coder:latest
 
 # Or using cloud frontier models:
 export ANTHROPIC_API_KEY="sk-ant-..."
-bkb run --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --provider anthropic --model claude-3-5-sonnet-20241022
+./bin/bkb.js run --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --provider anthropic --model claude-3-5-sonnet-20241022
 ```
 
 ---
@@ -261,11 +259,11 @@ After the migration claims the final root entrypoint, evaluate the full verifica
 
 1. **Compiler Gates:**
    - For TypeScript: `npx tsc --noEmit` exits with code 0.
-   - For Python: `python3 -m mypy` reports zero type errors.
+   - For Python: `python3 -m mypy --ignore-missing-imports .` reports zero type errors.
 2. **Snapshot Invariance:**
    - For Web APIs: Route snapshots match baseline exactly (zero missing or modified routes).
-   - For CJS $\rightarrow$ ESM: Export names and callable shapes match baseline 1:1.
-   - For Jest $\rightarrow$ Vitest: Test-count snapshot confirms identical suite and test counts.
+   - For CJS → ESM: Export surface and callable shapes match baseline 1:1.
+   - For Jest → Vitest: Test-count snapshot confirms identical suite and test counts.
 3. **Automated Test Suite:**
    - Execute the migrated project's test suite (`npm test` / `pytest`). All test cases must pass.
 
@@ -275,21 +273,21 @@ After the migration claims the final root entrypoint, evaluate the full verifica
 
 If an unexpected compilation error or broken dependency occurs mid-migration:
 
-1. **Step Rollback:** Roll back to the preceding step using the cryptographic checkpoint ledger:
+1. **Step Rollback:** Roll back to the preceding step using the checkpoint ledger and file snapshots:
    ```bash
-   bkb rollback --repo ./scratch/<REPO_NAME> --pack <PACK_ID>
+   ./bin/bkb.js rollback --repo ./scratch/<REPO_NAME> --pack <PACK_ID>
    ```
 2. **Specific Checkpoint Rollback:**
    ```bash
-   bkb rollback 3 --repo ./scratch/<REPO_NAME> --pack <PACK_ID>
+   ./bin/bkb.js rollback 3 --repo ./scratch/<REPO_NAME> --pack <PACK_ID>
    ```
 3. **Inspect Audit Trail:**
    ```bash
-   bkb audit --repo ./scratch/<REPO_NAME> --pack <PACK_ID>
+   ./bin/bkb.js audit --repo ./scratch/<REPO_NAME> --pack <PACK_ID>
    ```
 4. **Clean Reset:** If necessary, re-initialize the graph from scratch:
    ```bash
-   bkb init --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --reset
+   ./bin/bkb.js init --repo ./scratch/<REPO_NAME> --pack <PACK_ID> --reset
    ```
 
 ---
@@ -300,11 +298,11 @@ Use this tracking scorecard to record results as each candidate repository is te
 
 | Target Repository | Migration Pack | Phase 1: Ingestion & AST | Phase 2: Claim Schedule | Phase 3: Migration Loop | Phase 4: Snapshot Parity | Final Test Suite | Notes / Observations |
 |---|---|---|---|---|---|---|---|
-| `node-express-realworld` | `express-to-fastify` | Pending | Pending | Pending | Pending | Pending | |
-| `TypeScript-Node-Starter` | `express-to-fastify` | Pending | Pending | Pending | Pending | Pending | |
-| `flaskr` (Pallets) | `flask-to-fastapi` | Pending | Pending | Pending | Pending | Pending | |
-| `flask-realworld` | `flask-to-fastapi` | Pending | Pending | Pending | Pending | Pending | |
-| `node-glob@v7` | `cjs-to-esm` | Pending | Pending | Pending | Pending | Pending | |
-| `is-plain-obj@v2` | `cjs-to-esm` | Pending | Pending | Pending | Pending | Pending | |
-| `lowdb@v1` | `jest-to-vitest` | Pending | Pending | Pending | Pending | Pending | |
-| `TypeScript-Node-Starter (test/)` | `jest-to-vitest` | Pending | Pending | Pending | Pending | Pending | |
+| `node-express-realworld` | `express-to-fastify` | Pending | Pending | Pending | Pending | Pending | Primary REST API |
+| `TypeScript-Node-Starter` | `express-to-fastify` | Pending | Pending | Pending | Pending | Pending | Secondary (Archived / Ingestion only) |
+| `flask-realworld` | `flask-to-fastapi` | Pending | Pending | Pending | Pending | Pending | Primary REST API |
+| `flaskr` (Pallets) | `flask-to-fastapi` | Pending | Pending | Pending | Pending | Pending | Secondary (Jinja / Ingestion smoke only) |
+| `node-glob@v7` | `cjs-to-esm` | Pending | Pending | Pending | Pending | Pending | Multi-file CJS interop |
+| `is-plain-obj@v2` | `cjs-to-esm` | Pending | Pending | Pending | Pending | Pending | Micro export-shape smoke |
+| `node-express-boilerplate` | `jest-to-vitest` | Pending | Pending | Pending | Pending | Pending | Genuine Jest suite (`jest.fn()`, Supertest) |
+| `TypeScript-Node-Starter (test/)` | `jest-to-vitest` | Pending | Pending | Pending | Pending | Pending | TypeScript Jest types (`MockInstance`) |
