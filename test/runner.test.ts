@@ -68,8 +68,10 @@ describe('BKB Checkpoint & Rollback System', () => {
     writeFileSync(file, 'export const version = "v1.0.0";\n');
     saveCheckpoint(dummyRepo, 1, ['src/index.ts']);
 
-    // Modified state
+    // Modified state: create an extra file that wasn't in step 1
+    const extraFile = join(dummyRepo, 'src', 'extra-stale.ts');
     writeFileSync(file, 'export const version = "v2.0.0-broken";\n');
+    writeFileSync(extraFile, 'export const stale = true;\n');
     saveCheckpoint(dummyRepo, 2, ['src/index.ts']);
 
     // Further modified
@@ -80,6 +82,7 @@ describe('BKB Checkpoint & Rollback System', () => {
     assert.equal(res.ok, true);
     assert.equal(res.restoredStep, 1);
     assert.equal(readFileSync(file, 'utf8'), 'export const version = "v1.0.0";\n');
+    assert.equal(existsSync(extraFile), false, 'Extra files created after checkpoint should be deleted on rollback');
 
     clearCheckpoints(dummyRepo);
     rmSync(dummyRepo, { recursive: true, force: true });

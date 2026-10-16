@@ -5,8 +5,8 @@
  * enabling instantaneous zero-risk rollback of both disk state and FalkorDB graph state.
  */
 
-import { existsSync, mkdirSync, cpSync, rmSync, readdirSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { existsSync, mkdirSync, cpSync, rmSync, readdirSync, writeFileSync, readFileSync, statSync } from 'node:fs';
+import { resolve, join, relative, dirname } from 'node:path';
 import { MigrationGraphManager } from '../engine/graphManager';
 import { broadcastLiveEvent } from '../engine/telemetry';
 
@@ -21,7 +21,26 @@ export function getCheckpointsDir(repoPath: string): string {
 }
 
 /**
- * Saves a snapshot of source files before a migration step is applied.
+ * Recursively deletes any file or directory in destDir that does not exist in sourceDir.
+ */
+function syncDirDeletive(sourceDir: string, destDir: string): void {
+  if (!existsSync(destDir)) return;
+  const destEntries = readdirSync(destDir, { withFileTypes: true });
+  for (const entry of destEntries) {
+    const destPath = join(destDir, entry.name);
+    const sourcePath = join(sourceDir, entry.name);
+    if (!existsSync(sourcePath)) {
+      rmSync(destPath, { recursive: true, force: true });
+    } else if (entry.isDirectory()) {
+      syncDirDeletive(sourcePath, destPath);
+    }
+  }
+}
+
+const COMMON_ROOT_FILES = ['package.json', 'package-lock.json', 'tsconfig.json'];
+
+/**
+ * Saves a snapshot of source and configuration files before a migration step is applied.
  */
 export function saveCheckpoint(repoPath: string, step: number, targetPaths: string[] = []): string {
   const absRepo = resolve(repoPath);
@@ -30,21 +49,47 @@ export function saveCheckpoint(repoPath: string, step: number, targetPaths: stri
     mkdirSync(cpDir, { recursive: true });
   }
 
-  // If specific files given, backup those; otherwise snapshot src directory or repo files
+  const manifest: { timestamp: number; step: number; trackedPaths: string[] } = {
+    timestamp: Date.now(),
+    step,
+    trackedPaths: [],
+  };
+
+  // 1. Snapshot src/ directory
   const srcDir = join(absRepo, 'src');
   if (existsSync(srcDir)) {
     cpSync(srcDir, join(cpDir, 'src'), { recursive: true });
-  } else {
-    for (const p of targetPaths) {
-      const srcFile = join(absRepo, p);
-      if (existsSync(srcFile)) {
-        const destFile = join(cpDir, p);
-        mkdirSync(resolve(destFile, '..'), { recursive: true });
-        cpSync(srcFile, destFile);
-      }
+    manifest.trackedPaths.push('src');
+  }
+
+  // 2. Snapshot scripts/ directory
+  const scriptsDir = join(absRepo, 'scripts');
+  if (existsSync(scriptsDir)) {
+    cpSync(scriptsDir, join(cpDir, 'scripts'), { recursive: true });
+    manifest.trackedPaths.push('scripts');
+  }
+
+  // 3. Snapshot root configuration files
+  for (const filename of COMMON_ROOT_FILES) {
+    const fPath = join(absRepo, filename);
+    if (existsSync(fPath)) {
+      cpSync(fPath, join(cpDir, filename));
+      manifest.trackedPaths.push(filename);
     }
   }
 
+  // 4. Snapshot any explicitly specified targetPaths
+  for (const p of targetPaths) {
+    const srcFile = join(absRepo, p);
+    if (existsSync(srcFile) && !manifest.trackedPaths.includes(p)) {
+      const destFile = join(cpDir, p);
+      mkdirSync(dirname(destFile), { recursive: true });
+      cpSync(srcFile, destFile);
+      manifest.trackedPaths.push(p);
+    }
+  }
+
+  writeFileSync(join(cpDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
   return cpDir;
 }
 
@@ -97,13 +142,49 @@ export async function rollbackToCheckpoint(
     };
   }
 
-  // Restore files
+  // 1. Restore src/ with deletive cleanup of extraneous files created after the checkpoint
   const cpSrc = join(cpDir, 'src');
+  const repoSrc = join(absRepo, 'src');
   if (existsSync(cpSrc)) {
-    cpSync(cpSrc, join(absRepo, 'src'), { recursive: true });
-  } else {
-    // Copy all contents from checkpoint dir back to repo
-    cpSync(cpDir, absRepo, { recursive: true });
+    cpSync(cpSrc, repoSrc, { recursive: true });
+    syncDirDeletive(cpSrc, repoSrc);
+  }
+
+  // 2. Restore scripts/ with deletive cleanup
+  const cpScripts = join(cpDir, 'scripts');
+  const repoScripts = join(absRepo, 'scripts');
+  if (existsSync(cpScripts)) {
+    cpSync(cpScripts, repoScripts, { recursive: true });
+    syncDirDeletive(cpScripts, repoScripts);
+  }
+
+  // 3. Restore root configuration files
+  for (const filename of COMMON_ROOT_FILES) {
+    const cpRootFile = join(cpDir, filename);
+    const repoRootFile = join(absRepo, filename);
+    if (existsSync(cpRootFile)) {
+      cpSync(cpRootFile, repoRootFile);
+    }
+  }
+
+  // 4. Fallback restore for any other files in checkpoint directory
+  const manifestPath = join(cpDir, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      for (const p of manifest.trackedPaths || []) {
+        if (p !== 'src' && p !== 'scripts' && !COMMON_ROOT_FILES.includes(p)) {
+          const cpFile = join(cpDir, p);
+          const repoFile = join(absRepo, p);
+          if (existsSync(cpFile)) {
+            mkdirSync(dirname(repoFile), { recursive: true });
+            cpSync(cpFile, repoFile);
+          }
+        }
+      }
+    } catch {
+      // Ignore manifest parse errors
+    }
   }
 
   // Re-synchronize FalkorDB graph from the restored disk state
