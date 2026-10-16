@@ -35,4 +35,11 @@ describe('buildPackTemplate', () => {
     assert.equal(result.skipped, false);
     assert.equal(result.valid, true, result.errors.join('\n'));
   });
+
+  it('emits AST queries that compile under the Python adapter', async () => {
+    const pack = buildPackTemplate('py-pack', 'python');
+    const result = await validatePackQueries(pack, adapterRegistry);
+    assert.equal(result.skipped, false);
+    assert.equal(result.valid, true, result.errors.join('\n'));
+  });
 });

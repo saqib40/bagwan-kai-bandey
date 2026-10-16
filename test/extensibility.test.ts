@@ -64,12 +64,18 @@ describe('Layer 2 Extensibility: Language Adapters', () => {
   test('AdapterRegistry allows runtime registration and discovery', () => {
     const registry = new AdapterRegistry();
     assert.equal(registry.has('typescript'), true);
-    assert.equal(registry.has('python'), false);
-
-    registry.register(new CustomPythonAdapter());
     assert.equal(registry.has('python'), true);
-    assert.equal(registry.get('python').language, 'python');
-    assert.ok(registry.list().includes('python'));
+    assert.equal(registry.has('ruby'), false);
+
+    class CustomRubyAdapter extends BaseLanguageAdapter {
+      readonly language = 'ruby';
+      async parseModule(): Promise<any> { return {} as any; }
+    }
+
+    registry.register(new CustomRubyAdapter());
+    assert.equal(registry.has('ruby'), true);
+    assert.equal(registry.get('ruby').language, 'ruby');
+    assert.ok(registry.list().includes('ruby'));
   });
 
   test('AdapterRegistry throws actionable error for unregistered language', () => {

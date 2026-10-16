@@ -12,6 +12,7 @@ export const PACK_SCHEMA_URL =
 
 export function buildPackTemplate(packId: string, lang: string): MigrationPack {
   const extension = lang === 'python' ? 'py' : lang === 'go' ? 'go' : 'ts';
+  const callNode = lang === 'python' ? 'call' : 'call_expression';
   return {
     $schema: PACK_SCHEMA_URL,
     id: packId,
@@ -29,7 +30,7 @@ export function buildPackTemplate(packId: string, lang: string): MigrationPack {
       {
         id: 'legacy-api-call',
         description: 'Detects usage of legacy package APIs',
-        astQuery: '(call_expression function: (identifier) @api)',
+        astQuery: `(${callNode} function: (identifier) @api)`,
       },
     ],
     agentGuidance: {
@@ -43,7 +44,7 @@ export function buildPackTemplate(packId: string, lang: string): MigrationPack {
         scope: 'per-step',
         type: 'extracted-set-equality',
         description: 'Every internal API call surface in this file must match the captured baseline.',
-        astExtractor: '(call_expression function: (identifier) @fn)',
+        astExtractor: `(${callNode} function: (identifier) @fn)`,
       },
     ],
     verification: {
@@ -52,7 +53,7 @@ export function buildPackTemplate(packId: string, lang: string): MigrationPack {
       snapshots: [
         {
           id: 'route-surface',
-          command: 'node scripts/dump-routes.mjs',
+          command: lang === 'python' ? 'python3 scripts/dump_routes.py' : 'node scripts/dump-routes.mjs',
           kind: 'set',
         },
       ],
