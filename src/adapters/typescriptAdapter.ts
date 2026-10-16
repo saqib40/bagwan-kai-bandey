@@ -6,29 +6,20 @@
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, resolve, relative, normalize } from 'node:path';
+import { join, dirname, resolve, relative } from 'node:path';
 import { createRequire } from 'node:module';
-import { Parser, Language, Query, type Node as TSNode } from 'web-tree-sitter';
+import { Parser, Language, type Node as TSNode } from 'web-tree-sitter';
 import ts from 'typescript';
-import {
-  lineHasShimMarker,
-  type LanguageAdapter,
-  type ParsedModule,
-  type UniversalSymbol,
-  type APIUsage,
-  type MigrationPack,
-} from './types';
-import { BaseLanguageAdapter } from './baseAdapter';
+import { type UniversalSymbol } from './types';
+import { TreeSitterQueryAdapter } from './treeSitterAdapter';
 
 const require = createRequire(import.meta.url);
 
-export class TypeScriptAdapter extends BaseLanguageAdapter {
+export class TypeScriptAdapter extends TreeSitterQueryAdapter {
   readonly language = 'typescript';
 
-  private parser: Parser | null = null;
   private tsLang: Language | null = null;
   private tsxLang: Language | null = null;
-  private queryCache = new Map<string, Query>();
   private tsConfigCache = new Map<string, { baseUrl?: string; paths?: Record<string, string[]> }>();
 
   private getTsConfig(repoRoot: string): { baseUrl?: string; paths?: Record<string, string[]> } {
@@ -68,21 +59,11 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
     this.parser.setLanguage(this.tsLang);
   }
 
-  private getLanguage(path: string): Language {
+  protected getLanguageForPath(path: string): Language {
     if (!this.tsLang || !this.tsxLang) {
       throw new Error('TypeScriptAdapter not initialized. Call init() first.');
     }
     return path.endsWith('.tsx') || path.endsWith('.jsx') ? this.tsxLang : this.tsLang;
-  }
-
-  private getCompiledQuery(lang: Language, queryString: string): Query {
-    const key = `${lang.version}:${queryString}`;
-    let q = this.queryCache.get(key);
-    if (!q) {
-      q = new Query(lang, queryString);
-      this.queryCache.set(key, q);
-    }
-    return q;
   }
 
   async findSourceFiles(
@@ -133,135 +114,7 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
     return files.sort();
   }
 
-  async parseModule(
-    repoRoot: string,
-    relativePath: string,
-    sourceCode?: string,
-    pack?: MigrationPack,
-  ): Promise<ParsedModule> {
-    await this.init();
-    const normalizedRelPath = relativePath.split('\\').join('/');
-    const fullDiskPath = resolve(repoRoot, normalizedRelPath);
-    const content = sourceCode ?? readFileSync(fullDiskPath, 'utf8');
-    const lines = content.split('\n');
-
-    const lang = this.getLanguage(normalizedRelPath);
-    this.parser!.setLanguage(lang);
-    const tree = this.parser!.parse(content)!;
-    const root = tree.rootNode;
-
-    // 1. Syntax error check
-    const syntaxErrors: string[] = [];
-    const findErrors = (node: TSNode) => {
-      if (node.type === 'ERROR' || node.isMissing) {
-        syntaxErrors.push(
-          `Syntax error at line ${node.startPosition.row + 1}, col ${node.startPosition.column}: "${node.text}"`,
-        );
-      }
-      for (let i = 0; i < node.childCount; i++) {
-        const c = node.child(i);
-        if (c) findErrors(c);
-      }
-    };
-    if (root.hasError) {
-      findErrors(root);
-    }
-
-    // 2. Extract internal module imports
-    const imports = this.extractInternalImports(root, repoRoot, normalizedRelPath);
-
-    // 3. Extract exported symbols
-    const symbols = this.extractExportedSymbols(root, normalizedRelPath);
-
-    // 4. Evaluate detection rules
-    const apiUsages: APIUsage[] = [];
-    if (pack?.detectionRules) {
-      for (const rule of pack.detectionRules) {
-        try {
-          const query = this.getCompiledQuery(lang, rule.astQuery);
-          const matches = query.matches(root);
-          const seenLines = new Set<number>();
-          for (const match of matches) {
-            const startRow = Math.min(...match.captures.map((c) => c.node.startPosition.row));
-            const line = startRow + 1;
-            if (seenLines.has(line)) continue;
-            seenLines.add(line);
-
-            const snippet = lines[startRow]?.trim() ?? '';
-            const lineContent = lines[startRow] ?? '';
-            const isShimmed = lineHasShimMarker(lineContent);
-
-            apiUsages.push({
-              ruleId: rule.id,
-              line,
-              snippet,
-              isShimmed,
-            });
-          }
-        } catch (err) {
-          console.error(`[TypeScriptAdapter] Error evaluating rule "${rule.id}":`, err);
-        }
-      }
-    }
-
-    // 5. Evaluate invariant rules
-    const invariantSets: Record<string, string[]> = {};
-    if (pack?.invariants) {
-      for (const inv of pack.invariants) {
-        try {
-          const query = this.getCompiledQuery(lang, inv.astExtractor);
-          const matches = query.matches(root);
-          const extracted = new Set<string>();
-
-          for (const match of matches) {
-            const capMap = new Map<string, string>();
-            for (const c of match.captures) {
-              capMap.set(c.name, c.node.text);
-            }
-
-            if (inv.format) {
-              const formatted = inv.format.replace(/\{(\w+)(?:\|(\w+))?\}/g, (_, name, transform) => {
-                let val = capMap.get(name) ?? '';
-                if (transform === 'upper') val = val.toUpperCase();
-                if (transform === 'lower') val = val.toLowerCase();
-                return val;
-              });
-              extracted.add(formatted);
-            } else {
-              const method = capMap.get('method')?.toUpperCase();
-              const pathVal = capMap.get('path');
-              if (method && pathVal) {
-                extracted.add(`${method} ${pathVal}`);
-              }
-            }
-          }
-          invariantSets[inv.id] = [...extracted].sort();
-        } catch (err) {
-          console.error(`[TypeScriptAdapter] Error evaluating invariant "${inv.id}":`, err);
-        }
-      }
-    }
-
-    // 6. Count shim lines
-    let shimLineCount = 0;
-    for (const l of lines) {
-      if (lineHasShimMarker(l)) shimLineCount++;
-    }
-
-    return {
-      path: normalizedRelPath,
-      fullSource: content,
-      imports,
-      symbols,
-      apiUsages,
-      invariantSets,
-      shimLineCount,
-      hasSyntaxError: root.hasError || syntaxErrors.length > 0,
-      syntaxErrors,
-    };
-  }
-
-  private extractInternalImports(root: TSNode, repoRoot: string, currentFile: string): string[] {
+  protected extractInternalImports(root: TSNode, repoRoot: string, currentFile: string): string[] {
     const rawSpecifiers: string[] = [];
 
     // Query for import and export sources and CJS require
@@ -384,7 +237,7 @@ export class TypeScriptAdapter extends BaseLanguageAdapter {
     return [...resolvedSet].sort();
   }
 
-  private extractExportedSymbols(root: TSNode, modulePath: string): UniversalSymbol[] {
+  protected extractExportedSymbols(root: TSNode, modulePath: string): UniversalSymbol[] {
     const symbols: UniversalSymbol[] = [];
 
     for (let i = 0; i < root.childCount; i++) {

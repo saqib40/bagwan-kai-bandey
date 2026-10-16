@@ -44,6 +44,7 @@ export {
   type MigrationPack,
 } from './adapters/types';
 export { BaseLanguageAdapter } from './adapters/baseAdapter';
+export { TreeSitterQueryAdapter } from './adapters/treeSitterAdapter';
 export { TypeScriptAdapter } from './adapters/typescriptAdapter';
 export { adapterRegistry, AdapterRegistry } from './adapters/registry';
 
