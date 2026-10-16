@@ -1,0 +1,71 @@
+{
+  "$schema": "./PACK_SPEC.schema.json",
+  "id": "cjs-to-esm",
+  "name": "CommonJS to ES Modules Migration Pack",
+  "language": "typescript",
+  "shimStrategy": "runtime-interop",
+  "trustedExecutionNote": "Packs execute shell commands (perStepTypecheckCmd, checkpointTestCmd, snapshots). Only load trusted packs.",
+  "knownLimitations": [
+    "Requires Node >= 22.12.0 for synchronous `require(esm)` so un-migrated CommonJS callers can load migrated ES modules.",
+    "Shimmed/interop modules must not use Top-Level Await (TLA).",
+    "Shimmed/interop modules must not use dynamic or conditional exports.",
+    "Do not reassign `module.exports` after converting to ESM; export shape must be preserved via static `export` declarations."
+  ],
+  "sourceGlobs": {
+    "include": ["src/**/*.js"],
+    "exclude": ["**/node_modules/**", "**/dist/**", "**/*.d.ts"]
+  },
+  "packages": {
+    "legacy": [],
+    "target": []
+  },
+  "packageDetectors": [
+    {
+      "id": "commonjs-project",
+      "file": "package.json",
+      "description": "Confirms the target is a Node project without an explicit ESM `type` field (ambiguous .js files).",
+      "required": false,
+      "match": {}
+    }
+  ],
+  "detectionRules": [
+    {
+      "id": "cjs-require",
+      "description": "CommonJS require() call",
+      "astQuery": "(call_expression function: (identifier) @fn (#eq? @fn \"require\") arguments: (arguments (string) @path))"
+    },
+    {
+      "id": "cjs-module-exports",
+      "description": "Assignment to module.exports",
+      "astQuery": "(assignment_expression left: (member_expression object: (identifier) @obj property: (property_identifier) @prop (#eq? @obj \"module\") (#eq? @prop \"exports\")))"
+    },
+    {
+      "id": "cjs-exports-assign",
+      "description": "Assignment to a named property on exports (exports.foo = ...)",
+      "astQuery": "(assignment_expression left: (member_expression object: (identifier) @obj property: (property_identifier) @prop (#eq? @obj \"exports\")))"
+    },
+    {
+      "id": "cjs-globals",
+      "description": "CommonJS module-scope globals (__dirname, __filename)",
+      "astQuery": "((identifier) @name (#match? @name \"^(__dirname|__filename)$\"))"
+    }
+  ],
+  "agentGuidance": {
+    "MIGRATE": "Convert this module to ES Modules: replace `require(...)` with `import ...`, and `module.exports` / `exports.x` with `export` declarations. Preserve every exported name exactly. Replace `__dirname` with `fileURLToPath(new URL('.', import.meta.url))` and `__filename` with `fileURLToPath(import.meta.url)` (import them from `node:url`). Do NOT add any `// @bkb-shim` comments.",
+    "SHIM": "This module has un-migrated CommonJS callers. Emit PURE ESM syntax (no dual `require`/`module.exports`). Preserve CommonJS export shape so `require()` keeps working on Node >= 22.12: a callable/default `module.exports = X` becomes `export default X` plus `export { X as \"module.exports\" }`; named exports (`exports.a`, `module.exports.a`) become `export const a = ...` or `export { a }`. Tag exactly one line with `// @bkb-shim: esm-runtime-interop`. Never use Top-Level Await, dynamic/conditional exports, or reassign `module.exports`.",
+    "DE_SHIM": "All callers of this module are now ESM (`pendingCallersCount == 0`). Remove the `// @bkb-shim: esm-runtime-interop` comment line. Keep the pure ESM exports unchanged."
+  },
+  "invariants": [],
+  "verification": {
+    "perStepTypecheckCmd": "npx tsc --noEmit",
+    "checkpointTestCmd": "node scripts/smoke.mjs",
+    "snapshots": [
+      {
+        "id": "export-surface",
+        "command": "node scripts/dump-exports.mjs",
+        "kind": "set"
+      }
+    ],
+    "timeoutMs": 120000
+  }
+}
