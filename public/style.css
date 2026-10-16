@@ -1349,6 +1349,26 @@ body {
 .pill-repo { color: #A5B4FC; font-weight: 600; }
 .pill-divider { color: var(--text-dim); }
 .pill-pack { color: #34D399; }
+.pill-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #C4B5FD;
+  background: rgba(139, 92, 246, 0.14);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+.pill-tag-shim {
+  color: #FCD34D;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  text-transform: none;
+}
 .pill-arrow { font-size: 0.65rem; color: var(--text-dim); }
 
 

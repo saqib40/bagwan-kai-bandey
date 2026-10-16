@@ -25,6 +25,8 @@ import { MigrationGraphManager, getGraphNameForRepo as getEngineGraphName } from
 import { MigrationOps, type Phase } from '../engine/operations';
 import { LlmClient } from '../runner/llmClient';
 import { saveCheckpoint, listCheckpoints, rollbackToCheckpoint } from '../runner/rollback';
+import { loadPack } from '../engine/packLoader';
+import { getShimStrategy } from '../adapters/types';
 import * as Q from '../engine/queries';
 
 export function isPathContained(rootDir: string, targetPath: string): boolean {
@@ -146,7 +148,45 @@ export function broadcastSse(data: Record<string, unknown>): void {
   }
 }
 
-// Pre-defined code states for the 11 migration steps (exact code verified in Milestone 3)
+const PACKS_DIR = resolve(WORKSPACE, 'packs');
+
+/** Resolves display metadata for the currently active migration pack (never throws). */
+export function getActivePackMeta(): { id: string; name: string; language: string; shimStrategy: string } {
+  try {
+    const pack = loadPack(activePackId, [PACKS_DIR]);
+    return {
+      id: pack.id,
+      name: pack.name,
+      language: pack.language,
+      shimStrategy: getShimStrategy(pack),
+    };
+  } catch {
+    return { id: activePackId, name: activePackId, language: 'typescript', shimStrategy: 'in-file-branch' };
+  }
+}
+
+/**
+ * Loads canned step reference implementations from `<repoPath>/.bkb-steps.json` when present.
+ * Format: { "<stepKey>": { "<relativePath>": "<full file source>" } }. Returns null when absent
+ * so callers can fall back to pack-independent behavior.
+ */
+export function loadRepoStepStates(repoPath: string): Record<string, Record<string, string>> | null {
+  const file = resolve(repoPath, '.bkb-steps.json');
+  if (!existsSync(file)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, Record<string, string>>;
+    }
+    return null;
+  } catch (err: any) {
+    console.error(`[cockpit] Failed to parse ${file}: ${err.message}`);
+    return null;
+  }
+}
+
+// Built-in reference code states for the demo Express -> Fastify pack (fallback when a repo
+// does not ship its own `.bkb-steps.json`).
 const STEP_CODE_STATES: Record<string, Record<string, string>> = {
   // Step 1: response.ts -> SHIM
   'src/utils/response.ts:SHIM': {
@@ -743,6 +783,7 @@ export function startDemoServer(
           isDemoRepo: activeRepo === DEFAULT_TARGET_REPO,
           graphName: getGraphNameForRepo(activeRepo),
           currentPackId: activePackId,
+          pack: getActivePackMeta(),
           mode: activeMode,
           provider: activeProvider,
           model: activeModel,
@@ -813,10 +854,22 @@ export function startDemoServer(
           displayRepo: activeRepo === DEFAULT_TARGET_REPO ? 'demo-repo (Sandbox)' : activeRepo,
           isDemoRepo: activeRepo === DEFAULT_TARGET_REPO,
           currentPackId: activePackId,
+          pack: getActivePackMeta(),
           mode: activeMode,
           provider: activeProvider,
           model: activeModel,
           topology,
+        });
+
+        broadcastSse({
+          type: 'target-changed',
+          repoPath: activeRepo,
+          displayRepo: activeRepo === DEFAULT_TARGET_REPO ? 'demo-repo (Sandbox)' : activeRepo,
+          packId: activePackId,
+          pack: getActivePackMeta(),
+          mode: activeMode,
+          provider: activeProvider,
+          model: activeModel,
         });
       } catch (err: any) {
         sendJson(res, { error: err.message }, 500);
@@ -886,9 +939,13 @@ export function startDemoServer(
         const stepKey = `${sortedTargets}:${claim.phase}`;
         let replacements: Record<string, string> | undefined;
 
-        // Mode A: Canned step diff (if in canned mode and stepKey exists)
-        if (activeMode === 'canned' && activeRepo === DEFAULT_TARGET_REPO) {
-          replacements = STEP_CODE_STATES[stepKey];
+        // Mode A: Canned step diff. Prefer the target repo's own `.bkb-steps.json`, then fall
+        // back to the built-in Express reference states only for the default demo pack.
+        if (activeMode === 'canned') {
+          const repoStates = loadRepoStepStates(activeRepo);
+          replacements =
+            repoStates?.[stepKey] ??
+            (activePackId === DEFAULT_PACK_ID ? STEP_CODE_STATES[stepKey] : undefined);
         }
 
         // Mode B: Live LLM Transform via LlmClient

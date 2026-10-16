@@ -83,6 +83,7 @@ let currentAppInfo = {
   displayRepo: 'demo-repo (Sandbox)',
   isDemoRepo: true,
   currentPackId: 'express-to-fastify',
+  pack: { id: 'express-to-fastify', name: 'express-to-fastify', language: 'typescript', shimStrategy: 'in-file-branch' },
   mode: 'canned',
   provider: 'mock',
   model: 'qwen2.5-coder:latest',
@@ -1287,6 +1288,21 @@ async function executeRollback(targetStep) {
 }
 
 // ── System Info & Dynamic Target Manager ──────────────────
+function renderPackMeta(pack) {
+  const navPack = document.getElementById('nav-pack-name');
+  const langBadge = document.getElementById('nav-pack-lang');
+  const shimBadge = document.getElementById('nav-pack-shim');
+  if (navPack) navPack.textContent = pack.id || pack.name || 'unknown';
+  if (langBadge) {
+    langBadge.textContent = pack.language || 'unknown';
+    langBadge.style.display = pack.language ? '' : 'none';
+  }
+  if (shimBadge) {
+    shimBadge.textContent = pack.shimStrategy || 'in-file-branch';
+    shimBadge.style.display = pack.shimStrategy ? '' : 'none';
+  }
+}
+
 async function loadSystemInfo() {
   try {
     const res = await fetch('/api/info');
@@ -1294,9 +1310,8 @@ async function loadSystemInfo() {
     currentAppInfo = info;
 
     const navRepo = document.getElementById('nav-repo-name');
-    const navPack = document.getElementById('nav-pack-name');
     if (navRepo) navRepo.textContent = info.isDemoRepo ? 'demo-repo' : info.displayRepo.split('/').pop();
-    if (navPack) navPack.textContent = info.currentPackId;
+    renderPackMeta(info.pack || { id: info.currentPackId, language: 'typescript', shimStrategy: 'in-file-branch' });
 
     document.querySelectorAll('.mode-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.getAttribute('data-mode') === info.mode);
@@ -1393,6 +1408,17 @@ async function handleLiveTelemetryEvent(event, flashBadge) {
   }
 
   if (typeof flashBadge === 'function') flashBadge();
+
+  // Pack switched without a repo change: refresh pack metadata/badges only
+  if (
+    event.packId &&
+    currentAppInfo &&
+    event.repoPath === currentAppInfo.currentRepo &&
+    event.packId !== currentAppInfo.currentPackId
+  ) {
+    await loadSystemInfo();
+    return;
+  }
 
   // If repo switched in CLI, reload system info and re-render topology
   if (event.repoPath && currentAppInfo && event.repoPath !== currentAppInfo.currentRepo) {
