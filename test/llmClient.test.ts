@@ -12,6 +12,7 @@ import {
   fenceAliasesForLanguage,
   canonicalFenceForLanguage,
   loadFixtureMockTransforms,
+  openCodeModelId,
   LlmClient,
 } from '../src/runner/llmClient';
 
@@ -106,5 +107,21 @@ describe('opencode provider configuration', () => {
     const client = new LlmClient({ provider: 'opencode', model: 'deepseek-v4-pro' });
     assert.equal(client.provider, 'opencode');
     assert.equal(client.model, 'deepseek-v4-pro');
+  });
+
+  it('defaults the subprocess timeout and honors an override', () => {
+    assert.equal(new LlmClient({ provider: 'opencode' }).timeoutMs, 180_000);
+    assert.equal(new LlmClient({ provider: 'opencode', timeoutMs: 5_000 }).timeoutMs, 5_000);
+  });
+});
+
+describe('openCodeModelId', () => {
+  it('namespaces a bare model id with the opencode provider prefix', () => {
+    assert.equal(openCodeModelId('deepseek-v4.1-flash-free'), 'opencode/deepseek-v4.1-flash-free');
+  });
+
+  it('leaves an already-namespaced model id unchanged', () => {
+    assert.equal(openCodeModelId('opencode/deepseek-v4-pro'), 'opencode/deepseek-v4-pro');
+    assert.equal(openCodeModelId('anthropic/claude-sonnet-4-5'), 'anthropic/claude-sonnet-4-5');
   });
 });

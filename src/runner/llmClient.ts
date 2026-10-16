@@ -5,6 +5,7 @@
  *  - 'ollama': Local zero-cost LLM (e.g. qwen2.5-coder, deepseek-coder) via http://localhost:11434
  *  - 'openai': OpenAI chat completions API (gpt-4o, gpt-4o-mini, etc.)
  *  - 'anthropic': Anthropic messages API (claude-3-5-sonnet, etc.)
+ *  - 'opencode': Free DeepSeek model via the `opencode run` CLI (tool-isolated subprocess)
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -16,6 +17,30 @@ import {
   RUNTIME_INTEROP_MARKER,
   type ShimStrategy,
 } from '../adapters/types';
+
+/**
+ * Isolation profile injected into `opencode run` via `OPENCODE_CONFIG_CONTENT`.
+ *
+ * Denies every tool — built-in and MCP, including BKB's own `bkb_*` server — so
+ * the CLI behaves as a pure text transformer: it cannot edit files, run shell
+ * commands, or recursively invoke BKB's MCP tools. `read` is re-allowed because
+ * OpenCode's free-tier entitlement check fails when it is denied.
+ */
+const OPENCODE_ISOLATION_CONFIG = JSON.stringify({
+  permission: { '*': 'deny', read: 'allow' },
+});
+
+/** Default subprocess timeout for the `opencode` provider (3 minutes). */
+const DEFAULT_OPENCODE_TIMEOUT_MS = 180_000;
+
+/**
+ * Namespaces a bare model id with the `opencode/` provider prefix (e.g.
+ * `deepseek-v4.1-flash-free` -> `opencode/deepseek-v4.1-flash-free`). Already
+ * namespaced ids are returned unchanged.
+ */
+export function openCodeModelId(rawModel: string): string {
+  return rawModel.includes('/') ? rawModel : `opencode/${rawModel}`;
+}
 
 export interface LlmRequest {
   targetPath: string;
@@ -54,6 +79,8 @@ export interface LlmClientOptions {
   mockTransforms?: Record<string, LlmResponse>;
   /** SHIM lifecycle style for prompt guidance. Defaults to `in-file-branch`. */
   shimStrategy?: ShimStrategy;
+  /** Subprocess timeout (ms) for the `opencode` provider. Defaults to 180000. */
+  timeoutMs?: number;
 }
 
 /**
@@ -479,6 +506,7 @@ export class LlmClient {
   readonly language: string;
   readonly shimStrategy: ShimStrategy;
   readonly mockTransforms: Record<string, LlmResponse>;
+  readonly timeoutMs: number;
 
   constructor(options: LlmClientOptions = {}) {
     this.provider = options.provider ?? (process.env.OPENAI_API_KEY ? 'openai' : process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'mock');
@@ -486,6 +514,7 @@ export class LlmClient {
     this.baseUrl = options.baseUrl;
     this.language = options.language ?? 'typescript';
     this.shimStrategy = options.shimStrategy ?? DEFAULT_SHIM_STRATEGY;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_OPENCODE_TIMEOUT_MS;
     this.mockTransforms = {
       ...BUILTIN_MOCK_TRANSFORMS,
       ...loadFixtureMockTransforms(options.repoPath),
@@ -659,32 +688,68 @@ RULES:
 
   private async callOpenCode(prompt: string, req: LlmRequest): Promise<LlmResponse> {
     const rawModel = this.model || 'deepseek-v4.1-flash-free';
-    const model = rawModel.includes('/') ? rawModel : `opencode/${rawModel}`;
+    const model = openCodeModelId(rawModel);
     return new Promise((resolve, reject) => {
       const child = spawn('opencode', ['run', '-m', model, '--pure'], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, OPENCODE_CONFIG_CONTENT: OPENCODE_ISOLATION_CONFIG },
       });
       let stdout = '';
       let stderr = '';
+      let settled = false;
+
+      const finish = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn();
+      };
+
+      const timer = setTimeout(() => {
+        finish(() => {
+          child.kill('SIGKILL');
+          reject(new Error(`opencode timed out after ${this.timeoutMs}ms`));
+        });
+      }, this.timeoutMs);
+
       child.stdout.on('data', (d) => {
         stdout += d.toString();
       });
       child.stderr.on('data', (d) => {
         stderr += d.toString();
       });
-      child.on('error', (err) => reject(new Error(`Failed to spawn opencode: ${err.message}`)));
+      // opencode may exit before consuming stdin; swallow the resulting EPIPE
+      // instead of crashing the process with an unhandled 'error' event.
+      child.stdin.on('error', () => {});
+      child.on('error', (err) =>
+        finish(() => reject(new Error(`Failed to spawn opencode: ${err.message}`))),
+      );
       child.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`opencode exited with code ${code}: ${stderr || stdout}`));
-          return;
-        }
-        resolve({
-          code: extractCodeFromMarkdown(stdout, this.language),
-          summary: `OpenCode migrated ${req.targetPath} via ${model}`,
+        finish(() => {
+          if (code !== 0) {
+            reject(new Error(`opencode exited with code ${code}: ${(stderr || stdout).trim()}`));
+            return;
+          }
+          const extracted = extractCodeFromMarkdown(stdout, this.language);
+          if (!extracted.trim()) {
+            reject(
+              new Error(`opencode returned no code for ${req.targetPath}: ${stderr.trim()}`),
+            );
+            return;
+          }
+          resolve({
+            code: extracted,
+            summary: `OpenCode migrated ${req.targetPath} via ${model}`,
+          });
         });
       });
-      child.stdin.write(prompt);
-      child.stdin.end();
+
+      try {
+        child.stdin.write(prompt);
+        child.stdin.end();
+      } catch {
+        // EPIPE is already handled by the stdin 'error' listener above.
+      }
     });
   }
 }
