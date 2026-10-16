@@ -1,0 +1,26 @@
+{
+  "test/helpers/mockFactory.ts:MIGRATE": {
+    "code": "import { vi } from 'vitest';\n\nexport type Logger = {\n  info: (message: string) => void;\n  error: (message: string) => void;\n};\n\nexport function makeLogger(): Logger {\n  return {\n    info: vi.fn(),\n    error: vi.fn(),\n  };\n}\n\nexport function makeSequentialId(prefix: string): () => string {\n  let counter = 0;\n  return vi.fn(() => `${prefix}-${++counter}`);\n}\n",
+    "summary": "Migrate mock factory to Vitest"
+  },
+  "test/helpers/mockFactory.ts:SHIM": {
+    "code": "export type Logger = {\n  info: (message: string) => void;\n  error: (message: string) => void;\n};\n\nconst getMock = () => (typeof (globalThis as any).vi !== 'undefined' ? (globalThis as any).vi : (globalThis as any).jest); // @bkb-shim\n\nexport function makeLogger(): Logger {\n  const mock = getMock();\n  return {\n    info: mock.fn(),\n    error: mock.fn(),\n  };\n}\n\nexport function makeSequentialId(prefix: string): () => string {\n  const mock = getMock();\n  let counter = 0;\n  const next = mock.fn(() => `${prefix}-${++counter}`);\n  return next;\n}\n",
+    "summary": "Runner-agnostic shim for mock factory"
+  },
+  "test/helpers/mockFactory.ts:DE_SHIM": {
+    "code": "import { vi } from 'vitest';\n\nexport type Logger = {\n  info: (message: string) => void;\n  error: (message: string) => void;\n};\n\nexport function makeLogger(): Logger {\n  return {\n    info: vi.fn(),\n    error: vi.fn(),\n  };\n}\n\nexport function makeSequentialId(prefix: string): () => string {\n  let counter = 0;\n  return vi.fn(() => `${prefix}-${++counter}`);\n}\n",
+    "summary": "Drop Jest fallback from mock factory"
+  },
+  "test/math.test.ts:MIGRATE": {
+    "code": "import { describe, it, expect, vi } from 'vitest';\nimport { add, multiply, safeDivide } from '../src/math';\nimport { makeLogger } from './helpers/mockFactory';\n\ndescribe('math', () => {\n  it('adds two numbers', () => {\n    expect(add(2, 3)).toBe(5);\n  });\n\n  it('multiplies two numbers', () => {\n    expect(multiply(4, 5)).toBe(20);\n  });\n\n  it('returns null when dividing by zero', () => {\n    expect(safeDivide(1, 0)).toBeNull();\n  });\n\n  it('reports results through an injected logger', () => {\n    const logger = makeLogger();\n    logger.info(String(add(1, 1)));\n    expect(logger.info).toHaveBeenCalledWith('2');\n  });\n\n  it('supports mocks for callbacks', () => {\n    const double = vi.fn((value: number) => value * 2);\n    expect([1, 2].map(double)).toEqual([2, 4]);\n    expect(double).toHaveBeenCalledTimes(2);\n  });\n});\n",
+    "summary": "Migrate test/math.test.ts from Jest to Vitest"
+  },
+  "test/strings.test.ts:MIGRATE": {
+    "code": "import { describe, it, expect, vi } from 'vitest';\nimport { capitalize, slugify } from '../src/strings';\nimport { makeSequentialId } from './helpers/mockFactory';\n\ndescribe('strings', () => {\n  it('capitalizes the first letter', () => {\n    expect(capitalize('hello')).toBe('Hello');\n  });\n\n  it('slugifies arbitrary text', () => {\n    expect(slugify('  Hello World!! ')).toBe('hello-world');\n  });\n\n  it('generates sequential ids', () => {\n    const nextId = makeSequentialId('id');\n    expect(nextId()).toBe('id-1');\n    expect(nextId()).toBe('id-2');\n  });\n\n  it('tracks slug calls with a mock', () => {\n    const slug = vi.fn(slugify);\n    expect(slug('Hello There')).toBe('hello-there');\n    expect(slug).toHaveBeenCalledTimes(1);\n  });\n});\n",
+    "summary": "Migrate test/strings.test.ts from Jest to Vitest"
+  },
+  "test/inventory.test.ts:MIGRATE": {
+    "code": "import { describe, it, expect, vi } from 'vitest';\nimport { stockValue, lowStock, type Item } from '../src/inventory';\n\nconst items: Item[] = [\n  { sku: 'A', qty: 2, unitPrice: 10 },\n  { sku: 'B', qty: 0, unitPrice: 5 },\n];\n\ndescribe('inventory', () => {\n  it('computes the total stock value', () => {\n    expect(stockValue(items)).toBe(20);\n  });\n\n  it('finds items at or below the low-stock threshold', () => {\n    expect(lowStock(items, 0).map((item) => item.sku)).toEqual(['B']);\n  });\n\n  it('records stock checks with a spy', () => {\n    const rows: Item[] = [{ sku: 'C', qty: 3, unitPrice: 2 }];\n    const check = vi.fn((list: Item[]) => stockValue(list));\n    expect(check(rows)).toBe(6);\n    expect(check).toHaveBeenCalledWith(rows);\n  });\n});\n",
+    "summary": "Migrate test/inventory.test.ts from Jest to Vitest"
+  }
+}
