@@ -93,7 +93,30 @@ const SOURCE_REPO = resolve(WORKSPACE, 'demo-repo');
 const DEFAULT_TARGET_REPO = resolve(WORKSPACE, 'scratch/cockpit-demo-repo');
 const DEFAULT_PACK_ID = 'express-to-fastify';
 
-export const allowedWorkspaceRoots: string[] = [WORKSPACE, process.cwd()];
+export const allowedWorkspaceRoots: string[] = [
+  WORKSPACE,
+  ...(process.env.BKB_WORKSPACE_ROOT ? [resolve(process.env.BKB_WORKSPACE_ROOT)] : []),
+];
+let operatorTrustedRepo: string | null = null;
+
+export function isRepoAllowed(targetPath: string): boolean {
+  try {
+    const resolved = resolve(targetPath);
+    if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
+      return false;
+    }
+    // 1. Operator-supplied --repo from CLI startup is a trusted root for this session
+    if (operatorTrustedRepo && (resolved === operatorTrustedRepo || isPathContained(operatorTrustedRepo, resolved))) {
+      return true;
+    }
+    // 2. Allow-listed workspace root (WORKSPACE package root or BKB_WORKSPACE_ROOT)
+    return allowedWorkspaceRoots.some(
+      (root) => resolved === resolve(root) || isPathContained(root, resolved),
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function getGraphNameForRepo(repoPath: string): string {
   if (repoPath === DEFAULT_TARGET_REPO) {
@@ -605,16 +628,8 @@ export function startDemoServer(
 ) {
   if (initialRepo) {
     const resolvedInitial = resolve(initialRepo);
+    operatorTrustedRepo = resolvedInitial;
     activeRepo = resolvedInitial;
-    if (!allowedWorkspaceRoots.includes(resolvedInitial)) {
-      allowedWorkspaceRoots.push(resolvedInitial);
-    }
-  }
-  if (process.env.BKB_WORKSPACE_ROOT) {
-    const envRoot = resolve(process.env.BKB_WORKSPACE_ROOT);
-    if (!allowedWorkspaceRoots.includes(envRoot)) {
-      allowedWorkspaceRoots.push(envRoot);
-    }
   }
   if (initialPackId) {
     activePackId = initialPackId;
@@ -681,14 +696,21 @@ export function startDemoServer(
     if (pathname === '/api/broadcast' && req.method === 'POST') {
       try {
         const event = (await parseJsonBody(req)) as Record<string, any>;
-        if (event.repoPath && resolve(event.repoPath) !== activeRepo) {
-          activeRepo = resolve(event.repoPath);
-          if (event.packId) activePackId = event.packId;
-          if (dbClient) {
-            await dbClient.close().catch(() => {});
-            dbClient = null;
+        if (event.repoPath) {
+          const targetRepo = resolve(event.repoPath);
+          if (!isRepoAllowed(targetRepo)) {
+            sendJson(res, { error: 'Access denied: broadcast repoPath is not within an allow-listed workspace root' }, 403);
+            return;
           }
-          currentOps = null;
+          if (targetRepo !== activeRepo) {
+            activeRepo = targetRepo;
+            if (event.packId) activePackId = event.packId;
+            if (dbClient) {
+              await dbClient.close().catch(() => {});
+              dbClient = null;
+            }
+            currentOps = null;
+          }
         }
 
         broadcastSse(event);
@@ -756,17 +778,7 @@ export function startDemoServer(
           } else {
             targetPath = resolve(WORKSPACE, body.repoPath);
           }
-          if (!existsSync(targetPath) || !statSync(targetPath).isDirectory()) {
-            sendJson(res, { error: `Invalid repository path: ${body.repoPath}` }, 400);
-            return;
-          }
-          const isContained = allowedWorkspaceRoots.some(
-            (root) => isPathContained(root, targetPath) || resolve(targetPath) === resolve(root),
-          );
-          const isSystemPath =
-            /^\/(etc|usr|bin|sbin|var|dev|proc|sys|System|Library|Windows)($|\/)/i.test(targetPath) ||
-            resolve(targetPath) === resolve('/');
-          if (!isContained || isSystemPath) {
+          if (!isRepoAllowed(targetPath)) {
             sendJson(res, { error: 'Access denied: target repository is not within an allow-listed workspace root' }, 403);
             return;
           }

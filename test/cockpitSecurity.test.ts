@@ -85,6 +85,16 @@ describe('Cockpit Security & Origin Containment', () => {
       assert.strictEqual(targetRes.status, 403);
       const targetJson = await targetRes.json() as any;
       assert.strictEqual(targetJson.error, 'Access denied: target repository is not within an allow-listed workspace root');
+
+      // 5. POST /api/broadcast escaping workspace root blocked with 403
+      const broadcastRes = await fetch(`http://127.0.0.1:${port}/api/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoPath: '/' }),
+      });
+      assert.strictEqual(broadcastRes.status, 403);
+      const broadcastJson = await broadcastRes.json() as any;
+      assert.strictEqual(broadcastJson.error, 'Access denied: broadcast repoPath is not within an allow-listed workspace root');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
