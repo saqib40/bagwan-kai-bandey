@@ -36,7 +36,7 @@ const DEFAULT_PACK_ID = 'express-to-fastify';
 export function getGraphNameForRepo(repoPath: string): string {
   if (process.env.BKB_GRAPH) return process.env.BKB_GRAPH;
   if (repoPath === DEFAULT_TARGET_REPO) return 'bkb_cockpit';
-  return 'bkb_' + basename(repoPath).replace(/[^a-zA-Z0-9_]/g, '_');
+  return 'bkb';
 }
 
 // ── Dynamic Server State ─────────────────────────────────
