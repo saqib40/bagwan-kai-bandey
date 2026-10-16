@@ -324,6 +324,23 @@ describe('MigrationOps checkpoint gate', () => {
     assert.deepEqual(result.errors, []);
   });
 
+  it('honors verification.timeoutMs for checkpoint commands', async () => {
+    const pack: MigrationPack = {
+      ...MOCK_PACK,
+      verification: {
+        perStepTypecheckCmd: 'echo tsc-pass',
+        checkpointTestCmd: 'node -e "setTimeout(() => {}, 5000)"',
+        timeoutMs: 250,
+      },
+    };
+    const client = createMockClient();
+    const ops = new MigrationOps(client, pack, process.cwd());
+
+    const result = await ops.runCheckpointGate();
+    assert.equal(result.testPass, false);
+    assert.ok(result.errors.some((e) => e.includes('Tests failed')));
+  });
+
   it('reports a mismatch when a snapshot diverges from baseline', async () => {
     const pack: MigrationPack = {
       ...MOCK_PACK,
