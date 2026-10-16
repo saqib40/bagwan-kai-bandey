@@ -39,6 +39,8 @@ export {
   type APIUsage,
   type DetectionRule,
   type InvariantRule,
+  type VerificationSnapshot,
+  type SnapshotKind,
   type MigrationPack,
 } from './adapters/types';
 export { BaseLanguageAdapter } from './adapters/baseAdapter';

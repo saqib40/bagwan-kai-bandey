@@ -76,6 +76,23 @@ export interface InvariantRule {
   format?: string;
 }
 
+/** Kinds of global verification snapshot comparison. */
+export type SnapshotKind = 'set' | 'count' | 'exact';
+
+/**
+ * A global verification snapshot: a shell command captured at `init` and
+ * re-run at every checkpoint gate. The output is normalized according to `kind`
+ * and compared against the captured baseline.
+ */
+export interface VerificationSnapshot {
+  /** Stable identifier (e.g. `route-surface`, `export-surface`, `test-counts`). */
+  id: string;
+  /** Shell command executed in the repository root; must emit JSON (or raw text for `exact`). */
+  command: string;
+  /** Comparison strategy for the command output. */
+  kind: SnapshotKind;
+}
+
 export interface MigrationPack {
   $schema?: string;
   id: string;
@@ -97,7 +114,15 @@ export interface MigrationPack {
   verification: {
     perStepTypecheckCmd: string;
     checkpointTestCmd: string;
-    routeSnapshotCmd: string;
+    /**
+     * @deprecated Use `snapshots` instead. Retained as a backward-compatible alias
+     * that maps to `{ id: 'route-surface', command: routeSnapshotCmd, kind: 'set' }`.
+     */
+    routeSnapshotCmd?: string;
+    /** Global snapshots captured at init and compared at each checkpoint gate. */
+    snapshots?: VerificationSnapshot[];
+    /** Per-command execution timeout in milliseconds. Defaults to 60000. */
+    timeoutMs?: number;
   };
 }
 

@@ -291,6 +291,57 @@ describe('MigrationOps checkpoint gate', () => {
     assert.equal(result.tscPass, true);
     assert.equal(result.testPass, true);
   });
+
+  it('skips snapshot comparison cleanly when no snapshots are declared', async () => {
+    const pack: MigrationPack = {
+      ...MOCK_PACK,
+      verification: { perStepTypecheckCmd: 'echo tsc-pass', checkpointTestCmd: 'echo tests-pass' },
+    };
+    const client = createMockClient();
+    const ops = new MigrationOps(client, pack, process.cwd());
+
+    const result = await ops.runCheckpointGate();
+    assert.equal(result.routeMatch, true);
+    assert.deepEqual(result.errors, []);
+  });
+
+  it('matches declared snapshots against the captured baseline', async () => {
+    const pack: MigrationPack = {
+      ...MOCK_PACK,
+      verification: {
+        perStepTypecheckCmd: 'echo tsc-pass',
+        checkpointTestCmd: 'echo tests-pass',
+        snapshots: [{ id: 'export-surface', command: "echo '[\"a\",\"b\"]'", kind: 'set' }],
+      },
+    };
+    const client = createMockClient({
+      MigrationMeta: [{ baseline: '[]', snapshots: JSON.stringify({ 'export-surface': '["a","b"]' }) }],
+    });
+    const ops = new MigrationOps(client, pack, process.cwd());
+
+    const result = await ops.runCheckpointGate();
+    assert.equal(result.routeMatch, true);
+    assert.deepEqual(result.errors, []);
+  });
+
+  it('reports a mismatch when a snapshot diverges from baseline', async () => {
+    const pack: MigrationPack = {
+      ...MOCK_PACK,
+      verification: {
+        perStepTypecheckCmd: 'echo tsc-pass',
+        checkpointTestCmd: 'echo tests-pass',
+        snapshots: [{ id: 'export-surface', command: "echo '[\"a\",\"c\"]'", kind: 'set' }],
+      },
+    };
+    const client = createMockClient({
+      MigrationMeta: [{ baseline: '[]', snapshots: JSON.stringify({ 'export-surface': '["a","b"]' }) }],
+    });
+    const ops = new MigrationOps(client, pack, process.cwd());
+
+    const result = await ops.runCheckpointGate();
+    assert.equal(result.routeMatch, false);
+    assert.ok(result.errors.some((e) => e.includes('export-surface')));
+  });
 });
 
 describe('MigrationOps.advance', () => {

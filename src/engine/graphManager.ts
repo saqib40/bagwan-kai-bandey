@@ -14,6 +14,7 @@ import { loadPack } from './packLoader';
 import { adapterRegistry } from '../adapters/registry';
 import type { MigrationPack, ParsedModule } from '../adapters/types';
 import { broadcastLiveEvent } from './telemetry';
+import { getPackSnapshots, normalizeSnapshotOutput } from './snapshots';
 import * as Q from './queries';
 
 /**
@@ -84,20 +85,30 @@ export class MigrationGraphManager {
         await client.ensureIndex(ix);
       }
 
-      // 2. Capture baseline route snapshot using pack's command
-      console.error(`[bkb] Capturing baseline routes via "${pack.verification.routeSnapshotCmd}"...`);
-      let baselineRoutesJson = '[]';
-      try {
-        const out = execSync(pack.verification.routeSnapshotCmd, {
-          cwd: absRepoPath,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }).trim();
-        const parsedRoutes = JSON.parse(out);
-        baselineRoutesJson = JSON.stringify(Array.isArray(parsedRoutes) ? parsedRoutes.sort() : []);
-      } catch (err) {
-        console.error('[bkb] Warning: Failed to run routeSnapshotCmd:', err);
+      // 2. Capture baseline snapshots using the pack's declared commands
+      const snapshots = getPackSnapshots(pack);
+      const baselineSnapshots: Record<string, string> = {};
+      for (const snap of snapshots) {
+        console.error(`[bkb] Capturing baseline snapshot "${snap.id}" via "${snap.command}"...`);
+        try {
+          const out = execSync(snap.command, {
+            cwd: absRepoPath,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout: pack.verification.timeoutMs ?? 60_000,
+          });
+          baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, out);
+        } catch (err) {
+          console.error(`[bkb] Warning: Failed to run snapshot "${snap.id}":`, err);
+          baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, '');
+        }
       }
+      const baselineSnapshotsJson = JSON.stringify(baselineSnapshots);
+
+      // Backward-compat: expose the primary route/`set` snapshot under `baseline_routes`.
+      const legacyRouteSnap =
+        snapshots.find((s) => s.id === 'route-surface') ?? snapshots.find((s) => s.kind === 'set');
+      const baselineRoutesJson = legacyRouteSnap ? baselineSnapshots[legacyRouteSnap.id] : '[]';
 
       // Safety check: verify existing graph does not belong to a different repo
       if (!opts.reset) {
@@ -114,12 +125,16 @@ export class MigrationGraphManager {
       // 3. Upsert singleton :MigrationMeta node
       await client.query(
         `MERGE (meta:MigrationMeta {repo_path: $repoPath, pack_id: $packId})
-         ON CREATE SET meta.baseline_routes = $baselineRoutesJson, meta.created_at = timestamp()
+         ON CREATE SET
+           meta.baseline_routes = $baselineRoutesJson,
+           meta.baseline_snapshots = $baselineSnapshotsJson,
+           meta.created_at = timestamp()
          ON MATCH SET meta.updated_at = timestamp()`,
         {
           repoPath: absRepoPath,
           packId: pack.id,
           baselineRoutesJson,
+          baselineSnapshotsJson,
         },
       );
 

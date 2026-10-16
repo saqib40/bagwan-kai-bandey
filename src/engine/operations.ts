@@ -15,6 +15,7 @@ import { tarjanScc } from './scc';
 import { adapterRegistry } from '../adapters/registry';
 import { shimMarkerList, type MigrationPack, type ParsedModule } from '../adapters/types';
 import { broadcastLiveEvent } from './telemetry';
+import { getPackSnapshots, normalizeSnapshotOutput } from './snapshots';
 import * as Q from './queries';
 
 // ─── Result Types ────────────────────────────────────────
@@ -787,31 +788,37 @@ export class MigrationOps {
     const testResult = this.runCommand(this.pack.verification.checkpointTestCmd);
     if (!testResult.ok) errors.push(`Tests failed: ${testResult.output.slice(0, 500)}`);
 
-    // 3. Route snapshot comparison
+    // 3. Global snapshot comparison (routes, exports, counts, ...). Skipped when none declared.
     let routeMatch = true;
+    const snapshots = getPackSnapshots(this.pack);
     const metaRow = await this.db.roQuery<any>(
-      `MATCH (meta:MigrationMeta) RETURN meta.baseline_routes AS baseline LIMIT 1`,
+      `MATCH (meta:MigrationMeta) RETURN meta.baseline_routes AS baseline, meta.baseline_snapshots AS snapshots LIMIT 1`,
     );
-    const baselineStr = metaRow[0]?.baseline ?? '[]';
+    const legacyBaseline = metaRow[0]?.baseline;
+    let baselineMap: Record<string, string> = {};
+    try {
+      if (metaRow[0]?.snapshots) baselineMap = JSON.parse(metaRow[0].snapshots);
+    } catch { /* ignore malformed baseline map */ }
 
-    const routeResult = this.runCommand(this.pack.verification.routeSnapshotCmd);
-    if (routeResult.ok) {
-      try {
-        const currentRoutes = JSON.parse(routeResult.output.trim());
-        const currentStr = JSON.stringify(Array.isArray(currentRoutes) ? currentRoutes.sort() : []);
-        if (currentStr !== baselineStr) {
-          routeMatch = false;
-          errors.push(
-            `Route mismatch!\n  Baseline: ${baselineStr}\n  Current:  ${currentStr}`,
-          );
-        }
-      } catch (err) {
+    for (const snap of snapshots) {
+      const result = this.runCommand(snap.command);
+      if (!result.ok) {
         routeMatch = false;
-        errors.push(`Failed to parse route snapshot output: ${routeResult.output.slice(0, 200)}`);
+        errors.push(`Snapshot "${snap.id}" command failed: ${result.output.slice(0, 200)}`);
+        continue;
       }
-    } else {
-      routeMatch = false;
-      errors.push(`Route snapshot command failed: ${routeResult.output.slice(0, 200)}`);
+      const current = normalizeSnapshotOutput(snap.kind, result.output);
+      const baseline =
+        baselineMap[snap.id] ??
+        (snap.id === 'route-surface' && legacyBaseline !== undefined
+          ? normalizeSnapshotOutput(snap.kind, legacyBaseline)
+          : '');
+      if (current !== baseline) {
+        routeMatch = false;
+        errors.push(
+          `Snapshot "${snap.id}" mismatch!\n  Baseline: ${baseline}\n  Current:  ${current}`,
+        );
+      }
     }
 
     // 4. Count SHIMMED modules and @bkb-shim markers in source files
@@ -949,7 +956,7 @@ export class MigrationOps {
         cwd: this.repoPath,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 60_000,
+        timeout: this.pack.verification.timeoutMs ?? 60_000,
         env,
       });
       return { ok: true, output: output.trim() };
