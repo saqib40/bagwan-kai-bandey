@@ -7,7 +7,7 @@
  *  3. getMigrationSlice() (1-hop AST context, guidance, caller snippets)
  *  4. llmClient.generateTransform() (LLM code transformation)
  *  5. verifyAndCommitNode() (Tree-sitter AST, tsc --noEmit, route invariants, degrees)
- *  6. getAuditTrail(true) (Full checkpoint test & route diff gate)
+ *  6. Use the checkpoint result from verify (tests and route diff), rolling back on failure
  */
 
 import { writeFileSync } from 'node:fs';
@@ -196,25 +196,25 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
 
       claim.targetPaths.forEach((p) => migratedSet.add(p));
 
-      // 6. Checkpoint gate if triggered
-      if (verifyRes.checkpointTriggered) {
+      // 6. Checkpoint gate already ran inside verify. Do not run it again.
+      if (verifyRes.checkpointTriggered && verifyRes.checkpointResult) {
+        const cp = verifyRes.checkpointResult;
         options.onProgress?.({
           step: stepCount,
           phase: claim.phase,
           modules: claim.targetPaths,
-          action: `Running full checkpoint test & route diff gate...`,
-          status: 'in_progress',
+          action: `Checkpoint gate ${cp.tscPass && cp.testPass && cp.routeMatch ? 'passed' : 'failed'}`,
+          status: cp.tscPass && cp.testPass && cp.routeMatch ? 'success' : 'error',
         });
-        const trail = await ops.getAuditTrail(true);
-        if (
-          trail.checkpoint &&
-          (!trail.checkpoint.tscPass || !trail.checkpoint.testPass || !trail.checkpoint.routeMatch)
-        ) {
+        if (!cp.tscPass || !cp.testPass || !cp.routeMatch) {
+          if (autoRollback) {
+            await rollbackToCheckpoint(repoPath, packId, stepCount, graphName);
+          }
           return {
             ok: false,
             totalSteps: stepCount,
             migratedModules: migratedSet.size,
-            routeParity: trail.checkpoint.routeMatch,
+            routeParity: cp.routeMatch,
             checkpointPassed: false,
             durationMs: Date.now() - startTime,
             error: `Checkpoint gate failed at step ${stepCount}: tests or route invariant mismatch.`,
