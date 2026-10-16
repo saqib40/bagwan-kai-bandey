@@ -79,6 +79,9 @@ Options:
   --summary <text>   Agent summary for audit trail (default: "CLI verify")
   --checkpoint       Run full checkpoint gate during audit
   --reset            Drop and recreate graph before ingest
+  --port <port>      Port for Migration Cockpit web server (default: 4200)
+  --no-ui            Disable auto-launching Migration Cockpit web server during run
+  --wait             Keep Migration Cockpit web server running after run completes
 `);
 }
 
@@ -500,6 +503,30 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     const model = flags.model ? String(flags.model) : undefined;
     const maxSteps = flags['max-steps'] ? parseInt(String(flags['max-steps']), 10) : undefined;
     const autoRollback = flags['no-rollback'] === true ? false : true;
+    const port = Number(flags.port ?? process.env.BKB_COCKPIT_PORT ?? process.env.PORT ?? 4200);
+    const noUi = Boolean(
+      flags['no-ui'] || flags['no-cockpit'] || flags.ui === false || flags.cockpit === false,
+    );
+
+    let cockpitServer: any;
+    if (!noUi) {
+      try {
+        process.env.BKB_COCKPIT_PORT = String(port);
+        const { startDemoServer } = await import('../src/server/demoServer');
+        cockpitServer = startDemoServer(port, repoPath, packId, false);
+        cockpitServer.on('error', (err: any) => {
+          if (err.code === 'EADDRINUSE') {
+            console.error(
+              `[bkb] Live Cockpit: Connected to existing flight deck on http://localhost:${port}`,
+            );
+          } else {
+            console.error(`[bkb] Cockpit flight deck notice: ${err.message}`);
+          }
+        });
+      } catch (err: any) {
+        console.error(`[bkb] Could not auto-launch Cockpit: ${err.message}`);
+      }
+    }
 
     console.error(`[bkb] Starting autonomous migration runner on "${repoPath}"`);
     console.error(`  - Migration Pack: ${packId}`);
@@ -515,6 +542,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     );
     if (model) console.error(`  - Model:          ${model}`);
     console.error(`  - Auto Rollback:  ${autoRollback ? 'enabled' : 'disabled'}`);
+    if (!noUi) console.error(`  - Live Cockpit:   http://localhost:${port}`);
     console.error('');
 
     const res = await runAutonomousMigration({
@@ -552,12 +580,26 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       console.error(`  - Checkpoint Tests: ${res.checkpointPassed ? 'Passed' : 'Failed'}`);
       console.error(`  - Total Duration:   ${(res.durationMs / 1000).toFixed(2)}s`);
       console.error('====================================================');
+      if (cockpitServer && cockpitServer.listening) {
+        if (flags.wait || flags.serve || flags['keep-ui']) {
+          console.error(`\n[bkb] 🖥️ Migration Cockpit remains live at http://localhost:${port} (Press Ctrl+C to exit)`);
+          return;
+        }
+        cockpitServer.close();
+      }
       process.exit(0);
     } else {
       console.error('====================================================');
       console.error(`❌ Autonomous Migration Failed at step ${res.totalSteps}:`);
       console.error(`  ${res.error ?? 'Unknown error'}`);
       console.error('====================================================');
+      if (cockpitServer && cockpitServer.listening) {
+        if (flags.wait || flags.serve || flags['keep-ui']) {
+          console.error(`\n[bkb] 🖥️ Migration Cockpit remains live at http://localhost:${port} (Press Ctrl+C to exit)`);
+          return;
+        }
+        cockpitServer.close();
+      }
       process.exit(1);
     }
   }
