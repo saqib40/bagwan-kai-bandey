@@ -38,13 +38,61 @@ export interface LlmClientOptions {
   model?: string;
   apiKey?: string;
   baseUrl?: string;
+  /** Target language of the migration pack (drives prompt fences). Defaults to 'typescript'. */
+  language?: string;
+  /** Repository root, used to load fixture-local mock transforms (`.bkb-mocks.json`). */
+  repoPath?: string;
+}
+
+/** Returns the markdown code-fence aliases accepted for a given language. */
+export function fenceAliasesForLanguage(language: string): string[] {
+  switch ((language || 'typescript').toLowerCase()) {
+    case 'python':
+    case 'py':
+      return ['python', 'py'];
+    case 'javascript':
+    case 'js':
+      return ['javascript', 'js', 'typescript', 'ts'];
+    default:
+      return ['typescript', 'ts', 'javascript', 'js'];
+  }
+}
+
+/** Returns the canonical fence label used when instructing the model. */
+export function canonicalFenceForLanguage(language: string): string {
+  switch ((language || 'typescript').toLowerCase()) {
+    case 'python':
+    case 'py':
+      return 'python';
+    case 'javascript':
+    case 'js':
+      return 'javascript';
+    default:
+      return 'typescript';
+  }
+}
+
+/** Human-readable language label for prompts. */
+function displayLanguage(language: string): string {
+  switch ((language || 'typescript').toLowerCase()) {
+    case 'python':
+    case 'py':
+      return 'Python';
+    case 'javascript':
+    case 'js':
+      return 'JavaScript';
+    default:
+      return 'TypeScript';
+  }
 }
 
 /**
  * Extracts raw source code from an LLM response containing optional markdown code fences.
+ * The accepted fence languages are derived from `language` (defaults to TypeScript).
  */
-export function extractCodeFromMarkdown(raw: string): string {
-  const match = raw.match(/```(?:typescript|ts|javascript|js)?\s*\n([\s\S]*?)```/);
+export function extractCodeFromMarkdown(raw: string, language = 'typescript'): string {
+  const aliases = fenceAliasesForLanguage(language).join('|');
+  const match = raw.match(new RegExp('```(?:' + aliases + ')?\\s*\\n([\\s\\S]*?)```'));
   if (match && match[1]) {
     return match[1].trim() + '\n';
   }
@@ -380,11 +428,13 @@ export class LlmClient {
   readonly model: string;
   readonly apiKey?: string;
   readonly baseUrl?: string;
+  readonly language: string;
 
   constructor(options: LlmClientOptions = {}) {
     this.provider = options.provider ?? (process.env.OPENAI_API_KEY ? 'openai' : process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'mock');
     this.apiKey = options.apiKey ?? (this.provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY);
     this.baseUrl = options.baseUrl;
+    this.language = options.language ?? 'typescript';
 
     if (this.provider === 'openai') {
       this.model = options.model ?? 'gpt-4o';
@@ -434,6 +484,7 @@ export class LlmClient {
   }
 
   private buildPrompt(req: LlmRequest): string {
+    const fence = canonicalFenceForLanguage(this.language);
     return `You are an expert autonomous codebase migration engineer using Bagwan Kai Bandey (BKB).
 Your mission is to migrate the module at "${req.targetPath}" for Phase "${req.phase}".
 
@@ -447,18 +498,18 @@ CALLER SNIPPETS (Upstream callers):
 ${req.callerSnippets.map((u) => `${u.callerPath}: ${u.importSnippet}`).join('\n') || '(None)'}
 
 CURRENT SOURCE CODE:
-\`\`\`typescript
+\`\`\`${fence}
 ${req.fullSource}
 \`\`\`
 
 ${req.previousErrors?.length ? `PREVIOUS COMPILATION / INVARIANT ERRORS (Please fix these):\n${req.previousErrors.join('\n')}\n` : ''}
 
 RULES:
-1. Return ONLY valid, compilable code inside a single \`\`\`typescript ... \`\`\` code block.
-2. In Phase "SHIM": Maintain backward compatibility for callers that still pass Express req/res using ${shimMarkerList()} tags on legacy lines. Both markers are accepted.
+1. Return ONLY valid, compilable ${displayLanguage(this.language)} code inside a single \`\`\`${fence} ... \`\`\` code block.
+2. In Phase "SHIM": Maintain backward compatibility for callers that still use the legacy API using ${shimMarkerList()} tags on legacy lines. Both markers are accepted.
 3. In Phase "MIGRATE": Replace internal legacy API usages with modern target framework equivalents.
 4. In Phase "DE_SHIM": Remove all ${shimMarkerList()} tags and legacy fallback branches entirely.
-5. Invariants: Keep all HTTP route paths, parameter names, and HTTP status codes 100% identical.`;
+5. Invariants: Preserve all exported names, public symbols, route paths, parameter names, and HTTP status codes exactly as required by the migration pack's invariants.`;
   }
 
   private async callOpenAi(prompt: string, req: LlmRequest): Promise<LlmResponse> {
@@ -472,7 +523,7 @@ RULES:
       body: JSON.stringify({
         model: this.model,
         messages: [
-          { role: 'system', content: 'You are an autonomous codebase migration engine. Output only TypeScript code.' },
+          { role: 'system', content: `You are an autonomous codebase migration engine. Output only ${displayLanguage(this.language)} code.` },
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
@@ -487,7 +538,7 @@ RULES:
     const data: any = await res.json();
     const rawCode = data.choices?.[0]?.message?.content ?? req.fullSource;
     return {
-      code: extractCodeFromMarkdown(rawCode),
+      code: extractCodeFromMarkdown(rawCode, this.language),
       summary: `AI migrated ${req.targetPath} via ${this.model}`,
     };
   }
@@ -516,7 +567,7 @@ RULES:
     const data: any = await res.json();
     const rawCode = data.content?.[0]?.text ?? req.fullSource;
     return {
-      code: extractCodeFromMarkdown(rawCode),
+      code: extractCodeFromMarkdown(rawCode, this.language),
       summary: `AI migrated ${req.targetPath} via ${this.model}`,
     };
   }
@@ -541,7 +592,7 @@ RULES:
     const data: any = await res.json();
     const rawCode = data.response ?? req.fullSource;
     return {
-      code: extractCodeFromMarkdown(rawCode),
+      code: extractCodeFromMarkdown(rawCode, this.language),
       summary: `Local Ollama migrated ${req.targetPath} via ${this.model}`,
     };
   }
