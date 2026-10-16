@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bagwan-kai-bandey/PACK_SPEC.schema.json",
+  "title": "Bagwan Kai Bandey Migration Pack",
+  "description": "Declarative specification for a BKB migration pack (Layer 3).",
+  "type": "object",
+  "required": ["id", "name", "language", "sourceGlobs", "packages", "detectionRules", "agentGuidance", "invariants", "verification"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique pack identifier (e.g. \"express-to-fastify\")."
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "language": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Language adapter identifier (e.g. \"typescript\", \"python\")."
+    },
+    "trustedExecutionNote": { "type": "string" },
+    "knownLimitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "sourceGlobs": {
+      "type": "object",
+      "required": ["include"],
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "packages": {
+      "type": "object",
+      "required": ["legacy", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "legacy": { "type": "array", "items": { "type": "string" } },
+        "target": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "detectionRules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "astQuery"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "astQuery": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "agentGuidance": {
+      "type": "object",
+      "description": "Phase-keyed guidance for the LLM (SHIM / MIGRATE / DE_SHIM).",
+      "additionalProperties": { "type": "string" }
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "scope", "type", "description", "astExtractor"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "scope": {
+            "type": "string",
+            "enum": ["per-step"],
+            "description": "Only per-step invariants are enforced by the engine. Use `verification.snapshots` for global checks."
+          },
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "astExtractor": { "type": "string", "minLength": 1 },
+          "format": { "type": "string" }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": ["perStepTypecheckCmd", "checkpointTestCmd"],
+      "additionalProperties": false,
+      "properties": {
+        "perStepTypecheckCmd": { "type": "string", "minLength": 1 },
+        "checkpointTestCmd": { "type": "string", "minLength": 1 },
+        "routeSnapshotCmd": {
+          "type": "string",
+          "description": "Deprecated alias for a single { id: \"route-surface\", kind: \"set\" } snapshot."
+        },
+        "snapshots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "command", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "command": { "type": "string", "minLength": 1 },
+              "kind": { "type": "string", "enum": ["set", "count", "exact"] }
+            }
+          }
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Per-command execution timeout. Defaults to 60000."
+        }
+      }
+    }
+  }
+}
