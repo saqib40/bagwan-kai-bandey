@@ -35,48 +35,27 @@
       <span class="pill-arrow">▾</span>
     </button>
 
-    <!-- Execution Mode Segmented Toggle -->
-    <div class="mode-segmented-control" title="Choose execution mode">
-      <button class="mode-btn active" data-mode="canned" title="Instant zero-cost deterministic simulation on demo-repo">
-        <span class="mode-icon">⚡</span> Demo
-      </button>
-      <button class="mode-btn" data-mode="llm" title="Live autonomous transformation with Ollama or OpenAI on any codebase">
-        <span class="mode-icon">🤖</span> Live LLM
-      </button>
-      <button class="mode-btn" data-mode="observer" title="Passively listen to external MCP agent calls in real-time">
-        <span class="mode-icon">📡</span> Observer
-      </button>
-    </div>
-
     <!-- Center Inline Progress Telemetry -->
     <div class="header-progress">
       <div class="progress-track">
         <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
       </div>
       <div class="progress-labels">
-        <span id="step-badge" class="step-badge">Step 0 / 11</span>
+        <span id="step-badge" class="step-badge">0 / 0 Migrated</span>
         <span id="progress-percent" class="percent-badge">0%</span>
-        <span id="flight-milestone" class="flight-badge">Baseline Express</span>
+        <span id="flight-milestone" class="flight-badge">Live Stream</span>
       </div>
     </div>
 
-    <!-- Action Controls -->
+    <!-- Live Telemetry Status & Reset -->
     <div class="nav-actions">
       <div id="sync-status-badge" class="sync-status-badge" title="Real-time SSE event synchronization with BKB CLI and MCP Agent">
         <span class="sync-indicator pulse"></span>
-        <span id="sync-text">CLI Sync Live</span>
+        <span id="sync-text">Live Sync Active</span>
       </div>
-      <button id="btn-reset" class="btn btn-ghost" title="Reset codebase to baseline">
+      <button id="btn-reset" class="btn btn-ghost" title="Reset codebase & graph to clean baseline">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
         Reset
-      </button>
-      <button id="btn-step" class="btn btn-secondary" title="Execute next topological migration step">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-        Step
-      </button>
-      <button id="btn-auto" class="btn btn-primary" title="Auto-migrate the entire codebase step-by-step">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        <span id="btn-auto-label">Auto-Play</span>
       </button>
     </div>
   </header>
@@ -94,13 +73,6 @@
           <span class="meta-label">Click node to inspect details &amp; blast radius</span>
           <span class="meta-divider">·</span>
           <span class="meta-latency" id="graph-latency">FalkorDB: 1.5 ms</span>
-        </div>
-      </div>
-
-      <!-- Interactive Checkpoint & Step Timeline Strip -->
-      <div class="timeline-strip-container">
-        <div class="timeline-track" id="timeline-track">
-          <!-- Dynamically populated step markers -->
         </div>
       </div>
 
@@ -251,8 +223,49 @@
 
         <!-- Code Diff Viewer -->
         <div id="diff-viewer" class="diff-body">
-          <div class="target-empty">
-            <p>Ready to start. Click <strong>Step</strong> or <strong>Auto-Play</strong> to begin migration.</p>
+          <div class="mission-deck">
+            <div class="mission-header">
+              <div class="mission-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                  <polyline points="2 17 12 22 22 17"/>
+                  <polyline points="2 12 12 17 22 12"/>
+                </svg>
+              </div>
+              <div class="mission-details">
+                <div class="mission-title">Graph-Governed Migration Deck</div>
+                <div class="mission-subtitle">Live SSE Stream &middot; Listening for Agent Telemetry</div>
+              </div>
+            </div>
+
+            <div class="mission-invariants-grid">
+              <div class="invariant-card">
+                <div class="inv-icon">🔒</div>
+                <div class="inv-info">
+                  <div class="inv-title">Route Invariants</div>
+                  <div class="inv-desc">HTTP signatures &amp; middleware parity verified 100%</div>
+                </div>
+              </div>
+              <div class="invariant-card">
+                <div class="inv-icon">🔄</div>
+                <div class="inv-info">
+                  <div class="inv-title">Atomic Tarjan SCC</div>
+                  <div class="inv-desc">Circular dependency cycles migrated simultaneously</div>
+                </div>
+              </div>
+              <div class="invariant-card">
+                <div class="inv-icon">🚦</div>
+                <div class="inv-info">
+                  <div class="inv-title">Zero Broken Commits</div>
+                  <div class="inv-desc">TypeScript compilation verified at every topological gate</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mission-status-callout">
+              <span class="sync-indicator pulse"></span>
+              <span>Live Telemetry Synchronized. Listening for agent tool calls from <strong>OpenCode</strong> / <strong>Claude</strong> / <strong>CLI</strong>.</span>
+            </div>
           </div>
         </div>
 
@@ -295,7 +308,15 @@
 
         <!-- Chronological Episode Audit Stream -->
         <div id="audit-feed" class="audit-feed-list">
-          <div class="audit-empty">No episodes recorded yet.</div>
+          <div class="audit-empty-state">
+            <div class="audit-empty-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <div class="audit-empty-title">Audit Ledger Standing By</div>
+            <div class="audit-empty-desc">FalkorDB cryptographically tracks every claimed module, gate evaluation, and verified commit.</div>
+          </div>
         </div>
       </div>
     </aside>
@@ -327,50 +348,6 @@
           <span class="form-hint">Loaded from <code>packs/</code> or custom pack manifests.</span>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Execution Engine</label>
-          <div class="radio-cards-grid">
-            <label class="radio-card">
-              <input type="radio" name="exec-mode" value="canned" checked />
-              <div class="radio-card-content">
-                <strong>⚡ Instant Canned Demo</strong>
-                <span>Zero-cost pre-verified simulation on demo-repo.</span>
-              </div>
-            </label>
-            <label class="radio-card">
-              <input type="radio" name="exec-mode" value="llm" />
-              <div class="radio-card-content">
-                <strong>🤖 Autonomous LLM Agent</strong>
-                <span>Prompts real model to transform code live on any repository.</span>
-              </div>
-            </label>
-            <label class="radio-card">
-              <input type="radio" name="exec-mode" value="observer" />
-              <div class="radio-card-content">
-                <strong>📡 Live MCP Observer</strong>
-                <span>Passively renders external Cursor / Claude / CLI migrations.</span>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <div id="llm-options-box" class="llm-options-box" style="display: none;">
-          <div class="form-row-2">
-            <div class="form-group">
-              <label class="form-label">LLM Provider</label>
-              <select id="select-provider" class="form-select">
-                <option value="ollama">Ollama (Local Zero-Cost)</option>
-                <option value="openai">OpenAI (GPT-4o)</option>
-                <option value="anthropic">Anthropic (Claude 3.5)</option>
-                <option value="mock">Mock Reference</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Model Name</label>
-              <input type="text" id="input-model" class="form-input" value="qwen2.5-coder:latest" placeholder="e.g. qwen2.5-coder:latest" />
-            </div>
-          </div>
-        </div>
 
         <div class="modal-actions-bar">
           <button id="btn-save-settings" type="button" class="btn btn-primary">
@@ -460,9 +437,6 @@
         <button id="btn-download-audit" class="btn btn-secondary">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export Audit Trail (JSON)
-        </button>
-        <button id="btn-modal-replay" class="btn btn-secondary">
-          Replay Baseline
         </button>
         <button id="btn-modal-close" class="btn btn-primary">
           View Clean Topology

@@ -400,31 +400,39 @@ function updateNetworkTopology(modules) {
 
 // ── Refresh Status Counts & Header Progress ───────────────
 function updateStatusCounts(counts) {
-  document.getElementById('count-clean').textContent = counts.CLEAN ?? 0;
-  document.getElementById('count-pending').textContent = counts.PENDING ?? 0;
-  document.getElementById('count-shimmed').textContent = counts.SHIMMED ?? 0;
-  document.getElementById('count-verified').textContent = counts.VERIFIED ?? 0;
+  const cleanCount = counts.CLEAN ?? 0;
+  const pendingCount = counts.PENDING ?? 0;
+  const shimmedCount = counts.SHIMMED ?? 0;
+  const verifiedCount = counts.VERIFIED ?? 0;
 
-  const pct = Math.min(100, Math.round((currentStepNumber / TOTAL_STEPS) * 100));
+  document.getElementById('count-clean').textContent = cleanCount;
+  document.getElementById('count-pending').textContent = pendingCount;
+  document.getElementById('count-shimmed').textContent = shimmedCount;
+  document.getElementById('count-verified').textContent = verifiedCount;
+
+  const total = (allModulesCache && allModulesCache.length) || (cleanCount + pendingCount + shimmedCount + verifiedCount) || 1;
+  const migratedCount = cleanCount + verifiedCount;
+  const pct = Math.min(100, Math.round((migratedCount / total) * 100));
+
   const progressFill = document.getElementById('progress-fill');
   const progressPercent = document.getElementById('progress-percent');
   const stepBadge = document.getElementById('step-badge');
 
-  progressFill.style.width = `${pct}%`;
-  progressPercent.textContent = `${pct}%`;
-  stepBadge.textContent = `Step ${currentStepNumber} / ${TOTAL_STEPS}`;
+  if (progressFill) progressFill.style.width = `${pct}%`;
+  if (progressPercent) progressPercent.textContent = `${pct}%`;
+  if (stepBadge) stepBadge.textContent = `${migratedCount} / ${total} Migrated`;
 
   const flightTitle = document.getElementById('flight-milestone');
-  if (currentStepNumber === 0) {
-    flightTitle.textContent = 'Baseline Express';
-  } else if (currentStepNumber <= 5) {
-    flightTitle.textContent = 'Shimming Leaves';
-  } else if (currentStepNumber === 6) {
-    flightTitle.textContent = 'Fastify Entrypoint';
-  } else if (currentStepNumber < 11) {
-    flightTitle.textContent = 'Top-Down De-shimming';
-  } else {
-    flightTitle.textContent = '100% Verified';
+  if (flightTitle && !flightTitle.textContent.startsWith('Claimed') && !flightTitle.textContent.startsWith('Gate') && !flightTitle.textContent.startsWith('Verified')) {
+    if (pct === 100) {
+      flightTitle.textContent = '100% Migrated';
+    } else if (shimmedCount > 0) {
+      flightTitle.textContent = `${shimmedCount} Shimmed`;
+    } else if (pendingCount > 0) {
+      flightTitle.textContent = `${pendingCount} Pending`;
+    } else {
+      flightTitle.textContent = 'Live Stream';
+    }
   }
 }
 
@@ -525,7 +533,7 @@ function renderMissionDeck() {
 
         <div class="mission-status-callout">
           <span class="sync-indicator pulse"></span>
-          <span>Live Telemetry Synchronized. Use <strong>Step</strong> or prompt <strong>OpenCode</strong> / <strong>CLI</strong>.</span>
+          <span>Live Telemetry Synchronized. Listening for agent tool calls from <strong>OpenCode</strong> / <strong>Claude</strong> / <strong>CLI</strong>.</span>
         </div>
       </div>
     `;
@@ -1616,19 +1624,9 @@ function setupSettingsModal() {
     if (repoInput) repoInput.value = 'demo';
   });
 
-  modeRadios.forEach((radio) => {
-    radio.addEventListener('change', () => {
-      if (llmBox) llmBox.style.display = radio.value === 'llm' ? 'block' : 'none';
-    });
-  });
-
   btnSave?.addEventListener('click', async () => {
     btnSave.disabled = true;
     btnSave.textContent = 'Ingesting...';
-
-    const selectedMode = document.querySelector('input[name="exec-mode"]:checked')?.value || 'canned';
-    const selectedProvider = document.getElementById('select-provider')?.value || 'ollama';
-    const selectedModel = document.getElementById('input-model')?.value || 'qwen2.5-coder:latest';
 
     try {
       const res = await fetch('/api/target', {
@@ -1637,9 +1635,7 @@ function setupSettingsModal() {
         body: JSON.stringify({
           repoPath: repoInput.value.trim(),
           packId: packSelect.value,
-          mode: selectedMode,
-          provider: selectedProvider,
-          model: selectedModel,
+          mode: 'observer',
           reset: true,
         }),
       });
@@ -1650,7 +1646,10 @@ function setupSettingsModal() {
         await loadSystemInfo();
         updateNetworkTopology(data.topology.modules);
         updateStatusCounts(data.topology.statusCounts);
+        await loadAuditTrail();
+        renderMissionDeck();
         if (network) network.fit({ animation: { duration: 500 } });
+        showToast('Target Loaded', `Observing ${repoInput.value.trim()}`, 'info');
       } else {
         alert(`Failed to load target: ${data.error}`);
       }
@@ -1693,19 +1692,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     renderMissionDeck();
     await loadAuditTrail();
 
-    document.querySelectorAll('.mode-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mode = btn.getAttribute('data-mode');
-        setExecutionMode(mode);
-      });
-    });
-
-    document.getElementById('btn-step').addEventListener('click', executeStep);
-    document.getElementById('btn-auto').addEventListener('click', toggleAutoPlay);
-    document.getElementById('btn-reset').addEventListener('click', resetCodebase);
-
+    document.getElementById('btn-reset')?.addEventListener('click', resetCodebase);
     document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
-    document.getElementById('btn-modal-replay')?.addEventListener('click', resetCodebase);
     document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
 
     // Connect real-time CLI/MCP event synchronization
