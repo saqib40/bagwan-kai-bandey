@@ -17,8 +17,8 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
-import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, readdirSync } from 'node:fs';
-import { resolve, join, extname, basename } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { resolve, join, extname, basename, relative, isAbsolute } from 'node:path';
 import { ensureFalkorDB } from '../engine/docker';
 import { FalkorClient } from '../engine/falkorClient';
 import { MigrationGraphManager } from '../engine/graphManager';
@@ -26,6 +26,23 @@ import { MigrationOps, type Phase } from '../engine/operations';
 import { LlmClient } from '../runner/llmClient';
 import { saveCheckpoint, listCheckpoints, rollbackToCheckpoint } from '../runner/rollback';
 import * as Q from '../engine/queries';
+
+export function isPathContained(rootDir: string, targetPath: string): boolean {
+  const resolvedRoot = resolve(rootDir);
+  const resolvedTarget = resolve(rootDir, targetPath);
+  const rel = relative(resolvedRoot, resolvedTarget);
+  return !rel.startsWith('..') && !isAbsolute(rel);
+}
+
+export function isOriginAllowed(origin?: string): boolean {
+  if (!origin) return true; // Direct non-browser calls (curl, cli, node fetch)
+  try {
+    const parsed = new URL(origin);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
 
 const PORT = Number(process.env.PORT ?? 4200);
 const WORKSPACE = resolve(import.meta.dirname, '../..');
@@ -495,12 +512,16 @@ async function getGraphTopology() {
 // ── HTTP Helpers ─────────────────────────────────────────
 
 function sendJson(res: ServerResponse, data: unknown, status = 200) {
-  res.writeHead(status, {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  });
+  };
+  const origin = (res as any).__origin;
+  if (origin && isOriginAllowed(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+  }
+  res.writeHead(status, headers);
   res.end(JSON.stringify(data));
 }
 
@@ -534,13 +555,25 @@ export function startDemoServer(port = PORT) {
   const publicDir = resolve(WORKSPACE, 'public');
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    const origin = req.headers.origin;
+    (res as any).__origin = origin;
+
+    // Reject untrusted cross-origin requests from external websites
+    if (origin && !isOriginAllowed(origin)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden: untrusted origin' }));
+      return;
+    }
+
     // CORS preflight
     if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      });
+      const preflightHeaders: Record<string, string> = {};
+      if (origin && isOriginAllowed(origin)) {
+        preflightHeaders['Access-Control-Allow-Origin'] = origin;
+        preflightHeaders['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+        preflightHeaders['Access-Control-Allow-Headers'] = 'Content-Type';
+      }
+      res.writeHead(204, preflightHeaders);
       res.end();
       return;
     }
@@ -552,12 +585,15 @@ export function startDemoServer(port = PORT) {
 
     // SSE Stream for connected browser tabs
     if (pathname === '/api/events' && req.method === 'GET') {
-      res.writeHead(200, {
+      const sseHeaders: Record<string, string> = {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-      });
+      };
+      if (origin && isOriginAllowed(origin)) {
+        sseHeaders['Access-Control-Allow-Origin'] = origin;
+      }
+      res.writeHead(200, sseHeaders);
       res.write(
         `data: ${JSON.stringify({
           type: 'connected',
@@ -647,11 +683,17 @@ export function startDemoServer(port = PORT) {
       try {
         const body = await parseJsonBody(req);
         if (body.repoPath !== undefined) {
+          let targetPath = activeRepo;
           if (body.repoPath === 'demo' || body.repoPath === '' || body.repoPath === './demo-repo') {
-            activeRepo = DEFAULT_TARGET_REPO;
+            targetPath = DEFAULT_TARGET_REPO;
           } else {
-            activeRepo = resolve(WORKSPACE, body.repoPath);
+            targetPath = resolve(WORKSPACE, body.repoPath);
           }
+          if (!existsSync(targetPath) || !statSync(targetPath).isDirectory()) {
+            sendJson(res, { error: `Invalid repository path: ${body.repoPath}` }, 400);
+            return;
+          }
+          activeRepo = targetPath;
         }
         if (body.packId) activePackId = body.packId;
         if (body.mode) activeMode = body.mode;
@@ -842,6 +884,10 @@ export function startDemoServer(port = PORT) {
         sendJson(res, { error: 'Missing path query parameter' }, 400);
         return;
       }
+      if (!isPathContained(activeRepo, filePath)) {
+        sendJson(res, { error: 'Access denied: path escapes active repository root' }, 403);
+        return;
+      }
       try {
         const absPath = resolve(activeRepo, filePath);
         if (!existsSync(absPath)) {
@@ -902,12 +948,14 @@ export function startDemoServer(port = PORT) {
         // Multi-hop blast radius
         const blast = await ops.simulateBlastRadius(nodePath).catch(() => []);
 
-        // File content from disk
+        // File content from disk (guarded by repository containment)
         let fileContent = '';
         try {
-          const absPath = resolve(activeRepo, nodePath);
-          if (existsSync(absPath)) {
-            fileContent = readFileSync(absPath, 'utf8');
+          if (isPathContained(activeRepo, nodePath)) {
+            const absPath = resolve(activeRepo, nodePath);
+            if (existsSync(absPath)) {
+              fileContent = readFileSync(absPath, 'utf8');
+            }
           }
         } catch {
           fileContent = '';
@@ -988,7 +1036,7 @@ export function startDemoServer(port = PORT) {
     sendFile(res, localPath, mimeTypes[ext] ?? 'text/plain');
   });
 
-  server.listen(port, async () => {
+  server.listen(port, '127.0.0.1', async () => {
     console.error(`\n======================================================`);
     console.error(`  BAGWAN KAI BANDEY MIGRATION COCKPIT IS LIVE ON HTTP`);
     console.error(`  URL: http://localhost:${port}`);
