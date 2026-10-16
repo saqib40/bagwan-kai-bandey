@@ -24,21 +24,33 @@ Standard AI coding agents attempting framework migrations (e.g., Express $\right
 
 ## ⚡ 3-Minute Quickstart
 
-### Step 1: Install & Link CLI
-Clone the repository, install dependencies, and register the `bkb` CLI command globally:
+### Step 1: Install Dependencies
+Clone the repository and install dependencies:
 ```bash
 git clone https://github.com/saqib40/bagwan-kai-bandey.git
 cd bagwan-kai-bandey
 npm install
+```
+
+### Step 2: Running BKB (Choose Your Preferred Approach)
+
+#### Option A: Direct Local Execution (Recommended & Bulletproof)
+No global installs, no symlinks, and works identically across macOS, Linux, and WSL:
+```bash
+./bin/bkb.js doctor
+# or via npm script:
+npm run bkb -- doctor
+```
+
+#### Option B: Global System CLI (`npm link`)
+To use `bkb` as a standalone global command from any directory:
+```bash
 npm link
 ```
-> **Tip:** If you prefer not to link globally, you can prefix any command with `npm run bkb --` (e.g. `npm run bkb -- doctor`).
-
-### Step 2: Pre-Flight Check (`bkb doctor`)
-Verify that Node.js, Docker, FalkorDB port `:6379`, and git are ready:
-```bash
-bkb doctor
-```
+> **Note for Linux / WSL users:** If `bkb: command not found` appears after `npm link`, npm's global bin directory is not in your `$PATH`. Add it by running:
+> ```bash
+> echo 'export PATH="$(npm config get prefix)/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+> ```
 
 ### Step 3: Start FalkorDB
 ```bash
