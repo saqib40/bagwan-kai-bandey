@@ -8,37 +8,29 @@
 
 Rather than guessing which files to edit, an AI coding agent connected to BKB queries a graph engine that calculates exact topological callee order, circular dependency batches, and backward-compatible shims.
 
-### The 4-Step Autonomous Migration Loop
+### The Single-Turn Autonomous Migration Loop (`advance_migration`)
 ```
 ┌────────────────────────────────────────────────────────┐
-│ 1. claim_next_leaf                                     │
-│    Engine returns next unblocked module(s) and phase   │
+│ 1. advance_migration (No edits)                        │
+│    Engine claims leaf batch & returns target files,    │
+│    callee signatures, caller snippets, and guidance    │
 └───────────────────────────┬────────────────────────────┘
                             │
 ┌───────────────────────────▼────────────────────────────┐
-│ 2. get_migration_slice                                 │
-│    Engine returns target code, callee signatures,      │
-│    caller usage snippets, and phase guidance           │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 3. Agent modifies code on disk                         │
-│    Writes target framework syntax / dual-compat shims  │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 4. verify_and_commit_node                              │
-│    Engine runs AST check, tsc --noEmit, and updates    │
-│    topological degrees in FalkorDB                     │
+│ 2. advance_migration (With edits: [{path, content}])   │
+│    Engine writes files, executes AST/invariant gates,  │
+│    runs tsc --noEmit, rolls back on error, and returns │
+│    the next batch in a single turn (0 context bloat)   │
 └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. The 6 MCP Tools
+## 2. The MCP Tools
 
 | Tool | Parameters | Description |
 |---|---|---|
+| **`advance_migration`** ⭐ *(Recommended)* | `edits?: Array<{path, content}>`<br>`agentSummary?: string` | **Single-turn macro-tool.** With no edits: claims the batch and returns source, signatures, and guidance. With edits: writes files, executes verification gates, rolls back on error, and advances. |
 | **`init_migration_graph`** | `repoPath: string`<br>`packId: string`<br>`reset?: boolean` | Ingests the target codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route invariants, and computes PageRank. |
 | **`claim_next_leaf`** | `repoPath?: string`<br>`packId?: string` | Evaluates graph state and atomically claims the next unblocked target (Pass A: De-shim candidates; Pass B: Foundational leaves or circular SCC clusters). |
 | **`get_migration_slice`** | `modulePaths: string[]`<br>`phase: "SHIM" \| "MIGRATE" \| "DE_SHIM"` | Generates a 1-hop contextual slice containing disk source code, callee symbol signatures, caller call-site snippets, and tailored pack guidance. |

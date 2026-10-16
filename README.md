@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/bagwan-kai-bandey.svg?color=cb3837)](https://www.npmjs.com/package/bagwan-kai-bandey)
 [![Powered by FalkorDB](https://img.shields.io/badge/Powered%20by-FalkorDB-purple.svg)](https://www.falkordb.com/)
 [![Protocol: Model Context Protocol](https://img.shields.io/badge/Protocol-MCP-blue.svg)](https://modelcontextprotocol.io/)
-[![Tests: 38/38 Passing](https://img.shields.io/badge/Tests-38%2F38%20Pass-brightgreen.svg)]()
+[![Tests: 49/49 Passing](https://img.shields.io/badge/Tests-49%2F49%20Pass-brightgreen.svg)]()
 [![Typecheck: Clean](https://img.shields.io/badge/Typecheck-tsc%20green-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -90,7 +90,7 @@ bkb mcp install all        # All detected editors & agents
 ```
 
 **Instruct Your Agent in Chat:**
-> *"Migrate this repository using BKB MCP tools. Call `claim_next_leaf` to get the next target, inspect context with `get_migration_slice`, update code on disk, and call `verify_and_commit_node`. Repeat until all modules reach `VERIFIED`."*
+> *"Migrate this repository using BKB MCP tools. Call `advance_migration` with no edits to claim the first batch. Inspect the slice guidance and signatures, write your edits, and call `advance_migration` with `edits: [{path, content}]` to atomically verify, gate-check, and advance. Repeat until `done: true`."*
 
 ---
 
@@ -118,14 +118,20 @@ bkb rollback --list     # View all available step snapshots
 
 ---
 
-## 🖥️ Live Visual Cockpit (`http://localhost:4200`)
+## 🖥️ Live Visual Cockpit (`bkb cockpit` / `http://localhost:4200`)
 
-Launch the real-time visual flight deck to watch the codebase migrate live:
+Launch the real-time visual flight deck:
 ```bash
+bkb cockpit --repo /path/to/your-repo
+# or via npx:
+npx bagwan-kai-bandey cockpit --repo /path/to/your-repo
+# or from source:
 npm run demo
 ```
-- **Live Dependency Topology:** Vis.js canvas showing PageRank-scaled glowing nodes and Tarjan circular cycles.
-- **Controls:** Click **"Step Forward"** to execute one topological step, or **"Auto-Play ▶"** to watch the entire codebase migrate with real-time code diffs, FalkorDB sub-millisecond query latency, and green verification gates (`tsc`, integration tests, route parity).
+
+- **Live CLI & MCP Synchronization:** Features a built-in **Server-Sent Events (SSE)** telemetry stream. When you run `bkb run` or an AI agent calls `advance_migration` in your terminal or IDE, the browser automatically receives live events—pulsing claimed nodes in blue, flashing emerald green upon gate verification, advancing the timeline, and logging episodes with zero manual clicking or reloading.
+- **Live Dependency Topology:** Vis.js canvas showing PageRank-scaled glowing nodes, Tarjan circular cycles, and caller boundaries.
+- **Interactive Controls:** Execute one topological step, scrub through previous checkpoint snapshots, or trigger **"Auto-Play ▶"** to watch the codebase migrate autonomously with live code diffs and green verification gates (`tsc`, integration tests, route parity).
 - **FalkorDB Browser:** Inspect raw openCypher graph state live at `http://localhost:3000`.
 
 ---
@@ -152,6 +158,7 @@ For in-depth architectural details, custom framework extensions, and benchmark r
 | `bkb mcp install` | `[cursor\|claude\|vscode\|windsurf\|opencode\|all]` | 1-Click registers BKB MCP server into your editor or agent configuration. |
 | `bkb init` | `[--interactive\|-i] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]` | Ingests codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route snapshot. |
 | `bkb run` / `bkb auto`| `[--repo <path>] [--pack <id>] [--provider <p>] [--model <m>] [--dry-run]` | Autonomously executes migration loop (claim $\rightarrow$ checkpoint $\rightarrow$ slice $\rightarrow$ transform $\rightarrow$ verify $\rightarrow$ gate). |
+| `bkb cockpit` / `bkb ui` | `[--port <port>] [--repo <path>] [--pack <id>]` | Launches the live visual migration flight deck with real-time SSE synchronization. |
 | `bkb rollback` | `[step] [--repo <path>] [--pack <id>] [--list]` | Rollback source files and FalkorDB graph state to a previous step (or latest checkpoint). |
 | `bkb claim` | `--repo <path> --pack <id>` | Computes transitive callee graph and claims the next unblocked leaf or circular SCC cluster. |
 | `bkb slice` | `--repo <path> --pack <id> --module <path> --phase <phase>` | Returns 1-hop contextual slice (target files, callee signatures, caller snippets, guidance). |
