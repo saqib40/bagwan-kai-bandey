@@ -15,6 +15,15 @@
     "legacy": ["express", "@types/express"],
     "target": ["fastify"]
   },
+  "packageDetectors": [
+    {
+      "id": "express-project",
+      "file": "package.json",
+      "description": "Confirms the target is an Express.js (Node) project.",
+      "required": false,
+      "match": { "legacy": ["express"] }
+    }
+  ],
   "detectionRules": [
     {
       "id": "express-import-esm",

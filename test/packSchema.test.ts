@@ -97,6 +97,20 @@ describe('validatePackSchema (Ajv)', () => {
   });
 });
 
+describe('built-in pack conformance', () => {
+  it('express-to-fastify passes full validatePack (structural + semantic + schema)', () => {
+    const result = validatePack(readJson(EXPRESS_PACK));
+    assert.equal(result.valid, true, result.errors.join('\n'));
+  });
+
+  it('express-to-fastify declares manifest package detectors', () => {
+    const pack = readJson(EXPRESS_PACK);
+    assert.ok(Array.isArray(pack.packageDetectors));
+    assert.equal(pack.packageDetectors.length, 1);
+    assert.equal(pack.packageDetectors[0].file, 'package.json');
+  });
+});
+
 describe('validatePack schema integration', () => {
   it('surfaces schema errors with a [schema] prefix once structural checks pass', () => {
     const pack = minimalPack({ verification: { perStepTypecheckCmd: 'true', checkpointTestCmd: 'true', nope: true } });

@@ -18,6 +18,7 @@ import { validatePackQueries } from '../src/engine/packSemantics';
 import { runDiagnostics, formatDoctorReport } from '../src/cli/doctor';
 import { installMcpConfig, formatMcpInstallReport, type McpTarget } from '../src/cli/mcpInstaller';
 import { runInteractiveInit } from '../src/cli/wizard';
+import { buildPackTemplate } from '../src/cli/packScaffold';
 import { runAutonomousMigration } from '../src/runner/autonomousRunner';
 import { rollbackToCheckpoint, listCheckpoints } from '../src/runner/rollback';
 
@@ -171,46 +172,7 @@ async function main() {
       if (!existsSync(packsDir)) mkdirSync(packsDir, { recursive: true });
 
       const targetPath = join(packsDir, `${packId}.json`);
-      const template = {
-        $schema: 'https://raw.githubusercontent.com/saqib40/bagwan-kai-bandey/main/packs/schema.json',
-        id: packId,
-        name: `${packId} Migration Pack`,
-        language: lang,
-        sourceGlobs: {
-          include: [`**/*.${lang === 'python' ? 'py' : lang === 'go' ? 'go' : 'ts'}`],
-          exclude: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
-        },
-        packages: {
-          legacy: ['legacy-package'],
-          target: ['target-package'],
-        },
-        detectionRules: [
-          {
-            id: 'legacy-api-call',
-            description: 'Detects usage of legacy package APIs',
-            astQuery: '(call_expression (identifier) @api)',
-          },
-        ],
-        agentGuidance: {
-          SHIM: 'Implement dual-compatibility adapters for legacy callers.',
-          MIGRATE: 'Migrate internal module logic to modern framework semantics.',
-          DE_SHIM: 'Remove legacy shims and convert to pure target framework calls.',
-        },
-        invariants: [
-          {
-            id: 'api-routes',
-            scope: 'checkpoint',
-            type: 'route-set',
-            description: 'Guarantees 100% route invariant parity across migration',
-            astExtractor: 'routes',
-          },
-        ],
-        verification: {
-          perStepTypecheckCmd: lang === 'python' ? 'mypy .' : 'npm run typecheck',
-          checkpointTestCmd: lang === 'python' ? 'pytest' : 'npm test',
-          routeSnapshotCmd: 'node scripts/dump-routes.mjs',
-        },
-      };
+      const template = buildPackTemplate(packId, lang);
 
       writeFileSync(targetPath, JSON.stringify(template, null, 2) + '\n');
       console.error(`[bkb] Successfully scaffolded new Migration Pack at: ${targetPath}`);
