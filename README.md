@@ -90,7 +90,7 @@ bkb mcp install all        # All detected editors & agents
 ```
 
 **Instruct Your Agent in Chat:**
-> *"Migrate this repository using BKB MCP tools. Call `advance_migration` with no edits to claim the first batch. Inspect the slice guidance and signatures, write your edits, and call `advance_migration` with `edits: [{path, content}]` to atomically verify, gate-check, and advance. Repeat until `done: true`."*
+> *"Migrate this repository using BKB MCP tools and topological order. Always call `bkb_claim_module` to claim the next unblocked leaf or cycle, inspect the slice guidance and signatures, write your edits, and call `bkb_verify_step` to atomically verify typecheck gates, route parity, and advance. Watch the live sync cockpit at http://localhost:4200."*
 
 ---
 
@@ -120,7 +120,7 @@ bkb rollback --list     # View all available step snapshots
 
 ## 🖥️ Live Visual Cockpit (`bkb cockpit` / `http://localhost:4200`)
 
-Launch the real-time visual flight deck:
+Launch the dedicated **Live Sync Flight Deck & Visualizer**:
 ```bash
 bkb cockpit --repo /path/to/your-repo
 # or via npx:
@@ -129,10 +129,15 @@ npx bagwan-kai-bandey cockpit --repo /path/to/your-repo
 npm run demo
 ```
 
-- **Live CLI & MCP Synchronization:** Features a built-in **Server-Sent Events (SSE)** telemetry stream. When you run `bkb run` or an AI agent calls `advance_migration` in your terminal or IDE, the browser automatically receives live events—pulsing claimed nodes in blue, flashing emerald green upon gate verification, advancing the timeline, and logging episodes with zero manual clicking or reloading.
-- **Live Dependency Topology:** Vis.js canvas showing PageRank-scaled glowing nodes, Tarjan circular cycles, and caller boundaries.
-- **Interactive Controls:** Execute one topological step, scrub through previous checkpoint snapshots, or trigger **"Auto-Play ▶"** to watch the codebase migrate autonomously with live code diffs and green verification gates (`tsc`, integration tests, route parity).
-- **FalkorDB Browser:** Inspect raw openCypher graph state live at `http://localhost:3000`.
+- **Pure Real-Time Observability (Distraction-Free):** Streamlined strictly for live telemetry visualization without simulator buttons or clutter. Keep it open side-by-side with your terminal or AI coding agent.
+- **Instant CLI & MCP Synchronization (SSE):** Powered by an active **Server-Sent Events** event bus. Whenever your terminal CLI (`bkb claim`, `bkb verify`, `bkb run`) or AI agent (OpenCode, Claude, Cursor) calls MCP tools, the browser immediately mirrors the action:
+  - 🟠 **Pulsing Amber/Blue:** Module claimed and currently under migration.
+  - 🟢 **Glowing Emerald:** Invariants verified, `tsc` compilation passed, and committed to graph.
+  - 🔴 **Tarjan SCC Rings:** Circular dependencies visually highlighted and tracked.
+- **Mission Deck & Verification HUD:** Live single-line status for `tsc` typecheck, integration tests, route parity, and sub-2ms FalkorDB query latency.
+- **Cryptographic Audit Ledger:** Real-time chronological audit trail of claimed modules, gate evaluations, and verified git commit hashes.
+- **Interactive AST & Blast-Radius Inspection:** Click any node to instantly view inward callers, outward dependencies, exported symbols, and reverse multi-hop blast radius.
+- **FalkorDB Browser:** Direct access to inspect raw openCypher graph nodes and relationships at `http://localhost:3000`.
 
 ---
 
