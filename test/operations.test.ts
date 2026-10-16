@@ -7,7 +7,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FalkorClient } from '../src/engine/falkorClient';
@@ -290,6 +290,98 @@ describe('MigrationOps checkpoint gate', () => {
     const result = await ops.runCheckpointGate();
     assert.equal(result.tscPass, true);
     assert.equal(result.testPass, true);
+  });
+});
+
+describe('MigrationOps.advance', () => {
+  function claimedClient() {
+    return createMockClient({
+      'reclaim-active-claim': [
+        { path: 'src/a.ts', sccId: 1, phase: 'MIGRATE', pagerank: 1 },
+      ],
+      pendingCallers: [{ pendingCallers: 0, callerPaths: [] }],
+    });
+  }
+
+  function quietPack(typecheck = 'false'): MigrationPack {
+    return {
+      ...MOCK_PACK,
+      invariants: [],
+      detectionRules: [],
+      verification: { ...MOCK_PACK.verification, perStepTypecheckCmd: typecheck },
+    };
+  }
+
+  it('returns the claimed file without a separate slice call', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'bkb-advance-'));
+    mkdirSync(join(repo, 'src'));
+    writeFileSync(join(repo, 'src', 'a.ts'), 'export const hello = 1;\n');
+    const ops = new MigrationOps(claimedClient(), quietPack(), repo);
+    try {
+      const result = await ops.advance();
+      assert.equal(result.done, false);
+      assert.deepEqual(result.targetPaths, ['src/a.ts']);
+      assert.equal(result.files?.[0]?.source, 'export const hello = 1;\n');
+      assert.match(result.message ?? '', /advance_migration/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects edits that are not the claimed batch', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'bkb-advance-'));
+    mkdirSync(join(repo, 'src'));
+    writeFileSync(join(repo, 'src', 'a.ts'), 'export const hello = 1;\n');
+    const ops = new MigrationOps(claimedClient(), quietPack(), repo);
+    try {
+      const result = await ops.advance([{ path: 'src/other.ts', content: 'export const x = 1;\n' }]);
+      assert.equal(result.ok, false);
+      assert.equal(existsSync(join(repo, 'src', 'other.ts')), false);
+      assert.equal(readFileSync(join(repo, 'src', 'a.ts'), 'utf8'), 'export const hello = 1;\n');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('restores files when verification fails', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'bkb-advance-'));
+    mkdirSync(join(repo, 'src'));
+    writeFileSync(join(repo, 'src', 'a.ts'), 'export const hello = 1;\n');
+    const ops = new MigrationOps(claimedClient(), quietPack('false'), repo);
+    try {
+      const result = await ops.advance(
+        [{ path: 'src/a.ts', content: 'export const hello = 2;\n' }],
+        'bad edit',
+      );
+      assert.equal(result.ok, false);
+      assert.ok((result.errors ?? []).length > 0);
+      assert.equal(readFileSync(join(repo, 'src', 'a.ts'), 'utf8'), 'export const hello = 1;\n');
+      assert.equal(result.files?.[0]?.source, 'export const hello = 1;\n');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses an edit path that escapes the repository', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'bkb-advance-'));
+    mkdirSync(join(repo, 'src'));
+    writeFileSync(join(repo, 'src', 'a.ts'), 'export const hello = 1;\n');
+    const client = createMockClient({
+      'reclaim-active-claim': [
+        { path: '../secret.ts', sccId: 1, phase: 'MIGRATE', pagerank: 1 },
+      ],
+      pendingCallers: [{ pendingCallers: 0, callerPaths: [] }],
+    });
+    const ops = new MigrationOps(client, quietPack(), repo);
+    const outside = join(repo, '..', 'secret.ts');
+    try {
+      const result = await ops.advance([{ path: '../secret.ts', content: 'pwned\n' }]);
+      assert.equal(result.ok, false);
+      assert.equal(existsSync(outside), false);
+    } finally {
+      rmSync(outside, { force: true });
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
 

@@ -8,8 +8,8 @@
  */
 
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { FalkorClient } from './falkorClient';
 import { tarjanScc } from './scc';
 import { adapterRegistry } from '../adapters/registry';
@@ -28,6 +28,30 @@ export interface ClaimResult {
   pendingCallersCount: number;
   pendingCallerPaths: string[];
   proof: string;
+}
+
+export interface AdvanceEdit {
+  path: string;
+  content: string;
+}
+
+export interface AdvanceResult {
+  done: boolean;
+  ok?: boolean;
+  errors?: string[];
+  phase?: Phase;
+  targetPaths?: string[];
+  pendingCallersCount?: number;
+  guidance?: string;
+  files?: Array<{ path: string; source: string }>;
+  calleeSignatures?: Array<{
+    modulePath: string;
+    symbolName: string;
+    kind: string;
+    signature: string;
+  }>;
+  callerSnippets?: MigrationSlice['callerSnippets'];
+  message?: string;
 }
 
 export interface MigrationSlice {
@@ -294,12 +318,13 @@ export class MigrationOps {
           // Extract import lines and usage lines referencing the target module
           const baseName = mp.replace(/.*\//, '').replace(/\.[^/.]+$/, '');
           const snippetLines = lines
-            .filter((l) => l.includes(baseName) || l.includes(mp))
+            .map((text, index) => ({ line: index + 1, text }))
+            .filter(({ text }) => text.includes(baseName) || text.includes(mp))
             .slice(0, 5);
           if (snippetLines.length) {
             callerSnippets.push({
               callerPath: c.callerPath,
-              importSnippet: snippetLines.join('\n'),
+              importSnippet: snippetLines.map(({ line, text }) => `${line}: ${text}`).join('\n'),
             });
           }
         } catch {
@@ -315,6 +340,115 @@ export class MigrationOps {
       calleeSignatures,
       callerSnippets,
     };
+  }
+
+  /**
+   * One migration step for an agent.
+   * No edits: return the current or next batch.
+   * Edits: write those files, verify, restore them on failure, then return the next batch.
+   */
+  async advance(edits?: AdvanceEdit[], agentSummary = ''): Promise<AdvanceResult> {
+    const active = await this.reclaimInProgress();
+
+    if (edits?.length) {
+      if (!active) {
+        return {
+          done: false,
+          ok: false,
+          errors: ['No batch is claimed. Call advance_migration without edits first.'],
+        };
+      }
+      const expected = [...active.targetPaths].sort();
+      const received = edits.map((edit) => edit.path).sort();
+      if (expected.length !== received.length || expected.some((path, i) => path !== received[i])) {
+        return {
+          done: false,
+          ok: false,
+          phase: active.phase,
+          targetPaths: active.targetPaths,
+          errors: [`Edits must cover exactly [${expected.join(', ')}].`],
+        };
+      }
+
+      const previous = new Map<string, string | null>();
+      try {
+        for (const edit of edits) {
+          const abs = this.resolveInsideRepo(edit.path);
+          previous.set(abs, existsSync(abs) ? readFileSync(abs, 'utf8') : null);
+          mkdirSync(dirname(abs), { recursive: true });
+          writeFileSync(abs, edit.content, 'utf8');
+        }
+      } catch (err) {
+        this.restoreFiles(previous);
+        return {
+          done: false,
+          ok: false,
+          phase: active.phase,
+          targetPaths: active.targetPaths,
+          errors: [err instanceof Error ? err.message : String(err)],
+        };
+      }
+
+      const verified = await this.verifyAndCommitNode(active.targetPaths, agentSummary);
+      if (!verified.ok) {
+        this.restoreFiles(previous);
+        await this.db.query(
+          `UNWIND $paths AS p
+           MATCH (m:Module {path: p})
+           SET m.status = 'IN_PROGRESS', m.claimed_phase = $phase`,
+          { paths: active.targetPaths, phase: active.phase },
+        );
+        const work = await this.toWorkItem(active);
+        return { ...work, ok: false, errors: verified.errors };
+      }
+    }
+
+    const claim = edits?.length ? await this.claimNextLeaf() : (active ?? await this.claimNextLeaf());
+    const work = await this.toWorkItem(claim);
+    return edits?.length ? { ...work, ok: true } : work;
+  }
+
+  private async toWorkItem(claim: ClaimResult | null): Promise<AdvanceResult> {
+    if (!claim || !claim.targetPaths.length) {
+      return { done: true, message: 'No unblocked modules remaining. Migration is complete.' };
+    }
+    const slice = await this.getMigrationSlice(claim.targetPaths, claim.phase);
+    return {
+      done: false,
+      phase: claim.phase,
+      targetPaths: claim.targetPaths,
+      pendingCallersCount: claim.pendingCallersCount,
+      guidance: slice.guidance,
+      files: slice.targetModules.map((mod) => ({ path: mod.path, source: mod.fullSource })),
+      calleeSignatures: slice.calleeSignatures.map((sym) => ({
+        modulePath: sym.modulePath,
+        symbolName: sym.symbolName,
+        kind: sym.kind,
+        signature: sym.signature,
+      })),
+      callerSnippets: slice.callerSnippets,
+      message: 'Call advance_migration with edits for every targetPath. Do not edit these files with another tool.',
+    };
+  }
+
+  private resolveInsideRepo(relPath: string): string {
+    const root = resolve(this.repoPath);
+    const abs = resolve(root, relPath);
+    const rel = relative(root, abs);
+    if (!rel || rel.startsWith('..')) {
+      throw new Error(`Path escapes the repository: ${relPath}`);
+    }
+    return abs;
+  }
+
+  private restoreFiles(previous: Map<string, string | null>): void {
+    for (const [abs, content] of previous) {
+      if (content === null) {
+        rmSync(abs, { force: true });
+      } else {
+        writeFileSync(abs, content, 'utf8');
+      }
+    }
   }
 
   // ─── simulate_blast_radius (§8.4) ─────────────────────

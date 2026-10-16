@@ -36,6 +36,7 @@ test('verify_and_commit_node accepts a call that omits agentSummary', async () =
       ?.properties?.reset?.default;
     assert.equal(resetDefault, false);
     const instructions = client.getInstructions() ?? '';
+    assert.match(instructions, /advance_migration/);
     assert.match(instructions, /claim_next_leaf/);
     assert.match(instructions, /get_migration_slice/);
     assert.match(instructions, /verify_and_commit_node/);
@@ -64,10 +65,11 @@ test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async 
   await client.connect(clientTransport);
 
   try {
-    // 1. List tools and verify all 6 tools exist
+    // 1. List tools and verify all tools exist
     const { tools } = await client.listTools();
     const toolNames = tools.map((t) => t.name).sort();
     const expectedTools = [
+      'advance_migration',
       'claim_next_leaf',
       'get_migration_audit_trail',
       'get_migration_slice',

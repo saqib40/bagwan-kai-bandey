@@ -34,9 +34,8 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
     },
     {
       instructions: [
-        'Migrate one claimed batch at a time. Do not grep, search, or open other files.',
-        'Loop: claim_next_leaf, then get_migration_slice with the returned targetPaths and phase, edit only those files, then verify_and_commit_node with the same paths.',
-        'claim_next_leaf returns an in-progress batch again if verify was skipped. Do not start a different file.',
+        'Prefer advance_migration. Call it with no edits to get the batch. Call it again with edits: [{path, content}] for every targetPath. That writes the files, verifies them, and returns the next batch or the errors. Do not grep, read, or write files with other tools.',
+        'claim_next_leaf, get_migration_slice, and verify_and_commit_node remain for a manual loop. claim_next_leaf resumes an in-progress batch.',
         'Call init_migration_graph once. Omit reset unless the graph should be dropped.',
         'Do not call simulate_blast_radius or get_migration_audit_trail inside the edit loop.',
       ].join(' '),
@@ -107,7 +106,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                 {
                   message: 'Migration graph successfully initialized.',
                   summary,
-                  nextAction: 'Call claim_next_leaf to claim the first unblocked module or cycle.',
+                  nextAction: 'Call advance_migration with no edits to take the first batch.',
                 },
               ),
             },
@@ -116,6 +115,41 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
       } catch (err: any) {
         return {
           content: [{ type: 'text', text: `Failed to initialize migration graph: ${err.message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // ─── 1b. advance_migration (one call per batch) ─────────
+  server.tool(
+    'advance_migration',
+    'Take the current migration batch, or apply full-file edits for that batch and verify them. Prefer this over claim_next_leaf, get_migration_slice, and verify_and_commit_node. Do not read or edit the repository with other tools.',
+    {
+      edits: z
+        .array(
+          z.object({
+            path: z.string().describe('Repo-relative path from the current batch'),
+            content: z.string().describe('Full new file contents'),
+          }),
+        )
+        .optional()
+        .describe('Full contents for every file in the current batch. Omit to fetch the batch.'),
+      agentSummary: z.string().optional().describe('Audit summary for this batch'),
+      repoPath: z.string().optional().describe('Target repository path (defaults to initialized repo)'),
+      packId: z.string().optional().describe('Pack identifier (defaults to initialized pack)'),
+    },
+    async ({ edits, agentSummary, repoPath, packId }) => {
+      try {
+        const ops = await getOps(repoPath, packId);
+        const result = await ops.advance(edits, agentSummary ?? '');
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+          isError: result.ok === false,
+        };
+      } catch (err: any) {
+        return {
+          content: [{ type: 'text', text: `Failed to advance migration: ${err.message}` }],
           isError: true,
         };
       }
