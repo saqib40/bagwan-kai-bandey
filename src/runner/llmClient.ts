@@ -9,6 +9,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { spawn } from 'node:child_process';
 import {
   shimMarkerList,
   DEFAULT_SHIM_STRATEGY,
@@ -41,7 +42,7 @@ export interface LlmResponse {
 }
 
 export interface LlmClientOptions {
-  provider?: 'mock' | 'ollama' | 'openai' | 'anthropic' | 'custom';
+  provider?: 'mock' | 'ollama' | 'openai' | 'anthropic' | 'opencode' | 'custom';
   model?: string;
   apiKey?: string;
   baseUrl?: string;
@@ -471,7 +472,7 @@ export async function startServer(port: number) {
 };
 
 export class LlmClient {
-  readonly provider: 'mock' | 'ollama' | 'openai' | 'anthropic' | 'custom';
+  readonly provider: 'mock' | 'ollama' | 'openai' | 'anthropic' | 'opencode' | 'custom';
   readonly model: string;
   readonly apiKey?: string;
   readonly baseUrl?: string;
@@ -498,6 +499,8 @@ export class LlmClient {
     } else if (this.provider === 'ollama') {
       this.model = options.model ?? 'qwen2.5-coder:latest';
       this.baseUrl = this.baseUrl ?? 'http://localhost:11434';
+    } else if (this.provider === 'opencode') {
+      this.model = options.model ?? 'deepseek-v4.1-flash-free';
     } else {
       this.model = options.model ?? 'mock-deterministic';
     }
@@ -533,6 +536,8 @@ export class LlmClient {
       return this.callAnthropic(prompt, request);
     } else if (this.provider === 'ollama') {
       return this.callOllama(prompt, request);
+    } else if (this.provider === 'opencode') {
+      return this.callOpenCode(prompt, request);
     }
 
     throw new Error(`Unsupported LLM provider: ${this.provider}`);
@@ -650,5 +655,36 @@ RULES:
       code: extractCodeFromMarkdown(rawCode, this.language),
       summary: `Local Ollama migrated ${req.targetPath} via ${this.model}`,
     };
+  }
+
+  private async callOpenCode(prompt: string, req: LlmRequest): Promise<LlmResponse> {
+    const rawModel = this.model || 'deepseek-v4.1-flash-free';
+    const model = rawModel.includes('/') ? rawModel : `opencode/${rawModel}`;
+    return new Promise((resolve, reject) => {
+      const child = spawn('opencode', ['run', '-m', model, '--pure'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (d) => {
+        stdout += d.toString();
+      });
+      child.stderr.on('data', (d) => {
+        stderr += d.toString();
+      });
+      child.on('error', (err) => reject(new Error(`Failed to spawn opencode: ${err.message}`)));
+      child.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`opencode exited with code ${code}: ${stderr || stdout}`));
+          return;
+        }
+        resolve({
+          code: extractCodeFromMarkdown(stdout, this.language),
+          summary: `OpenCode migrated ${req.targetPath} via ${model}`,
+        });
+      });
+      child.stdin.write(prompt);
+      child.stdin.end();
+    });
   }
 }

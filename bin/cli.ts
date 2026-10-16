@@ -66,8 +66,8 @@ Options:
   --interactive, -i  Run interactive setup wizard for bkb init
   --repo <path>      Path to target repository (default: ./demo-repo)
   --pack <id>        Migration pack id or path (default: express-to-fastify)
-  --provider <p>     LLM provider for run: mock (default / zero-cost), ollama, openai, anthropic
-  --model <id>       Model identifier (e.g. gpt-4o, qwen2.5-coder:latest, claude-3-5-sonnet-20241022)
+  --provider <p>     LLM provider for run: mock (default / zero-cost), opencode, ollama, openai, anthropic
+  --model <id>       Model identifier (e.g. deepseek-v4.1-flash-free, gpt-4o, qwen2.5-coder:latest)
   --dry-run          Run autonomous migration using deterministic mock transforms (zero API cost)
   --list             List available checkpoints for bkb rollback
   --no-rollback      Disable automatic rollback on unrecoverable step failure

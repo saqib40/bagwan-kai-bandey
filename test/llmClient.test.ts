@@ -94,3 +94,17 @@ describe('fixture mock transforms', () => {
     }
   });
 });
+
+describe('opencode provider configuration', () => {
+  it('defaults to deepseek-v4.1-flash-free when provider is opencode', () => {
+    const client = new LlmClient({ provider: 'opencode' });
+    assert.equal(client.provider, 'opencode');
+    assert.equal(client.model, 'deepseek-v4.1-flash-free');
+  });
+
+  it('respects custom model when provider is opencode', () => {
+    const client = new LlmClient({ provider: 'opencode', model: 'deepseek-v4-pro' });
+    assert.equal(client.provider, 'opencode');
+    assert.equal(client.model, 'deepseek-v4-pro');
+  });
+});
