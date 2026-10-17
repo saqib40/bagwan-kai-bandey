@@ -13,42 +13,43 @@
 
 ---
 
-### 📑 Table of Contents
-- [⚡ 60-Second Quickstart (Try the Sandbox)](#-60-second-quickstart-try-the-sandbox)
-- [🛠️ Prerequisites](#️-prerequisites)
-- [🚀 Using BKB on Your Own Codebase](#-using-bkb-on-your-own-codebase)
+### Table of Contents
+- [Installation & Prerequisites](#installation--prerequisites)
+- [Quickstart (Sandbox Demo)](#quickstart-sandbox-demo)
+- [Using BKB on Your Codebase](#using-bkb-on-your-codebase)
   - [Workflow A: AI Agent via MCP (Cursor, Claude, VS Code, Windsurf, OpenCode)](#workflow-a-ai-coding-agent-via-mcp-recommended)
   - [Workflow B: Autonomous Terminal CLI (`bkb run`)](#workflow-b-autonomous-terminal-cli-bkb-run)
-- [📦 Supported Migration Packs & Polyglot Adapters](#-supported-migration-packs--polyglot-adapters)
-- [🤝 Phased Multi-Sprint Migrations & Team Handoff](#-phased-multi-sprint-migrations--team-handoff)
-- [🖥️ Live Visual Cockpit](#️-live-visual-cockpit-bkb-cockpit)
-- [⌨️ CLI Command Reference](#️-cli-command-reference)
-- [🔄 Updating Bagwan Kai Bandey](#-updating-bagwan-kai-bandey)
-- [📖 Documentation Index](#-documentation-index)
+- [Supported Migration Packs & Polyglot Adapters](#supported-migration-packs--polyglot-adapters)
+- [Phased Multi-Sprint Migrations & Team Handoff](#phased-multi-sprint-migrations--team-handoff)
+- [Live Visual Cockpit](#live-visual-cockpit-bkb-cockpit)
+- [CLI Command Reference](#cli-command-reference)
+- [Updating Bagwan Kai Bandey](#updating-bagwan-kai-bandey)
+- [Documentation Index](#documentation-index)
 
 ---
 
-## ⚡ 60-Second Quickstart (Try the Sandbox)
+## Installation & Prerequisites
 
-Want to see BKB in action without touching your own code? BKB includes a built-in sandbox (`./demo-repo` featuring an Express.js app with circular dependencies, authentication middleware, and integration tests).
+### 1. Installation Options
+Choose how you want to run BKB:
 
 ```bash
-# 1. Run environment diagnostics (verifies Node, Docker, and FalkorDB)
+# Option A: Global CLI (Recommended for fast daily workflows & clean 'bkb' commands)
+npm install -g bagwan-kai-bandey
+bkb doctor
+
+# Option B: Zero-Install via npx (Instant execution without local installation)
 npx bagwan-kai-bandey doctor
 
-# 2. Ingest the built-in demo sandbox into FalkorDB
-npx bagwan-kai-bandey init --repo ./demo-repo --pack express-to-fastify
-
-# 3. Launch the live visual flight deck in your browser
-npx bagwan-kai-bandey cockpit
+# Option C: From Source (For local development & contributors)
+git clone https://github.com/saqib40/bagwan-kai-bandey.git
+cd bagwan-kai-bandey && npm install
+./bin/bkb.js doctor
 ```
 
-Open **`http://localhost:4200`** in your browser. You will see the live dependency graph, PageRank risk scores, Tarjan SCC cycle clusters, and invariant verification gates standing by.
+> **CLI Command Syntax:** Throughout this documentation, commands use the short **`bkb`** syntax (e.g. `bkb init`, `bkb cockpit`, `bkb status`). If you prefer zero-install `npx`, simply prepend **`npx bagwan-kai-bandey`** instead (e.g. `npx bagwan-kai-bandey init`). Both forms are 100% interchangeable.
 
----
-
-## 🛠️ Prerequisites
-
+### 2. Prerequisites
 - **Node.js**: $\ge 18.0.0$ (Node $\ge 22.12.0$ recommended for CommonJS $\rightarrow$ ESM runtime interop)
 - **Docker**: For running the FalkorDB knowledge graph engine:
   ```bash
@@ -58,7 +59,26 @@ Open **`http://localhost:4200`** in your browser. You will see the live dependen
 
 ---
 
-## 🚀 Using BKB on Your Own Codebase
+## Quickstart (Sandbox Demo)
+
+Want to see BKB in action without touching your own code? BKB includes a built-in sandbox (`./demo-repo` featuring an Express.js app with circular dependencies, authentication middleware, and integration tests).
+
+```bash
+# 1. Run environment diagnostics (verifies Node, Docker, and FalkorDB)
+bkb doctor
+
+# 2. Ingest the built-in demo sandbox into FalkorDB
+bkb init --repo ./demo-repo --pack express-to-fastify
+
+# 3. Launch the live visual flight deck in your browser
+bkb cockpit
+```
+
+Open **`http://localhost:4200`** in your browser. You will see the live dependency graph, PageRank risk scores, Tarjan SCC cycle clusters, and invariant verification gates standing by.
+
+---
+
+## Using BKB on Your Codebase
 
 Choose your preferred way of working:
 
@@ -85,30 +105,30 @@ Register the BKB MCP server in your editor with a single command:
 
 ```bash
 # Target your specific editor:
-npx bagwan-kai-bandey mcp install cursor     # Cursor (.cursor/mcp.json)
-npx bagwan-kai-bandey mcp install claude     # Claude Desktop (claude_desktop_config.json)
-npx bagwan-kai-bandey mcp install vscode     # VS Code (.vscode/mcp.json)
-npx bagwan-kai-bandey mcp install windsurf   # Windsurf (.codeium/windsurf/mcp_config.json)
-npx bagwan-kai-bandey mcp install opencode   # OpenCode CLI / opencode.jsonc
+bkb mcp install cursor     # Cursor (.cursor/mcp.json)
+bkb mcp install claude     # Claude Desktop (claude_desktop_config.json)
+bkb mcp install vscode     # VS Code (.vscode/mcp.json)
+bkb mcp install windsurf   # Windsurf (.codeium/windsurf/mcp_config.json)
+bkb mcp install opencode   # OpenCode CLI / opencode.jsonc
 
 # Or install for all detected editors at once:
-npx bagwan-kai-bandey mcp install all
+bkb mcp install all
 ```
 
 #### Step 2: Initialize Graph & Open Visual Flight Deck
 ```bash
 # Ingest your codebase and capture pre-migration invariant baseline
-npx bagwan-kai-bandey init --repo /path/to/your-repo --pack express-to-fastify
+bkb init --repo /path/to/your-repo --pack express-to-fastify
 
 # In another terminal window, launch the real-time visual cockpit
-npx bagwan-kai-bandey cockpit --repo /path/to/your-repo
+bkb cockpit --repo /path/to/your-repo
 ```
 
 #### Step 3: Prompt Your AI Agent
 Paste one of these prompts into your agent's chat interface:
 
 <details open>
-<summary><b>🛡️ Production Team Prompt (Recommended for Full Codebases)</b></summary>
+<summary><b>Production Team Prompt (Recommended for Full Codebases)</b></summary>
 
 ```markdown
 You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
@@ -143,7 +163,7 @@ Repeat this loop until `bkb_get_migration_status` confirms 100% of modules are V
 </details>
 
 <details>
-<summary><b>⚡ Quick Try Prompt (Minimal 1-Liner)</b></summary>
+<summary><b>Quick Try Prompt (Minimal 1-Liner)</b></summary>
 
 > *"Use the BKB MCP server to migrate this repository. Call `bkb_get_migration_status` to see current progress, then run the `advance_migration` loop to claim, transform, and verify each batch until 100% complete."*
 </details>
@@ -156,30 +176,30 @@ Execute migrations directly from your shell without an interactive editor:
 
 ```bash
 # 1. Zero-Cost Deterministic Dry Run (Simulates the entire topological loop):
-npx bagwan-kai-bandey run --repo /path/to/your-repo --pack express-to-fastify --dry-run
+bkb run --repo /path/to/your-repo --pack express-to-fastify --dry-run
 
 # 2. Local Zero-Cost LLM via Ollama (e.g. Qwen2.5-Coder):
-npx bagwan-kai-bandey run --repo /path/to/your-repo --pack express-to-fastify --provider ollama --model qwen2.5-coder:latest
+bkb run --repo /path/to/your-repo --pack express-to-fastify --provider ollama --model qwen2.5-coder:latest
 
 # 3. OpenCode / DeepSeek (Default: deepseek-v4.1-flash-free):
-npx bagwan-kai-bandey run --repo /path/to/your-repo --pack cjs-to-esm --provider opencode
+bkb run --repo /path/to/your-repo --pack cjs-to-esm --provider opencode
 
 # 4. Cloud LLMs (OpenAI GPT-4o / Anthropic Claude):
 export OPENAI_API_KEY="sk-..."
-npx bagwan-kai-bandey run --repo /path/to/your-repo --pack express-to-fastify --provider openai --model gpt-4o
+bkb run --repo /path/to/your-repo --pack express-to-fastify --provider openai --model gpt-4o
 ```
 
-#### 🛡️ Instant Rollback Safety Net
+#### Rollback Safety Net
 If a transformation ever fails unexpectedly, revert your codebase and graph state instantly:
 ```bash
-npx bagwan-kai-bandey rollback            # Revert to the latest verified checkpoint
-npx bagwan-kai-bandey rollback 3          # Revert to specific Step 3
-npx bagwan-kai-bandey rollback --list     # View all available step snapshots
+bkb rollback            # Revert to the latest verified checkpoint
+bkb rollback 3          # Revert to specific Step 3
+bkb rollback --list     # View all available step snapshots
 ```
 
 ---
 
-## 📦 Supported Migration Packs & Polyglot Adapters
+## Supported Migration Packs & Polyglot Adapters
 
 Bagwan Kai Bandey includes four production-ready packs spanning **TypeScript/JavaScript** and **Python**:
 
@@ -201,7 +221,7 @@ Bagwan Kai Bandey includes four production-ready packs spanning **TypeScript/Jav
 
 ---
 
-## 🤝 Phased Multi-Sprint Migrations & Team Handoff
+## Phased Multi-Sprint Migrations & Team Handoff
 
 Real enterprise migrations span weeks across distributed teams. BKB enables phased migrations with **Git-Native Manifests (`.bkb/manifest.json`)**:
 
@@ -221,27 +241,27 @@ your-repo/
    AI agents call `bkb_commit_milestone` to atomically stage modified code and `.bkb/manifest.json`, commit with structured audit notes, and embed the new Git commit SHA into the manifest history.
 4. **Flight Deck Status**:  
    ```bash
-   npx bagwan-kai-bandey status --repo /path/to/your-repo
+   bkb status --repo /path/to/your-repo
    ```
    Outputs an instant ASCII flight deck progress bar (`[■■■■░░░░░░░░░░░░░░░░]`), module counts, baseline snapshot health, last team milestone, and unblocked leaves ready for the next sprint.
 
 ---
 
-## 🖥️ Live Visual Cockpit (`bkb cockpit`)
+## Live Visual Cockpit (`bkb cockpit`)
 
 Launch the dedicated **Live Sync Flight Deck & Visualizer**:
 ```bash
-npx bagwan-kai-bandey cockpit --repo /path/to/your-repo
+bkb cockpit --repo /path/to/your-repo
 ```
 
-- **Editorial Minimalist Craft**: Clean Carbon Dark interface inspired by Linear and 21st.dev, featuring hairline tables, recessed segmented pill tracks, and an architectural dot-matrix canvas.
+- **Editorial Minimalist Craft**: High-definition Alabaster and warm stone interface inspired by Vercel Geist and Linear, powered by a Cytoscape.js & Dagre hierarchical layout, hairline dividers, and tactile pill controls.
 - **Real-Time SSE Synchronization**: Powered by a Server-Sent Events bus. Whenever your CLI (`bkb claim`, `bkb verify`, `bkb run`) or AI agent calls MCP tools, the browser visualizer immediately mirrors the action.
 - **Interactive AST & Blast-Radius Inspection**: Click any node in the graph to inspect inward callers, outward dependencies, exported symbols, and reverse multi-hop blast radius.
 - **Collapsible openCypher Tray**: Run live graph queries against FalkorDB with built-in presets (`Leaf Claim`, `De-shim Prioritizer`, `Circular Cycles (SCC)`, `PageRank Risk`, `Reverse Blast Radius`).
 
 ---
 
-## ⌨️ CLI Command Reference
+## CLI Command Reference
 
 | Command | Arguments / Flags | Description |
 |---|---|---|
@@ -264,7 +284,7 @@ npx bagwan-kai-bandey cockpit --repo /path/to/your-repo
 
 ---
 
-## 🔄 Updating Bagwan Kai Bandey
+## Updating Bagwan Kai Bandey
 
 Stay up to date with the latest migration packs, AST language adapters, and graph engine improvements:
 
@@ -283,7 +303,7 @@ bkb doctor
 ### Refresh Editor & Agent MCP Configurations:
 After updating BKB, re-run the 1-click MCP installer so your editors point to the newest tool definitions:
 ```bash
-npx bagwan-kai-bandey mcp install all
+bkb mcp install all
 ```
 
 ### Update FalkorDB Docker Image:
@@ -293,18 +313,18 @@ docker pull falkordb/falkordb:latest
 
 ---
 
-## 📖 Documentation Index
+## Documentation Index
 
 For in-depth architectural details, custom framework extensions, and benchmark results:
 
 | Guide | Description |
 |---|---|
-| 📐 **[Architecture & Universal Laws](docs/architecture.md)** | The 3-Layer engine design, The 5 Universal Laws of Topological Migration, and the FalkorDB openCypher graph schema. |
-| 🤝 **[Phased Migrations & Team Handoff](docs/phased-migrations-and-team-handoff.md)** | The Git-native `.bkb/manifest.json` schema, baseline snapshot invariance, and MCP milestone commits across multi-sprint lifecycles. |
-| 🔌 **[Extensibility: Custom Packs & Adapters](docs/extensibility.md)** | How to build custom Migration Packs (`defineMigrationPack`), custom Language Adapters (`BaseLanguageAdapter`), and `bkb.config.ts`. |
-| 🤖 **[MCP Server & AI Agent Guide](docs/mcp-guide.md)** | Detailed reference for the 9 MCP tools, manual JSON-RPC configs, and optimal agent prompts. |
-| 📊 **[Benchmarks & Performance](docs/benchmarks.md)** | 150-Module scale evaluation ($< 25\text{ms}$ SLA) and Naive Grep vs. BKB MCP comparison (81% token reduction). |
-| 🛠️ **[Developer & Contributor Setup](docs/contributing.md)** | Development environment setup, running tests (`npm test`), and AST validators. |
+| **[Architecture & Universal Laws](docs/architecture.md)** | The 3-Layer engine design, The 5 Universal Laws of Topological Migration, and the FalkorDB openCypher graph schema. |
+| **[Phased Migrations & Team Handoff](docs/phased-migrations-and-team-handoff.md)** | The Git-native `.bkb/manifest.json` schema, baseline snapshot invariance, and MCP milestone commits across multi-sprint lifecycles. |
+| **[Extensibility: Custom Packs & Adapters](docs/extensibility.md)** | How to build custom Migration Packs (`defineMigrationPack`), custom Language Adapters (`BaseLanguageAdapter`), and `bkb.config.ts`. |
+| **[MCP Server & AI Agent Guide](docs/mcp-guide.md)** | Detailed reference for the 9 MCP tools, manual JSON-RPC configs, and optimal agent prompts. |
+| **[Benchmarks & Performance](docs/benchmarks.md)** | 150-Module scale evaluation ($< 25\text{ms}$ SLA) and Naive Grep vs. BKB MCP comparison (81% token reduction). |
+| **[Developer & Contributor Setup](docs/contributing.md)** | Development environment setup, running tests (`npm test`), and AST validators. |
 
 ---
 
