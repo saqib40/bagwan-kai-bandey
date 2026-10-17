@@ -67,6 +67,11 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0"
+    "@types/cytoscape": "^3.21.9",
+    "@types/dagre": "^0.7.54",
+    "@types/node": "^22.10.0",
+    "cytoscape": "^3.34.4",
+    "cytoscape-dagre": "^4.0.1",
+    "dagre": "^0.8.5"
   }
 }
