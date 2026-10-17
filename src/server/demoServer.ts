@@ -12,8 +12,7 @@
  *  - GET /api/audit       -> Full chronological audit trail of MigrationEpisodes
  *  - GET /api/checkpoints -> Available step snapshots in .bkb/checkpoints/
  *  - POST /api/rollback   -> Instant 1-click disk and graph rollback to a previous checkpoint
- *
- * Serves the modern Vis.js visualizer from `public/`.
+ * Serves the modern Cytoscape.js & Dagre visualizer from `public/`.
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
