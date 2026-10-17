@@ -25,7 +25,7 @@
     "bkb": "node ./bin/bkb.js",
     "shift": "node ./bin/bkb.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/**/*.test.ts",
+    "test": "tsx --test \"test/**/*.test.ts\"",
     "validate:queries": "tsx scripts/validate-queries.ts",
     "validate:cypher": "tsx scripts/validate-cypher.ts",
     "benchmark": "tsx scripts/benchmark-scale.ts",

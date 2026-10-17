@@ -121,6 +121,28 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
       // 3. Obtain 1-hop migration slice
       const slice = await ops.getMigrationSlice(claim.targetPaths, claim.phase);
 
+      // Re-prompt the LLM with the observed failures so it can resolve
+      // verification/checkpoint problems within the loop (not at Phase 4).
+      const healSlice = async (errors: string[]): Promise<string | undefined> => {
+        try {
+          for (const targetMod of slice.targetModules) {
+            const healedResp = await llm.generateTransform({
+              targetPath: targetMod.path,
+              phase: claim.phase,
+              fullSource: targetMod.fullSource,
+              guidance: slice.guidance,
+              calleeSignatures: slice.calleeSignatures,
+              callerSnippets: slice.callerSnippets,
+              previousErrors: errors,
+            });
+            writeFileSync(resolve(repoPath, targetMod.path), healedResp.code, 'utf8');
+          }
+          return undefined;
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      };
+
       // 4. Generate transform and write to disk. A provider-level failure (e.g.
       // a subprocess timeout) must not abort the whole run: treat it as a step
       // failure so the self-healing pass below can retry, then roll back.
@@ -190,29 +212,13 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
           details: verifyRes.errors.join('\n'),
         });
 
-        let healError: string | undefined;
-        try {
-          for (const targetMod of slice.targetModules) {
-            const healedResp = await llm.generateTransform({
-              targetPath: targetMod.path,
-              phase: claim.phase,
-              fullSource: targetMod.fullSource,
-              guidance: slice.guidance,
-              calleeSignatures: slice.calleeSignatures,
-              callerSnippets: slice.callerSnippets,
-              previousErrors: verifyRes.errors,
-            });
-            writeFileSync(resolve(repoPath, targetMod.path), healedResp.code, 'utf8');
-          }
-        } catch (err) {
-          healError = err instanceof Error ? err.message : String(err);
+        const healError = await healSlice(verifyRes.errors);
+        if (healError) {
           verifyRes = {
             ...verifyRes,
             errors: [...verifyRes.errors, `Self-heal generation error: ${healError}`],
           };
-        }
-
-        if (!healError) {
+        } else {
           verifyRes = await ops.verifyAndCommitNode(claim.targetPaths, `${lastSummary} (self-healed)`);
         }
       }
@@ -234,16 +240,55 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
 
       claim.targetPaths.forEach((p) => migratedSet.add(p));
 
-      // 6. Checkpoint gate already ran inside verify. Do not run it again.
+      // 6. Checkpoint gate already ran inside verify. A failure here is a
+      // runtime/behavioural regression (tests, snapshots, boot) — feed those
+      // errors back to the LLM and give it one self-healing pass before
+      // rolling back, so fidelity issues are resolved inside the loop.
       if (verifyRes.checkpointTriggered && verifyRes.checkpointResult) {
-        const cp = verifyRes.checkpointResult;
+        let cp = verifyRes.checkpointResult;
+        const cpOk = () => cp.tscPass && cp.testPass && cp.routeMatch;
         options.onProgress?.({
           step: stepCount,
           phase: claim.phase,
           modules: claim.targetPaths,
-          action: `Checkpoint gate ${cp.tscPass && cp.testPass && cp.routeMatch ? 'passed' : 'failed'}`,
-          status: cp.tscPass && cp.testPass && cp.routeMatch ? 'success' : 'error',
+          action: `Checkpoint gate ${cpOk() ? 'passed' : 'failed'}`,
+          status: cpOk() ? 'success' : 'error',
+          details: cpOk() ? undefined : cp.errors.join('\n'),
         });
+
+        if (!cpOk()) {
+          options.onProgress?.({
+            step: stepCount,
+            phase: claim.phase,
+            modules: claim.targetPaths,
+            action: 'Self-healing: fixing checkpoint (tests/routes) errors...',
+            status: 'warning',
+            details: cp.errors.join('\n'),
+          });
+
+          const healError = await healSlice(cp.errors);
+          if (healError) {
+            cp = { ...cp, errors: [...cp.errors, `Checkpoint self-heal generation error: ${healError}`] };
+          } else {
+            const reVerify = await ops.verifyAndCommitNode(
+              claim.targetPaths,
+              `${lastSummary} (checkpoint self-healed)`,
+            );
+            if (!reVerify.ok) {
+              cp = { ...cp, errors: [...cp.errors, ...reVerify.errors] };
+            } else {
+              cp = await ops.runCheckpointGate();
+              options.onProgress?.({
+                step: stepCount,
+                phase: claim.phase,
+                modules: claim.targetPaths,
+                action: `Checkpoint re-gate after self-heal ${cp.tscPass && cp.testPass && cp.routeMatch ? 'passed' : 'failed'}`,
+                status: cp.tscPass && cp.testPass && cp.routeMatch ? 'success' : 'error',
+              });
+            }
+          }
+        }
+
         if (!cp.tscPass || !cp.testPass || !cp.routeMatch) {
           if (autoRollback) {
             await rollbackToCheckpoint(repoPath, packId, stepCount, graphName);
