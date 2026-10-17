@@ -255,7 +255,7 @@ export async function runAutonomousMigration(options: RunOptions): Promise<Auton
             routeParity: cp.routeMatch,
             checkpointPassed: false,
             durationMs: Date.now() - startTime,
-            error: `Checkpoint gate failed at step ${stepCount}: tests or route invariant mismatch.`,
+            error: `Checkpoint gate failed at step ${stepCount}: tests or route invariant mismatch.\n${cp.errors.join('\n')}`,
           };
         }
       }
