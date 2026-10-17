@@ -28,13 +28,11 @@
       </div>
 
       <span class="nav-slash">/</span>
-      <span id="nav-pack-name" class="nav-pack-label">express-to-fastify</span>
-      <span class="nav-badge-subtle">TypeScript</span>
-
-      <!-- Preserved DOM IDs for JS backward compatibility -->
-      <span id="nav-repo-name" style="display:none;">demo</span>
-      <span id="nav-pack-lang" style="display:none;">TypeScript</span>
-      <span id="nav-pack-shim" style="display:none;">in-file-branch</span>
+      <span id="nav-repo-name" class="nav-repo-label">codebase</span>
+      <span class="nav-slash" id="nav-pack-slash" style="display:none;">/</span>
+      <span id="nav-pack-name" class="nav-pack-label" style="display:none;"></span>
+      <span id="nav-pack-lang" class="nav-badge-subtle" style="display:none;"></span>
+      <span id="nav-pack-shim" style="display:none;"></span>
     </div>
 
     <!-- Center Inline Progress Telemetry Module (80px slim track) -->
@@ -69,6 +67,63 @@
             <span>Dependency Graph</span>
             <span class="meta-dot-sep">•</span>
             <span class="meta-latency" id="graph-latency">FalkorDB: 1.5 ms</span>
+          </div>
+          <button id="btn-show-standby" class="canvas-action-pill" title="Show Agent Prompts & CLI Commands">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Agent Prompt</span>
+          </button>
+        </div>
+
+        <!-- Editorial Standby Flight Deck (Shows when idle / waiting for agent or CLI) -->
+        <div id="standby-overlay" class="standby-overlay">
+          <div class="standby-card">
+            <div class="standby-header">
+              <div class="standby-pulse-badge">
+                <span class="standby-radar-dot"></span>
+                <span>FLIGHT DECK STANDBY</span>
+              </div>
+              <h2 class="standby-title">Autonomous Migration Governor</h2>
+              <p class="standby-desc">
+                Connected to FalkorDB. Waiting for AI agent (MCP) or CLI execution...
+              </p>
+            </div>
+
+            <div class="standby-prompt-box">
+              <div class="prompt-box-header">
+                <div class="prompt-box-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span>AI Agent Prompt (Cursor • Claude • VS Code • Windsurf)</span>
+                </div>
+                <button id="btn-copy-prompt" class="btn-copy-prompt" title="Copy prompt to clipboard">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span id="btn-copy-text">Copy Prompt</span>
+                </button>
+              </div>
+              <pre class="prompt-content" id="agent-prompt-text">You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
+First call bkb_get_migration_status to inspect current progress, then claim and verify batches until 100% complete.</pre>
+            </div>
+
+            <div class="standby-terminal-section">
+              <div class="terminal-col">
+                <span class="terminal-col-label">Run autonomously via CLI:</span>
+                <code class="terminal-col-code" id="cmd-run-code">bkb run</code>
+              </div>
+              <div class="terminal-col">
+                <span class="terminal-col-label">Claim first topological batch:</span>
+                <code class="terminal-col-code">bkb claim</code>
+              </div>
+            </div>
+
+            <div class="standby-footer">
+              <button id="btn-dismiss-standby" class="btn-dismiss-standby" title="Inspect static graph structure">
+                <span>Explore Graph Canvas</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+              <div class="standby-footer-status">
+                <span class="status-dot-subtle"></span>
+                <span id="standby-status-label">SSE Stream Ready on localhost</span>
+              </div>
+            </div>
           </div>
         </div>
 

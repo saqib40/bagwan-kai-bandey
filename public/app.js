@@ -1511,6 +1511,59 @@ function highlightCypherSyntax(rawQuery) {
   html = html.replace(/('[^']*')/g, '<span class="cypher-str">$1</span>');
 
   return `<code>${html}</code>`;
+// ── Standby Flight Deck Overlay Helpers ────────────────────
+function dismissStandby() {
+  const overlay = document.getElementById('standby-overlay');
+  if (overlay) overlay.classList.add('dismissed');
+}
+
+function showStandby() {
+  const overlay = document.getElementById('standby-overlay');
+  if (overlay) overlay.classList.remove('dismissed');
+}
+
+function checkStandbyState(modules) {
+  if (!modules || modules.length === 0) {
+    showStandby();
+    return;
+  }
+  const hasActiveProgress = modules.some((m) => m.status === 'CLAIMED' || m.status === 'VERIFIED');
+  if (hasActiveProgress) {
+    dismissStandby();
+  } else {
+    showStandby();
+  }
+}
+
+function setupStandbyDeck() {
+  const btnCopy = document.getElementById('btn-copy-prompt');
+  const copyText = document.getElementById('btn-copy-text');
+  const promptText = document.getElementById('agent-prompt-text');
+  const btnDismiss = document.getElementById('btn-dismiss-standby');
+  const btnShow = document.getElementById('btn-show-standby');
+
+  btnCopy?.addEventListener('click', async () => {
+    if (!promptText) return;
+    try {
+      await navigator.clipboard.writeText(promptText.textContent);
+      if (copyText) copyText.textContent = 'Copied! ✓';
+      btnCopy.classList.add('copied');
+      setTimeout(() => {
+        if (copyText) copyText.textContent = 'Copy Prompt';
+        btnCopy.classList.remove('copied');
+      }, 2000);
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(promptText);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      if (copyText) copyText.textContent = 'Press ⌘+C / Ctrl+C';
+    }
+  });
+
+  btnDismiss?.addEventListener('click', dismissStandby);
+  btnShow?.addEventListener('click', showStandby);
 }
 
 function setupControlsDrawer() {
@@ -2041,17 +2094,36 @@ async function executeRollback(targetStep) {
 
 // ── System Info & Dynamic Target Manager ──────────────────
 function renderPackMeta(pack) {
+  const navSlash = document.getElementById('nav-pack-slash');
   const navPack = document.getElementById('nav-pack-name');
   const langBadge = document.getElementById('nav-pack-lang');
   const shimBadge = document.getElementById('nav-pack-shim');
-  if (navPack) navPack.textContent = pack.id || pack.name || 'unknown';
-  if (langBadge) {
-    langBadge.textContent = pack.language || 'unknown';
-    langBadge.style.display = pack.language ? '' : 'none';
-  }
-  if (shimBadge) {
-    shimBadge.textContent = pack.shimStrategy || 'in-file-branch';
-    shimBadge.style.display = pack.shimStrategy ? '' : 'none';
+
+  if (pack && pack.id) {
+    if (navSlash) navSlash.style.display = 'inline';
+    if (navPack) {
+      navPack.textContent = pack.id;
+      navPack.style.display = 'inline';
+    }
+    if (langBadge && pack.language) {
+      const formattedLang = pack.language.charAt(0).toUpperCase() + pack.language.slice(1);
+      langBadge.textContent = formattedLang;
+      langBadge.style.display = 'inline-flex';
+    }
+    if (shimBadge && pack.shimStrategy) {
+      shimBadge.textContent = pack.shimStrategy;
+      shimBadge.style.display = 'none';
+    }
+
+    // Update Standby CLI commands with actual active pack
+    const cmdRun = document.getElementById('cmd-run-code');
+    if (cmdRun) {
+      cmdRun.textContent = `bkb run --pack ${pack.id}`;
+    }
+  } else {
+    if (navSlash) navSlash.style.display = 'none';
+    if (navPack) navPack.style.display = 'none';
+    if (langBadge) langBadge.style.display = 'none';
   }
 }
 
@@ -2062,7 +2134,11 @@ async function loadSystemInfo() {
     currentAppInfo = info;
 
     const navRepo = document.getElementById('nav-repo-name');
-    if (navRepo) navRepo.textContent = info.isDemoRepo ? 'demo-repo' : info.displayRepo.split('/').pop();
+    if (navRepo && info.displayRepo) {
+      const repoClean = info.isDemoRepo ? 'demo-repo' : (info.displayRepo.split('/').filter(Boolean).pop() || 'codebase');
+      navRepo.textContent = repoClean;
+      navRepo.style.display = 'inline';
+    }
     renderPackMeta(info.pack || { id: info.currentPackId, language: 'typescript', shimStrategy: 'in-file-branch' });
 
     document.querySelectorAll('.mode-btn').forEach((btn) => {
@@ -2157,6 +2233,13 @@ async function handleLiveTelemetryEvent(event, flashBadge) {
   if (event.type === 'connected') {
     updateSyncStatus(true);
     return;
+  }
+
+  // Any active telemetry event from CLI or AI agent automatically awakens the flight deck
+  if (event.type === 'claim' || event.type === 'verify' || event.type === 'step' || event.type === 'complete') {
+    dismissStandby();
+  } else if (event.type === 'reset') {
+    showStandby();
   }
 
   if (typeof flashBadge === 'function') flashBadge();
@@ -2548,7 +2631,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     setupDrawerTabs();
     setupViewSwitchTabs();
     setupDelegatedClickHandlers();
+    setupStandbyDeck();
     await loadSystemInfo();
+    checkStandbyState(data.modules);
     renderMissionDeck();
     await loadAuditTrail();
 

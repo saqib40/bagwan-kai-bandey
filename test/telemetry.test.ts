@@ -49,8 +49,11 @@ describe('BKB Live Telemetry & Event Synchronization', () => {
         step: 5,
       });
 
-      // Wait a short tick for loopback fetch to finish
-      await new Promise((r) => setTimeout(r, 100));
+      // Wait for loopback fetch to finish
+      const start = Date.now();
+      while (!receivedPayload && Date.now() - start < 1000) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
 
       assert.ok(receivedPayload !== null, 'Server should have received broadcast payload');
       const payload = receivedPayload as LiveEvent;
