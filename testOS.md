@@ -403,8 +403,14 @@ Use this tracking scorecard to record results as each candidate repository is te
 | `flaskr` (Pallets) | `flask-to-fastapi` | ✅ `dump_routes.py` | ✅ 5 mod (4 pending) · 12 routes · 5 SCCs | ✅ 1st claim `flaskr/db.py` | — ingestion-only | — | — | Jinja/form app; blueprint-prefix snapshot |
 | `node-glob@v7` | `cjs-to-esm` (adapted) | ✅ Adapted | ✅ 3 mod, 2 SCCs | ⚠️ 1st claim only | — | — | — | Real `glob.js:51` ⇄ `sync.js:7` cycle verified; full schedule needs mocks |
 | `is-plain-obj@v2` | `cjs-to-esm` (adapted) | ✅ Adapted | ✅ 1 mod | ⚠️ needs mocks | ✅ Mock run completed | ✅ Export surface 1:1 | ✅ `node --check` + smoke | CJS confirmed; add `"type":"module"` post-step |
-| `node-express-boilerplate` | `jest-to-vitest` (adapted) | ✅ Adapted | ✅ 10 mod (2 pending) · 24 SCCs | ✅ 1st claim `tests/integration/auth.test.js` (14 legacy) | — not attempted (CJS `require()` vs Vitest ESM) | — | ✅ Baseline jest 7 suites / 113 tests | `.js` tests; glob `tests/**/*.js`, `node --check` gate, runner scripts |
+| `node-express-boilerplate` | `jest-to-vitest` (adapted) | ✅ Adapted | ✅ 10 mod (2 pending) · 24 SCCs | ✅ 1st claim `tests/integration/auth.test.js` (14 legacy) | ✅ Mock E2E complete (2 files: `jest.*` → `vi.*`) | ✅ Counts held: 7 suites / 113 tests | ✅ Jest 113/113 → Vitest 113/113 | `.js`; Vitest runs CJS via `globals`+`globalThis.jest=vi` bridge; needs `--no-file-parallelism` (shared Mongo) |
 | `TypeScript-Node-Starter (test/)` | `jest-to-vitest` | ✅ scripts copied | ✅ 5 mod · 0 pending | ✅ 1-step no-op (0 modules) | — n/a (no `jest.*` usage) | — | ⚠️ checkpoint "Failed" (jest 19 unrunnable) | Tests use `supertest` only; nothing to migrate |
 
 **Legend:** ✅ pass · ⚠️ partial (see Notes) · — not run · `Pending` not started.
 Repo-local adapted packs live under `scratch/<repo>/oss-cjs-esm-pack.json` (Phase 0) and are not committed (`scratch/` is gitignored).
+
+**Harness findings (from the `node-express-boilerplate` mock E2E):**
+- A `count`-kind snapshot must not propagate the runner's process exit code. Jest exits `1` on this suite even with 113/113 passing (unclosed Mongoose handles), which caused `bkb init` to discard the baseline and every checkpoint to report a false mismatch. Fix: emit counts and exit `0` when tests ran.
+- Test-runner wrappers must spawn the runner via `process.execPath`, not the `node_modules/.bin/*` shebang — otherwise the runner executes under the wrong Node (Node 25 instead of the pinned Node 18) and exits non-zero.
+- Vitest executes CommonJS (`require`) test files; a `globals: true` config plus a `globalThis.jest = vi` setup bridge gives full parity with Jest. Sequential execution (`--no-file-parallelism`) is required when test files share a database, otherwise cross-file interference causes spurious failures.
+- Provider-level failures (e.g. timeouts or a quota/rate-limit response) are now fault-tolerant: they surface as a normal step failure, trigger the self-healing retry, and fall back to a step-scoped rollback instead of aborting the process. Verified live on `node-express-realworld` (Steps 2–3 self-healed; a slow/failed Step 4 rolled back cleanly while preserving earlier progress).
