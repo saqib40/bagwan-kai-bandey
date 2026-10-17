@@ -70,9 +70,13 @@ test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async 
     const toolNames = tools.map((t) => t.name).sort();
     const expectedTools = [
       'advance_migration',
+      'bkb_commit_milestone',
+      'bkb_get_migration_status',
       'claim_next_leaf',
+      'commit_milestone',
       'get_migration_audit_trail',
       'get_migration_slice',
+      'get_migration_status',
       'init_migration_graph',
       'simulate_blast_radius',
       'verify_and_commit_node',
@@ -156,6 +160,23 @@ test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async 
       auditData.reportMarkdown.includes('# Bagwan Kai Bandey Migration Audit Trail') ||
       auditData.reportMarkdown.includes('# Shift Migration Audit Trail'),
     );
+
+    // 7. Test get_migration_status & bkb_get_migration_status
+    const statusRes = await client.callTool({
+      name: 'get_migration_status',
+      arguments: {},
+    });
+    assert.equal(statusRes.isError ?? false, false);
+    const statusData = JSON.parse((statusRes.content as any)[0].text);
+    assert.equal(statusData.packId, packId);
+    assert.ok(statusData.progress.totalModules > 0);
+    assert.ok(typeof statusData.progress.percentComplete === 'string');
+
+    const bkbStatusRes = await client.callTool({
+      name: 'bkb_get_migration_status',
+      arguments: {},
+    });
+    assert.equal(bkbStatusRes.isError ?? false, false);
   } finally {
     await client.close();
     await server.close();

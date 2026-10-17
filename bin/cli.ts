@@ -21,6 +21,7 @@ import { runInteractiveInit } from '../src/cli/wizard';
 import { buildPackTemplate } from '../src/cli/packScaffold';
 import { runAutonomousMigration } from '../src/runner/autonomousRunner';
 import { rollbackToCheckpoint, listCheckpoints } from '../src/runner/rollback';
+import { loadManifest } from '../src/engine/manifest';
 
 function printHelp() {
   console.error(`
@@ -30,6 +31,7 @@ Usage:
   bkb doctor [--repo <path>]
   bkb mcp install [cursor|claude|vscode|windsurf|opencode|all]
   bkb init [--interactive] [--repo <path>] [--pack <id>] [--reset] [--adapter <path>]
+  bkb status [--repo <path>] [--pack <id>] [--json]
   bkb run [--repo <path>] [--pack <id>] [--provider <p>] [--model <m>] [--dry-run] [--no-rollback]
   bkb rollback [step] [--repo <path>] [--pack <id>] [--list]
   bkb claim --repo <path> --pack <id>
@@ -48,6 +50,7 @@ Commands:
   doctor         Run pre-flight environment diagnostics (Node, Docker, FalkorDB, Git)
   mcp install    1-Click install BKB MCP server config into Cursor, Claude, VS Code, Windsurf, or OpenCode
   init           Initialize the migration graph in FalkorDB (interactive wizard if -i)
+  status         Show current migration progress, unblocked leaves, and Git manifest sync
   run, auto      Autonomously execute the migration loop (claim -> slice -> transform -> verify)
   cockpit, ui    Start the live visual migration flight deck (browser GUI with real-time SSE sync)
   rollback       Rollback source files and FalkorDB graph to a previous checkpoint (or latest)
@@ -80,6 +83,7 @@ Options:
   --checkpoint       Run full checkpoint gate during audit
   --reset            Drop and recreate graph before ingest
   --port <port>      Port for Migration Cockpit web server (default: 4200)
+  --json             Output machine-readable JSON for status
   --no-ui            Disable auto-launching Migration Cockpit web server during run
   --wait             Keep Migration Cockpit web server running after run completes
 `);
@@ -101,6 +105,7 @@ function parseArgs(args: string[]) {
       arg === '--checkpoint' ||
       arg === '--dry-run' ||
       arg === '--list' ||
+      arg === '--json' ||
       arg === '--no-rollback'
     ) {
       flags[arg.slice(2)] = true;
@@ -328,6 +333,176 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       console.error('[bkb] Failed to initialize migration graph:', err);
       process.exit(1);
     }
+  }
+
+  if (command === 'status') {
+    const repoPath = resolve(String(flags.repo ?? activeConfig?.defaultRepo ?? './demo-repo'));
+    const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
+    const isJson = Boolean(flags.json);
+
+    const manifest = loadManifest(repoPath);
+
+    // Attempt to query FalkorDB if running, but do not crash if offline
+    let falkorStats: {
+      total: number;
+      clean: number;
+      pending: number;
+      shimmed: number;
+      verified: number;
+      unblocked: Array<{ path: string; status: string; inDegree: number; pagerank: number }>;
+    } | null = null;
+
+    try {
+      await ensureFalkorDB();
+      const ops = await createOps(flags);
+      const statusCounts = await ops.db.roQuery<{ status: string; cnt: number }>(
+        'MATCH (m:Module) RETURN m.status AS status, count(m) AS cnt',
+      );
+      const counts = new Map(statusCounts.map((r) => [r.status, Number(r.cnt)]));
+      const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
+
+      const unblockedRows = await ops.db.roQuery<{
+        path: string;
+        status: string;
+        inDegree: number;
+        pagerank: number;
+      }>(
+        `MATCH (m:Module)
+         WHERE m.pending_callers_count = 0 AND m.status IN ['PENDING', 'SHIMMED']
+         RETURN m.path AS path, m.status AS status, m.in_degree AS inDegree, m.pagerank AS pagerank
+         ORDER BY m.pagerank DESC LIMIT 5`,
+      );
+
+      falkorStats = {
+        total,
+        clean: counts.get('CLEAN') ?? 0,
+        pending: counts.get('PENDING') ?? 0,
+        shimmed: counts.get('SHIMMED') ?? 0,
+        verified: counts.get('VERIFIED') ?? 0,
+        unblocked: unblockedRows.map((r) => ({
+          path: r.path,
+          status: r.status,
+          inDegree: Number(r.inDegree),
+          pagerank: Number(r.pagerank || 0),
+        })),
+      };
+      await ops.db.close();
+    } catch {
+      // FalkorDB offline or not initialized yet - fall back to manifest data
+    }
+
+    // Derive numbers from FalkorDB if available, otherwise from manifest
+    let total = 0;
+    let clean = 0;
+    let pending = 0;
+    let shimmed = 0;
+    let verified = 0;
+
+    if (falkorStats && falkorStats.total > 0) {
+      total = falkorStats.total;
+      clean = falkorStats.clean;
+      pending = falkorStats.pending;
+      shimmed = falkorStats.shimmed;
+      verified = falkorStats.verified;
+    } else if (manifest) {
+      const modValues = Object.values(manifest.modules);
+      total = modValues.length;
+      clean = modValues.filter((m) => m.status === 'CLEAN').length;
+      pending = modValues.filter((m) => m.status === 'PENDING').length;
+      shimmed = modValues.filter((m) => m.status === 'SHIMMED').length;
+      verified = modValues.filter((m) => m.status === 'VERIFIED').length;
+    }
+
+    const percentVal = total > 0 ? ((verified + clean + shimmed * 0.5) / total) * 100 : 0;
+    const percentStr = percentVal.toFixed(1) + '%';
+
+    const lastMilestone = manifest?.history?.length
+      ? manifest.history[manifest.history.length - 1]
+      : null;
+
+    const statusObj = {
+      repoPath,
+      packId: manifest?.packId ?? packId,
+      phase: manifest?.phase ?? (pending > 0 ? 'SHIM' : 'DE_SHIM'),
+      progress: {
+        totalModules: total,
+        clean,
+        pending,
+        shimmed,
+        verified,
+        percentComplete: percentStr,
+      },
+      baseline: manifest?.baseline
+        ? {
+            snapshotType: manifest.baseline.snapshotType,
+            entryCount: manifest.baseline.entryCount,
+          }
+        : null,
+      unblockedLeavesReady: falkorStats?.unblocked ?? [],
+      lastMilestone,
+      manifestSynchronized: Boolean(manifest),
+      falkorDbOnline: Boolean(falkorStats),
+    };
+
+    if (isJson) {
+      console.log(JSON.stringify(statusObj, null, 2));
+      process.exit(0);
+    }
+
+    const barWidth = 20;
+    const filled = Math.round((percentVal / 100) * barWidth);
+    const bar = '■'.repeat(filled) + '░'.repeat(barWidth - filled);
+
+    console.error(`
+======================================================================
+  Bagwan Kai Bandey — Migration Flight Status
+======================================================================
+Repository:         ${repoPath}
+Migration Pack:     ${statusObj.packId}
+Current Phase:      ${statusObj.phase}
+Manifest:           ${manifest ? '.bkb/manifest.json (Synchronized with Git)' : 'Not yet initialized (Run "bkb init")'}
+FalkorDB Engine:    ${falkorStats ? 'Connected & Synced' : 'Offline / Idle'}
+
+--- Migration Progress [${bar}] ${percentStr} ---
+Total Modules:      ${total}
+  - Verified:       ${verified}
+  - Shimmed:        ${shimmed}
+  - Pending:        ${pending}
+  - Clean:          ${clean}
+`);
+
+    if (manifest?.baseline) {
+      console.error(`--- Baseline Invariant Preservation ---`);
+      console.error(`Snapshot Kind:      ${manifest.baseline.snapshotType}`);
+      console.error(`Recorded Entries:   ${manifest.baseline.entryCount}`);
+      if (manifest.baseline.entries?.length) {
+        const preview = manifest.baseline.entries.slice(0, 3).join(', ');
+        console.error(`Sample Invariants:  ${preview}${manifest.baseline.entries.length > 3 ? '...' : ''}`);
+      }
+      console.error('');
+    }
+
+    if (lastMilestone) {
+      console.error(`--- Last Verified Team Milestone ---`);
+      console.error(`Step:               ${lastMilestone.step} [${lastMilestone.phase}]`);
+      if (lastMilestone.commitSha) {
+        console.error(`Git Commit SHA:     ${lastMilestone.commitSha.slice(0, 7)}`);
+      }
+      console.error(`Action:             ${lastMilestone.action}`);
+      console.error(`Timestamp:          ${lastMilestone.timestamp}`);
+      console.error('');
+    }
+
+    if (falkorStats?.unblocked?.length) {
+      console.error(`--- Unblocked Leaves (Ready for Next Claim / Sprint) ---`);
+      for (const u of falkorStats.unblocked) {
+        console.error(`  - ${u.path} (${u.status}, inDegree: ${u.inDegree})`);
+      }
+      console.error('');
+    }
+
+    console.error('======================================================\n');
+    process.exit(0);
   }
 
   // Ensure FalkorDB container is up and healthy for graph operations

@@ -16,6 +16,7 @@ import { adapterRegistry } from '../adapters/registry';
 import { shimMarkerList, type MigrationPack, type ParsedModule } from '../adapters/types';
 import { broadcastLiveEvent } from './telemetry';
 import { getPackSnapshots, normalizeSnapshotOutput } from './snapshots';
+import { recordStepInManifest } from './manifest';
 import * as Q from './queries';
 
 // ─── Result Types ────────────────────────────────────────
@@ -656,6 +657,24 @@ export class MigrationOps {
     if (shouldCheckpoint) {
       checkpointTriggered = true;
       checkpointResult = await this.runCheckpointGate();
+    }
+
+    // ── Update Git-Native .bkb/manifest.json ──
+    try {
+      recordStepInManifest(this.repoPath, {
+        step: stepNum,
+        phase: claimedPhase,
+        modules: modulePaths,
+        status: newStatus as 'SHIMMED' | 'VERIFIED',
+        action: agentSummary || `Committed ${modulePaths.join(', ')} to ${newStatus}`,
+        verifiedBy: 'BKB Verification Gate',
+        invariants: {
+          compilerErrors: 0,
+          checkpointTriggered,
+        },
+      });
+    } catch (err) {
+      console.error('[bkb] Warning: Failed to update .bkb/manifest.json:', err);
     }
 
     broadcastLiveEvent({

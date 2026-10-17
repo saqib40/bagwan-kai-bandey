@@ -17,6 +17,12 @@ import { broadcastLiveEvent } from './telemetry';
 import { getPackSnapshots, normalizeSnapshotOutput } from './snapshots';
 import { evaluatePackageDetectors, formatPackageDetectorAdvisories } from './packageDetectors';
 import { assertRuntimeInteropSupport } from './runtimePreflight';
+import {
+  loadManifest,
+  initOrUpdateManifest,
+  reconcileGraphWithManifest,
+  getManifestPath,
+} from './manifest';
 import * as Q from './queries';
 
 /**
@@ -46,8 +52,11 @@ export interface GraphSummary {
   totalModules: number;
   cleanModules: number;
   pendingModules: number;
+  shimmedModules?: number;
+  verifiedModules?: number;
   baselineRoutesCount: number;
   sccCount: number;
+  manifestPath?: string;
 }
 
 export class MigrationGraphManager {
@@ -94,21 +103,43 @@ export class MigrationGraphManager {
       }
 
       // 2. Capture baseline snapshots using the pack's declared commands
+      const existingManifest = loadManifest(absRepoPath);
       const snapshots = getPackSnapshots(pack);
       const baselineSnapshots: Record<string, string> = {};
-      for (const snap of snapshots) {
-        console.error(`[bkb] Capturing baseline snapshot "${snap.id}" via "${snap.command}"...`);
-        try {
-          const out = execSync(snap.command, {
-            cwd: absRepoPath,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-            timeout: pack.verification.timeoutMs ?? 60_000,
-          });
-          baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, out);
-        } catch (err) {
-          console.error(`[bkb] Warning: Failed to run snapshot "${snap.id}":`, err);
-          baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, '');
+
+      const primarySnap =
+        snapshots.find((s) => s.id === 'route-surface') ??
+        snapshots.find((s) => s.kind === 'set') ??
+        snapshots[0];
+
+      // If manifest already exists with a baseline and we are not resetting, preserve it
+      if (
+        existingManifest &&
+        existingManifest.packId === pack.id &&
+        !opts.reset &&
+        existingManifest.baseline?.entries
+      ) {
+        console.error(
+          `[bkb] Reusing committed baseline snapshot from .bkb/manifest.json (${existingManifest.baseline.entryCount} entries)...`,
+        );
+        if (primarySnap) {
+          baselineSnapshots[primarySnap.id] = JSON.stringify(existingManifest.baseline.entries);
+        }
+      } else {
+        for (const snap of snapshots) {
+          console.error(`[bkb] Capturing baseline snapshot "${snap.id}" via "${snap.command}"...`);
+          try {
+            const out = execSync(snap.command, {
+              cwd: absRepoPath,
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'pipe'],
+              timeout: pack.verification.timeoutMs ?? 60_000,
+            });
+            baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, out);
+          } catch (err) {
+            console.error(`[bkb] Warning: Failed to run snapshot "${snap.id}":`, err);
+            baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, '');
+          }
         }
       }
       const baselineSnapshotsJson = JSON.stringify(baselineSnapshots);
@@ -271,7 +302,45 @@ export class MigrationGraphManager {
         legacyCallers: [...Q.LEGACY_CALLER_STATUSES],
       });
 
-      // Query summary
+      // 11. Sync with Git-native .bkb/manifest.json
+      const baselineEntries =
+        primarySnap && baselineSnapshots[primarySnap.id]
+          ? (() => {
+              try {
+                return JSON.parse(baselineSnapshots[primarySnap.id]);
+              } catch {
+                return [];
+              }
+            })()
+          : [];
+
+      const manifest = initOrUpdateManifest({
+        repoPath: absRepoPath,
+        packId: pack.id,
+        reset: opts.reset,
+        baselineSnapshot: {
+          snapshotType: primarySnap?.id ?? 'route-surface',
+          entryCount: Array.isArray(baselineEntries) ? baselineEntries.length : 0,
+          entries: Array.isArray(baselineEntries) ? baselineEntries : [],
+          command: primarySnap?.command,
+        },
+        modules: parsedModules.map((m) => {
+          const sccId = sccResult.sccOf.get(m.path) ?? 0;
+          const hasLegacy = m.apiUsages.length > 0;
+          return {
+            path: m.path,
+            status: hasLegacy ? 'PENDING' : 'CLEAN',
+            sccId,
+          };
+        }),
+      });
+
+      // Reconcile FalkorDB node statuses if manifest had previously completed nodes
+      if (manifest && !opts.reset) {
+        await reconcileGraphWithManifest(client, manifest);
+      }
+
+      // Query summary after reconciliation
       const counts = await client.query<{ status: string; n: number }>(Q.STATUS_COUNTS);
       const countMap = new Map(counts.map((r) => [r.status, Number(r.n)]));
 
@@ -289,8 +358,11 @@ export class MigrationGraphManager {
         totalModules: parsedModules.length,
         cleanModules: countMap.get('CLEAN') ?? 0,
         pendingModules: countMap.get('PENDING') ?? 0,
+        shimmedModules: countMap.get('SHIMMED') ?? 0,
+        verifiedModules: countMap.get('VERIFIED') ?? 0,
         baselineRoutesCount: baselineRoutes.length,
         sccCount: sccResult.members.size,
+        manifestPath: getManifestPath(absRepoPath),
       };
     } finally {
       if (ownClient) {
