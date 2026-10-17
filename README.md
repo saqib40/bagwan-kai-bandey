@@ -131,21 +131,70 @@ bkb init --repo /path/to/your-repo --pack express-to-fastify
 ## 🚀 Migration Modes
 
 ### Mode A: Autonomous AI Agent via MCP (Recommended)
-BKB turns Cursor, Claude Desktop, VS Code, Windsurf, or OpenCode into a graph-governed migration engineer.
 
-**1-Click Editor & Agent Installation:**
+BKB turns **Cursor**, **Claude Desktop**, **VS Code**, **Windsurf**, or **OpenCode** into a graph-governed migration engineer that never deadlocks, never inverts dependencies, and never breaks the build.
+
+#### Step 1: 1-Click Connect Your Agent
 ```bash
-# Auto-configure your favorite editor or coding agent:
-bkb mcp install opencode   # OpenCode CLI / opencode.jsonc
+# Register BKB MCP tools in your chosen environment:
 bkb mcp install cursor     # Cursor (.cursor/mcp.json)
 bkb mcp install claude     # Claude Desktop (claude_desktop_config.json)
 bkb mcp install vscode     # VS Code (.vscode/mcp.json)
 bkb mcp install windsurf   # Windsurf (.codeium/windsurf/mcp_config.json)
-bkb mcp install all        # All detected editors & agents
+bkb mcp install opencode   # OpenCode CLI / opencode.jsonc
+bkb mcp install all        # All detected editors & agents at once
 ```
 
-**Instruct Your Agent in Chat:**
-> *"Migrate this repository using BKB MCP tools. Call `bkb_get_migration_status` to inspect current progress, phase, and unblocked leaves. Call `advance_migration` to take each batch, inspect signatures, apply edits, and verify invariants in a single loop. When an atomic module or milestone passes verification, call `bkb_commit_milestone` to commit the verified state to Git with full audit metadata. Watch the live sync cockpit at http://localhost:4200."*
+#### Step 2: Initialize Graph & Open Visual Cockpit
+```bash
+# Ingest target codebase and capture baseline invariants
+bkb init --repo /path/to/your-repo --pack express-to-fastify
+
+# In another terminal, launch the live real-time flight deck
+bkb cockpit --repo /path/to/your-repo
+```
+
+#### Step 3: Copy-Paste the Production Agent Prompt
+Paste this prompt into your agent's chat interface (Cursor Composer, Claude Desktop, or Windsurf Cascade). This is the exact prompt that successfully governed our automated end-to-end migrations:
+
+```markdown
+You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
+
+Your objective: Safely and incrementally migrate this codebase using the active migration pack, preserving all compiler gates, invariant snapshots, and backward compatibility.
+
+Protocol:
+1. CHECK STATUS:
+   Start by calling `bkb_get_migration_status` to inspect overall progress, the active phase (SHIM, MIGRATE, or DE_SHIM), and unblocked leaves ready for migration.
+
+2. CLAIM & INSPECT BATCH:
+   Call `advance_migration` with NO arguments (`{}`) to claim the next topological batch.
+   - The response provides the full disk source, callee symbol signatures, caller snippets, and specific pack guidance.
+   - Do NOT grep or crawl the workspace; everything needed is in the returned slice.
+
+3. TRANSFORM WITH DUAL COMPATIBILITY:
+   Write the migrated code adhering strictly to the returned slice instructions:
+   - In SHIM phase: Preserve existing exports and caller call patterns (using @bkb-shim dual branches or runtime-interop export shapes). Downstream callers must not break!
+   - In DE_SHIM phase: Strip the legacy shims cleanly once all upstream callers are verified.
+
+4. VERIFY & ADVANCE:
+   Call `advance_migration` with `edits: [{ path: "<path>", content: "<full new code>" }]` and an `agentSummary`.
+   - The engine writes the file, runs AST re-parsing, executes compiler typechecks (tsc/mypy), and verifies invariant snapshots.
+   - If verification passes: The engine commits the node in FalkorDB, updates .bkb/manifest.json, and returns the next batch.
+   - If verification fails: Inspect the compiler error returned, fix the types, and re-call `advance_migration`.
+
+5. COMMIT MILESTONES:
+   Whenever an atomic batch or sprint milestone is verified, call `bkb_commit_milestone` to create an atomic Git commit with structured audit notes so other team members can track progress.
+
+Repeat this loop until `bkb_get_migration_status` confirms 100% of modules are VERIFIED.
+```
+
+#### What Happens Under the Hood (Real Interaction Trace)
+1. 🔍 **Agent calls `bkb_get_migration_status`**: Reads `.bkb/manifest.json` and FalkorDB. Discovers `src/utils/response.ts` is unblocked.
+2. 📥 **Agent calls `advance_migration({})`**: BKB atomically claims `src/utils/response.ts` (Phase: `SHIM`) and returns the file source, export signatures, and `@bkb-shim` dual-compatibility template.
+3. ✏️ **Agent submits edits**: Agent calls `advance_migration({ edits: [{ path: "src/utils/response.ts", content: "..." }] })`.
+4. 🛡️ **BKB verifies invariants**: Engine runs AST parser, checks `tsc --noEmit`, compares route snapshots, and marks node `SHIMMED` in FalkorDB.
+5. 💾 **Agent commits milestone**: Agent calls `bkb_commit_milestone({ message: "chore: shim response utility to Fastify" })`. Git commit is created and `.bkb/manifest.json` is updated.
+6. 🔁 **Repeat**: Agent receives next unblocked leaf until migration is 100% complete.
 
 ---
 
