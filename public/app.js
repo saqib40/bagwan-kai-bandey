@@ -469,14 +469,6 @@ function bindCanvasControls() {
     });
   });
 
-  // Replay Traversal Button
-  document.getElementById('btn-replay-traversal')?.addEventListener('click', () => {
-    if (lastProofHops.length > 0) {
-      animateTraversal(lastProofHops);
-    } else if (blastRadiusActiveNode) {
-      highlightBlastRadius(blastRadiusActiveNode);
-    }
-  });
 }
 
 function applyStatusFilter(filter) {
@@ -2395,8 +2387,9 @@ async function setExecutionMode(newMode) {
 }
 
 function setupSettingsModal() {
-  const btnOpen = document.getElementById('btn-project-settings');
   const modal = document.getElementById('project-settings-modal');
+  if (!modal) return;
+  const btnOpen = document.getElementById('btn-project-settings');
   const btnClose = document.getElementById('btn-close-settings');
   const btnCancel = document.getElementById('btn-cancel-settings');
   const btnSave = document.getElementById('btn-save-settings');
@@ -2559,10 +2552,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     renderMissionDeck();
     await loadAuditTrail();
 
-    document.getElementById('btn-step')?.addEventListener('click', executeStep);
-    document.getElementById('btn-step-card')?.addEventListener('click', executeStep);
-    document.getElementById('btn-auto')?.addEventListener('click', toggleAutoPlay);
-    document.getElementById('btn-reset')?.addEventListener('click', resetCodebase);
     document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
     document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
 

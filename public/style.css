@@ -1065,6 +1065,31 @@ code, pre, .font-mono {
 .phase-shim { background: #FAF5FF; color: #7E22CE; border-color: #E9D5FF; }
 .phase-migrate { background: var(--status-pending-bg); color: var(--status-pending-text); border-color: #FDE68A; }
 .phase-verified { background: var(--status-verified-bg); color: var(--status-verified-text); border-color: #A7F3D0; }
+.target-telemetry-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-hairline);
+  padding: 4px 10px;
+  border-radius: 6px;
+  user-select: none;
+}
+
+.telemetry-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  display: inline-block;
+}
 
 .target-actions-group {
   display: flex;
