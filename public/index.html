@@ -6,80 +6,89 @@
   <title>Bagwan Kai Bandey — Graph-Governed Codebase Migration Cockpit</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Cytoscape.js & Dagre Hierarchical Engine -->
+  <script type="text/javascript" src="/cytoscape.min.js"></script>
+  <script type="text/javascript" src="/dagre.min.js"></script>
+  <script type="text/javascript" src="/cytoscape-dagre.js"></script>
   <!-- Vis.js Network Local Bundle -->
   <script type="text/javascript" src="/vis-network.min.js"></script>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <!-- Minimalist Unified Header -->
+  <!-- Phase 1: Minimalist Unified Header (52px, Editorial True Minimalism) -->
   <header class="navbar">
-    <div class="nav-brand">
-      <div class="logo-mark">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="#5E6AD2"/>
-        </svg>
-      </div>
-      <div class="brand-text">
+    <div class="nav-brand-group">
+      <div class="nav-brand">
+        <div class="logo-mark">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="#09090B"/>
+          </svg>
+        </div>
         <span class="brand-title">Bagwan Kai Bandey</span>
-        <span class="badge-falkor">FalkorDB</span>
       </div>
+
+      <span class="nav-slash">/</span>
+      <span id="nav-pack-name" class="nav-pack-label">express-to-fastify</span>
+      <span class="nav-badge-subtle">TypeScript</span>
+
+      <!-- Preserved DOM IDs for JS backward compatibility -->
+      <span id="nav-repo-name" style="display:none;">demo</span>
+      <span id="nav-pack-lang" style="display:none;">TypeScript</span>
+      <span id="nav-pack-shim" style="display:none;">in-file-branch</span>
     </div>
 
-    <!-- Active Target & Pack Quick Selector -->
-    <button id="btn-project-settings" class="project-pill-btn" title="Configure target repository, migration pack, and LLM provider">
-      <span class="pill-icon">📁</span>
-      <span id="nav-repo-name" class="pill-repo">demo-repo</span>
-      <span class="pill-divider">/</span>
-      <span id="nav-pack-name" class="pill-pack">express-to-fastify</span>
-      <span id="nav-pack-lang" class="pill-tag" title="Migration pack source language">ts</span>
-      <span id="nav-pack-shim" class="pill-tag pill-tag-shim" title="Shim strategy for this pack">in-file-branch</span>
-      <span class="pill-arrow">▾</span>
-    </button>
-
-    <!-- Center Inline Progress Telemetry -->
+    <!-- Center Inline Progress Telemetry Module (80px slim track) -->
     <div class="header-progress">
-      <div class="progress-track">
+      <span id="step-badge" class="step-badge">0 of 9 verified</span>
+      <div class="progress-track-slim">
         <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
       </div>
-      <div class="progress-labels">
-        <span id="step-badge" class="step-badge">0 / 0 Migrated</span>
-        <span id="progress-percent" class="percent-badge">0%</span>
-        <span id="flight-milestone" class="flight-badge">Live Stream</span>
-      </div>
+      <span id="progress-percent" class="percent-badge">0%</span>
+      <span id="flight-milestone" style="display:none;">Live Stream</span>
     </div>
 
-    <!-- Live Telemetry Status & Reset -->
+    <!-- Right Header Controls: Ghost/Icon-first secondary controls + minimal CLI sync -->
     <div class="nav-actions">
-      <div id="sync-status-badge" class="sync-status-badge" title="Real-time SSE event synchronization with BKB CLI and MCP Agent">
-        <span class="sync-indicator pulse"></span>
-        <span id="sync-text">Live Sync Active</span>
-      </div>
-      <button id="btn-reset" class="btn btn-ghost" title="Reset codebase & graph to clean baseline">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        Reset
+      <button id="btn-auto" class="btn-ghost-nav" title="Auto-play topological migration steps">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+          <line x1="19" y1="5" x2="19" y2="19"/>
+        </svg>
+        <span id="btn-auto-label">Auto-Play</span>
       </button>
+      <button id="btn-reset" class="btn-ghost-nav" title="Reset codebase & graph to clean baseline">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        <span>Reset</span>
+      </button>
+      <button id="btn-project-settings" class="btn-ghost-nav" title="Project & Migration Settings">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <div id="sync-status-badge" class="sync-status-minimal" title="Real-time SSE event synchronization with BKB CLI and MCP Agent">
+        <span class="sync-dot-minimal"></span>
+        <span id="sync-text">CLI Sync</span>
+      </div>
+      <!-- Preserved for JS executeStep() without solid black styling -->
+      <button id="btn-step" style="display: none;" title="Execute Step"></button>
     </div>
   </header>
 
-  <!-- Main Minimalist Workspace -->
+  <!-- Main Workspace -->
   <main class="cockpit-grid">
     <!-- Left Column: Dependency Graph (Maximized) -->
     <section class="card graph-pane">
-      <div class="pane-header">
-        <div class="pane-title">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          Dependency Graph
-        </div>
-        <div class="graph-badges">
-          <span class="meta-label">Click node to inspect details &amp; blast radius</span>
-          <span class="meta-divider">·</span>
-          <span class="meta-latency" id="graph-latency">FalkorDB: 1.5 ms</span>
-        </div>
-      </div>
-
-      <!-- Graph Canvas Container -->
+      <!-- Graph Canvas Container (Architectural Dot Matrix Surface) -->
       <div class="network-canvas-wrapper" style="position: relative;">
+        <!-- Top Overlay Bar inside Canvas (Phase 5.1 Minimalist Badge) -->
+        <div class="canvas-top-bar">
+          <div class="canvas-title-pill">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span>Dependency Graph</span>
+            <span class="meta-dot-sep">•</span>
+            <span class="meta-latency" id="graph-latency">FalkorDB: 1.5 ms</span>
+          </div>
+        </div>
+
         <div id="network-container" class="network-canvas"></div>
 
         <!-- Floating Blast Radius HUD Tooltip -->
@@ -160,171 +169,216 @@
             </div>
           </div>
         </aside>
-      </div>
 
-      <!-- Graph Footer: Legend & Cypher Drawer Toggle -->
-      <div class="graph-footer-bar">
-        <div class="graph-legend">
-          <span class="leg-item"><span class="leg-dot dot-pending"></span> Pending (<span id="count-pending">7</span>)</span>
-          <span class="leg-item"><span class="leg-dot dot-shimmed"></span> Shimmed (<span id="count-shimmed">0</span>)</span>
-          <span class="leg-item"><span class="leg-dot dot-verified"></span> Verified (<span id="count-verified">0</span>)</span>
-          <span class="leg-item"><span class="leg-dot dot-clean"></span> Clean (<span id="count-clean">2</span>)</span>
-          <span class="leg-item"><span class="leg-dot dot-scc"></span> 2-Node Cycle</span>
-        </div>
-        <button id="btn-toggle-cypher" class="btn-cypher-toggle" title="Toggle openCypher Query Console">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          <span>openCypher</span>
-          <span class="toggle-arrow" id="cypher-arrow">▾</span>
-        </button>
-      </div>
-
-      <!-- Collapsible openCypher Tray -->
-      <div id="cypher-drawer" class="cypher-tray" style="display: none;">
-        <div class="cypher-tray-header">
-          <div class="cypher-presets">
-            <button class="btn-preset active" data-preset="claim">Leaf Claim (Pass B)</button>
-            <button class="btn-preset" data-preset="deshim">De-shim (Pass A)</button>
-            <button class="btn-preset" data-preset="scc">Tarjan SCCs</button>
-            <button class="btn-preset" data-preset="pagerank">PageRank</button>
-            <button class="btn-preset" data-preset="blast">Blast Radius</button>
+        <!-- Phase 5.2: Slimmed-Down Floating Dock -->
+        <div class="graph-floating-dock">
+          <div class="graph-legend">
+            <span class="leg-item"><span class="leg-dot dot-pending"></span> <span id="count-pending">7</span> Pending</span>
+            <span class="leg-item"><span class="leg-dot dot-claimed"></span> <span id="count-shimmed">0</span> Active</span>
+            <span class="leg-item"><span class="leg-dot dot-verified"></span> <span id="count-verified">0</span> Verified</span>
+            <span class="leg-item"><span class="leg-dot dot-scc"></span> 1 Cycle</span>
+            <!-- Preserved for JS updates -->
+            <span id="count-clean" style="display:none;">2</span>
           </div>
-          <span id="cypher-latency-badge" class="badge-cypher-latency">1.2 ms</span>
+          <div class="dock-divider"></div>
+          <div class="graph-footer-actions">
+            <button id="btn-toggle-controls" class="btn-dock-pill" title="Toggle Zoom, Filters & Search Controls">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+              </svg>
+              <span>Filters</span>
+              <span class="toggle-arrow" id="controls-arrow">▾</span>
+            </button>
+            <button id="btn-toggle-cypher" class="btn-dock-pill" title="Toggle openCypher Query Console">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              <span>Cypher</span>
+              <span class="toggle-arrow" id="cypher-arrow">▾</span>
+            </button>
+          </div>
         </div>
-        <div class="cypher-terminal-body">
-          <pre id="cypher-query-display" class="cypher-code"><code><span class="cypher-kw">MATCH</span> (m:<span class="cypher-lbl">Module</span> {status: <span class="cypher-str">'PENDING'</span>})
+
+        <!-- Collapsible Floating Controls Tray -->
+        <div id="controls-drawer" class="controls-tray floating-tray" style="display: none;">
+          <div class="bottom-controls-content">
+            <div class="canvas-btn-group">
+              <button id="btn-zoom-in" class="canvas-tool-btn" title="Zoom In">+</button>
+              <button id="btn-zoom-out" class="canvas-tool-btn" title="Zoom Out">−</button>
+              <button id="btn-zoom-fit" class="canvas-tool-btn" title="Fit to Screen">⛶</button>
+              <button id="btn-toggle-direction" class="canvas-tool-btn" title="Toggle Topological Direction (Callee-First Bottom-Up / Top-Down)">⇄</button>
+            </div>
+            <div class="canvas-filter-group">
+              <button class="filter-chip active" data-filter="all">All</button>
+              <button class="filter-chip" data-filter="pending">Pending</button>
+              <button class="filter-chip" data-filter="shimmed">Shimmed</button>
+              <button class="filter-chip" data-filter="verified">Verified</button>
+              <button class="filter-chip" data-filter="cycles">Tarjan Cycles</button>
+            </div>
+            <div class="canvas-search-box">
+              <input type="text" id="input-search-node" placeholder="Search module..." class="canvas-search-input" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Collapsible Floating openCypher Tray -->
+        <div id="cypher-drawer" class="cypher-tray floating-tray" style="display: none;">
+          <div class="cypher-tray-header">
+            <div class="cypher-presets">
+              <button class="btn-preset active" data-preset="claim">Leaf Claim (Pass B)</button>
+              <button class="btn-preset" data-preset="deshim">De-shim (Pass A)</button>
+              <button class="btn-preset" data-preset="scc">Tarjan SCCs</button>
+              <button class="btn-preset" data-preset="pagerank">PageRank</button>
+              <button class="btn-preset" data-preset="blast">Blast Radius</button>
+            </div>
+            <span id="cypher-latency-badge" class="badge-cypher-latency">1.2 ms</span>
+          </div>
+          <div class="cypher-terminal-body">
+            <pre id="cypher-query-display" class="cypher-code"><code><span class="cypher-kw">MATCH</span> (m:<span class="cypher-lbl">Module</span> {status: <span class="cypher-str">'PENDING'</span>})
 <span class="cypher-kw">OPTIONAL MATCH</span> (m)-[:<span class="cypher-rel">IMPORTS</span>*1..10]->(blocker:<span class="cypher-lbl">Module</span>)
 <span class="cypher-kw">WHERE</span> blocker.scc_id <> m.scc_id <span class="cypher-kw">AND</span> blocker.status <span class="cypher-kw">IN</span> <span class="cypher-fn">$blocking</span>
 <span class="cypher-kw">WITH</span> m, <span class="cypher-fn">count</span>(<span class="cypher-kw">DISTINCT</span> blocker) <span class="cypher-kw">AS</span> blockerCount
 <span class="cypher-kw">WHERE</span> blockerCount = 0
 <span class="cypher-kw">WITH</span> m <span class="cypher-kw">ORDER BY</span> m.scc_size <span class="cypher-kw">ASC</span>, m.pagerank <span class="cypher-kw">DESC</span>, m.path <span class="cypher-kw">ASC LIMIT</span> 1
 <span class="cypher-kw">RETURN</span> m.path, m.scc_id, m.pagerank</code></pre>
-          <div id="cypher-rationale" class="cypher-rationale">
-            FalkorDB evaluates topological blockers in O(1) indexed query time without full AST re-traversals.
+            <div id="cypher-rationale" class="cypher-rationale">
+              FalkorDB evaluates topological blockers in O(1) indexed query time without full AST re-traversals.
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Right Column: 2 Consolidated Cards -->
+    <!-- Phase 2.1 & 2.2: Right Column — Dedicated Full-Height Topological Journey & Code Panel -->
     <aside class="sidebar-pane">
-      <!-- Card 1: Active Migration Target & Code Diff -->
-      <div class="card active-diff-card">
-        <div class="pane-header">
-          <div class="target-header-left">
-            <span class="pane-title" id="target-title">Active Migration Target</span>
+      <div class="card active-diff-card full-sidebar-card">
+        <!-- Section 2.1: Clean 2-Row Header Structure (p-4, no wrapping, no button squishing) -->
+        <div class="pane-header-2row">
+          <!-- Row 1: Eyebrow + Status Pill on Left, Action Buttons on Right -->
+          <div class="target-row-1">
+            <div class="target-status-group">
+              <span class="target-eyebrow" id="target-eyebrow">TARGET MODULE</span>
+              <span id="phase-badge" class="phase-pill-compact">READY</span>
+            </div>
+            <div class="target-actions-group">
+              <button id="btn-replay-traversal" class="btn-replay-pill" title="Animate Hop-by-Hop Traversal on Graph">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19"/></svg>
+                <span>Replay</span>
+              </button>
+              <button id="btn-step-card" class="btn-step-primary" title="Execute next topological migration step">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <span>Step</span>
+              </button>
+            </div>
+          </div>
+          <!-- Row 2: Filename Title on Dedicated Line (Truncated, never wraps or pushes buttons) -->
+          <div class="target-row-2">
+            <span class="target-filename-title" id="target-title" title="Topological Migration Stepper">
+              Topological Migration Stepper
+            </span>
             <span id="diff-file-label" class="diff-file-badge" style="display: none;"></span>
           </div>
-          <span id="phase-badge" class="phase-pill phase-idle">READY</span>
         </div>
 
-        <!-- Target details summary (only shown if needed, e.g. SCC notice or proof) -->
-        <div id="target-meta" class="target-meta-box" style="display: none;"></div>
+        <!-- Section 2.2: Non-Scrolling Compact 4-Pill Grid (No Horizontal Scrollbars!) -->
+        <div class="safety-compact-grid">
+          <div class="safety-grid-col">
+            <span class="safety-dot dot-pass"></span>
+            <span class="safety-lbl">TS</span>
+            <strong id="gate-tsc" class="safety-val">PASS</strong>
+          </div>
+          <div class="safety-grid-col">
+            <span class="safety-lbl">Tests</span>
+            <strong id="gate-test" class="safety-val">6/6</strong>
+          </div>
+          <div class="safety-grid-col">
+            <span class="safety-lbl">Routes</span>
+            <strong id="gate-routes" class="safety-val">100%</strong>
+          </div>
+          <div class="safety-grid-col">
+            <span class="safety-lbl">SLA</span>
+            <strong id="gate-falkor" class="safety-val">&lt; 2 ms</strong>
+          </div>
+          <span id="gate-overall-badge" style="display: none;">GATES INTACT</span>
+        </div>
 
-        <!-- Multi-File Tabs Container for SCC cycles -->
-        <div id="diff-tabs" class="diff-tabs-bar" style="display: none;"></div>
+        <!-- Section 5.2: Segmented Control Tabs (Topological Hops | Code Changes) -->
+        <div class="view-switch-bar">
+          <button class="view-tab-btn active" id="tab-btn-hops">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Topological Hops
+          </button>
+          <button class="view-tab-btn" id="tab-btn-diff">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Code Changes (Diff)
+          </button>
+        </div>
 
-        <!-- Code Diff Viewer -->
-        <div id="diff-viewer" class="diff-body">
-          <div class="mission-deck">
-            <div class="mission-header">
-              <div class="mission-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                  <polyline points="2 17 12 22 22 17"/>
-                  <polyline points="2 12 12 17 22 12"/>
-                </svg>
-              </div>
-              <div class="mission-details">
-                <div class="mission-title">Graph-Governed Migration Deck</div>
-                <div class="mission-subtitle">Live SSE Stream &middot; Listening for Agent Telemetry</div>
-              </div>
-            </div>
-
-            <div class="mission-invariants-grid">
-              <div class="invariant-card">
-                <div class="inv-icon">🔒</div>
-                <div class="inv-info">
-                  <div class="inv-title">Route Invariants</div>
-                  <div class="inv-desc">HTTP signatures &amp; middleware parity verified 100%</div>
+        <!-- View 1: Hop Pipeline (Section 3 & 4) -->
+        <div id="journey-view" class="journey-body">
+          <div id="hop-pipeline" class="hop-pipeline-track">
+            <!-- Phase 4: Clean Left-Aligned Editorial Onboarding Empty State -->
+            <div class="journey-empty-state-editorial">
+              <div class="empty-state-header">
+                <div class="empty-state-title">Topological Migration Stepper</div>
+                <div class="empty-state-desc">
+                  Click <strong>Step</strong> above or tap any module on the graph to watch the sequential caller-to-target dependency traversal in real time.
                 </div>
               </div>
-              <div class="invariant-card">
-                <div class="inv-icon">🔄</div>
-                <div class="inv-info">
-                  <div class="inv-title">Atomic Tarjan SCC</div>
-                  <div class="inv-desc">Circular dependency cycles migrated simultaneously</div>
+              <div class="editorial-principles-list">
+                <div class="editorial-principle-item">
+                  <span class="principle-number">1</span>
+                  <div class="principle-content">
+                    <strong>Leaves First:</strong> Modules with 0 outgoing dependencies are migrated first so upstream callers never break.
+                  </div>
+                </div>
+                <div class="editorial-principle-item">
+                  <span class="principle-number">2</span>
+                  <div class="principle-content">
+                    <strong>Atomic Cycles:</strong> Circular dependencies (auditA ↔ auditB) are migrated together to prevent compile errors.
+                  </div>
+                </div>
+                <div class="editorial-principle-item">
+                  <span class="principle-number">3</span>
+                  <div class="principle-content">
+                    <strong>100% Gate Verification:</strong> TypeScript compiler &amp; 6/6 route tests run before and after every step.
+                  </div>
                 </div>
               </div>
-              <div class="invariant-card">
-                <div class="inv-icon">🚦</div>
-                <div class="inv-info">
-                  <div class="inv-title">Zero Broken Commits</div>
-                  <div class="inv-desc">TypeScript compilation verified at every topological gate</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mission-status-callout">
-              <span class="sync-indicator pulse"></span>
-              <span>Live Telemetry Synchronized. Listening for agent tool calls from <strong>OpenCode</strong> / <strong>Claude</strong> / <strong>CLI</strong>.</span>
             </div>
           </div>
         </div>
 
-        <!-- Proof footer (compact) -->
-        <div id="proof-container" class="proof-footer" style="display: none;">
-          <span class="proof-label">Shortest Path:</span>
-          <span id="proof-text" class="proof-text"></span>
-        </div>
-      </div>
-
-      <!-- Card 2: Verification Gates & Episode Audit -->
-      <div class="card verify-audit-card">
-        <div class="pane-header">
-          <div class="pane-title">Verification &amp; Audit</div>
-          <span class="gate-overall" id="gate-overall-badge">GATES INTACT</span>
+        <!-- View 2: Code Diff Viewer (Section 5.4) -->
+        <div id="diff-view" class="diff-view-pane" style="display: none;">
+          <!-- Multi-File Tabs Container for SCC cycles -->
+          <div id="diff-tabs" class="diff-tabs-bar" style="display: none;"></div>
+          <div id="diff-viewer" class="diff-body"></div>
         </div>
 
-        <!-- Compact Single-Line Gates HUD -->
-        <div class="gates-inline-strip">
-          <div class="gate-inline-item">
-            <span class="gate-name">Typecheck</span>
-            <span class="gate-val" id="gate-tsc">PASS</span>
+        <!-- Hidden legacy elements for complete backward compatibility with background tasks & scripts -->
+        <div style="display: none;">
+          <div id="step-story-card"></div>
+          <div id="target-meta"></div>
+          <div id="proof-container"><span id="proof-text"></span></div>
+          <div id="node-dossier">
+            <span id="dossier-layer"></span>
+            <span id="dossier-file"></span>
+            <span id="dossier-status-text"></span>
+            <div id="dossier-loop-alert"><span id="dossier-loop-text"></span></div>
+            <span id="dossier-callers-count"></span>
+            <div id="dossier-callers-chips"></div>
+            <button id="btn-close-dossier"></button>
+            <button id="btn-dossier-trace"></button>
           </div>
-          <span class="gate-sep">·</span>
-          <div class="gate-inline-item">
-            <span class="gate-name">Tests</span>
-            <span class="gate-val" id="gate-test">6/6</span>
-          </div>
-          <span class="gate-sep">·</span>
-          <div class="gate-inline-item">
-            <span class="gate-name">Routes</span>
-            <span class="gate-val" id="gate-routes">100%</span>
-          </div>
-          <span class="gate-sep">·</span>
-          <div class="gate-inline-item">
-            <span class="gate-name">Latency</span>
-            <span class="gate-val" id="gate-falkor">&lt; 2 ms</span>
-          </div>
-        </div>
-
-        <!-- Chronological Episode Audit Stream -->
-        <div id="audit-feed" class="audit-feed-list">
-          <div class="audit-empty-state">
-            <div class="audit-empty-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-            </div>
-            <div class="audit-empty-title">Audit Ledger Standing By</div>
-            <div class="audit-empty-desc">FalkorDB cryptographically tracks every claimed module, gate evaluation, and verified commit.</div>
+          <div id="migration-roadmap-view">
+            <span id="roadmap-step-indicator"></span>
+            <div id="audit-feed"></div>
           </div>
         </div>
       </div>
     </aside>
   </main>
 
-  <!-- Project & Execution Settings Modal -->
+  <!-- Phase 6: Project & Execution Settings Modal -->
   <div id="project-settings-modal" class="modal-overlay" style="display: none;">
     <div class="modal-card settings-card">
       <div class="modal-header-row">
@@ -350,12 +404,11 @@
           <span class="form-hint">Loaded from <code>packs/</code> or custom pack manifests.</span>
         </div>
 
-
         <div class="modal-actions-bar">
           <button id="btn-save-settings" type="button" class="btn btn-primary">
             Ingest &amp; Load Graph
           </button>
-          <button id="btn-cancel-settings" type="button" class="btn btn-ghost">
+          <button id="btn-cancel-settings" type="button" class="btn btn-secondary">
             Cancel
           </button>
         </div>
@@ -363,30 +416,29 @@
     </div>
   </div>
 
-  <!-- Step 11 Production Sign-off & Audit Verification Modal -->
+  <!-- Phase 6: Step 11 Production Sign-off & Audit Verification Modal -->
   <div id="victory-modal" class="modal-overlay" style="display: none;">
     <div class="modal-card">
       <div class="modal-header-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
         </svg>
       </div>
 
       <h2 class="modal-title">Codebase Migration Verified</h2>
       <p class="modal-subtitle">
-        100% Graph-Governed Express-to-Fastify migration successfully verified. All verification gates intact across 11 intermediate commits.
+        100% Graph-Governed Express-to-Fastify transformation verified. All verification gates intact across 11 intermediate commits.
       </p>
 
-      <!-- Scorecard Summary Grid -->
+      <!-- 4-Column KPI Grid -->
       <div class="scorecard-grid">
         <div class="scorecard-box">
           <div class="score-num">9 / 9</div>
           <div class="score-lbl">Files Migrated</div>
         </div>
-        <div class="scorecard-box highlight-green">
+        <div class="scorecard-box">
           <div class="score-num">0</div>
-          <div class="score-lbl">Broken Commits</div>
+          <div class="score-lbl">Broken Contracts</div>
         </div>
         <div class="scorecard-box">
           <div class="score-num">0 lines</div>
@@ -400,7 +452,6 @@
 
       <!-- Architectural Evaluation Table -->
       <div class="benchmark-table-box">
-        <div class="table-header-title">Architectural Evaluation: Bagwan Kai Bandey vs Naive LLM Grep Agent</div>
         <table class="benchmark-table">
           <thead>
             <tr>
@@ -412,23 +463,23 @@
           <tbody>
             <tr>
               <td>Cyclic Dependencies</td>
-              <td class="text-danger">Failed (circular deadlock)</td>
-              <td class="text-success">Tarjan SCC Atomic Migration</td>
+              <td><span class="text-danger">Failed (circular deadlock)</span></td>
+              <td><span class="text-success">Tarjan SCC Atomic Migration</span></td>
             </tr>
             <tr>
               <td>Intermediate Typecheck</td>
-              <td class="text-danger">Failed 4 intermediate commits</td>
-              <td class="text-success">100% Clean Pass (Every Step)</td>
+              <td><span class="text-danger">Failed 4 intermediate commits</span></td>
+              <td><span class="text-success">100% Clean Pass (Every Step)</span></td>
             </tr>
             <tr>
               <td>Route Invariant Parity</td>
-              <td class="text-danger">33% Match (breaking route drift)</td>
-              <td class="text-success">100% Match (6/6 Integration Tests)</td>
+              <td><span class="text-danger">33% Match (breaking route drift)</span></td>
+              <td><span class="text-success">100% Match (6/6 Integration Tests)</span></td>
             </tr>
             <tr>
               <td>Residual Technical Debt</td>
-              <td class="text-danger">18 unverified shims remaining</td>
-              <td class="text-success">0 Residual Shims (Pure Fastify)</td>
+              <td><span class="text-danger">18 unverified shims remaining</span></td>
+              <td><span class="text-success">0 Residual Shims (Pure Fastify)</span></td>
             </tr>
           </tbody>
         </table>
@@ -447,8 +498,8 @@
     </div>
   </div>
 
-  <!-- Toast Notification Container -->
-  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+  <!-- Toast Notification Container (Disabled) -->
+  <div id="toast-container" class="toast-container" aria-live="polite" style="display: none !important;"></div>
 
   <script src="/app.js"></script>
 </body>

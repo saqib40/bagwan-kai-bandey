@@ -3,13 +3,13 @@
  * Clean, distraction-free architecture powered by FalkorDB openCypher graph engine.
  */
 
-// ── Status Color Mapping (Matte Engineering Palette) ──────
+// ── Status Color Mapping (High-Definition Light Palette) ──
 const STATUS_COLORS = {
-  CLEAN: { border: '#475569', background: '#1E293B', highlight: { border: '#64748B', background: '#334155' } },
-  PENDING: { border: '#D97706', background: '#78350F', highlight: { border: '#F59E0B', background: '#92400E' } },
-  IN_PROGRESS: { border: '#3B82F6', background: '#1E3A8A', highlight: { border: '#60A5FA', background: '#1D4ED8' } },
-  SHIMMED: { border: '#8B5CF6', background: '#4C1D95', highlight: { border: '#A78BFA', background: '#5B21B6' } },
-  VERIFIED: { border: '#10B981', background: '#064E3B', highlight: { border: '#34D399', background: '#065F46' } },
+  CLEAN: { border: '#D4D4D8', background: '#FFFFFF', highlight: { border: '#09090B', background: '#F7F7F5' } },
+  PENDING: { border: '#F59E0B', background: '#FFFBEB', highlight: { border: '#B45309', background: '#FEF3C7' } },
+  IN_PROGRESS: { border: '#09090B', background: '#09090B', highlight: { border: '#09090B', background: '#18181B' } },
+  SHIMMED: { border: '#A855F7', background: '#FAF5FF', highlight: { border: '#7E22CE', background: '#F3E8FF' } },
+  VERIFIED: { border: '#10B981', background: '#ECFDF5', highlight: { border: '#047857', background: '#D1FAE5' } },
 };
 
 // ── openCypher Presets & Rationales ───────────────────────
@@ -93,180 +93,423 @@ let currentAppInfo = {
 let observerInterval = null;
 let activeDrawerNode = null;
 
-// ── Hairline Compass Ring for Active Target ───────────────
-let radarPulseRadius = 0;
-let radarAnimationId = null;
+// ── Cytoscape.js & Dagre Graph Engine ─────────────────────
+let cy = null;
+let currentRankDir = 'TB'; // Top-Down layout per Master UI Overhaul
+let currentStatusFilter = 'all';
+let activeTraversalTimer = null;
+let lastProofHops = [];
 
-function startRadarPulse() {
-  if (radarAnimationId) return;
-
-  function loop() {
-    radarPulseRadius = (radarPulseRadius + 0.35) % 20;
-    if (network && activeTargetPaths.length > 0) {
-      network.redraw();
-    }
-    radarAnimationId = requestAnimationFrame(loop);
-  }
-  radarAnimationId = requestAnimationFrame(loop);
-}
-
-// ── Initialize Vis.js Network ─────────────────────────────
 function initNetwork(modules, edges) {
   const container = document.getElementById('network-container');
   allModulesCache = modules;
   allEdgesCache = edges;
 
-  if (typeof vis === 'undefined') {
-    console.error('Vis.js is not loaded!');
-    container.innerHTML = '<div style="color:#F43F5E;padding:20px;text-align:center;">Vis.js failed to load.</div>';
+  if (typeof cytoscape === 'undefined') {
+    console.error('Cytoscape.js is not loaded!');
+    container.innerHTML = '<div style="color:#F43F5E;padding:20px;text-align:center;">Cytoscape.js failed to load.</div>';
     return;
   }
 
-  const nodes = modules.map((m) => {
-    const isCycle = (m.sccSize ?? 1) > 1;
-    const baseColors = STATUS_COLORS[m.status] || STATUS_COLORS.PENDING;
-    const label = m.path.replace(/^src\//, '');
-    const size = Math.max(15, Math.min(32, Math.round((m.pagerank || 0.1) * 150 + 14)));
-
-    return {
-      id: m.path,
-      label,
-      title: `${m.path}\nStatus: ${m.status}\nPageRank: ${Number(m.pagerank ?? 0).toFixed(4)}\nPending Callers: ${m.pendingCallers ?? 0}\nSCC Size: ${m.sccSize ?? 1}`,
-      size,
-      value: size,
-      shape: 'dot',
-      color: isCycle ? { ...baseColors, border: '#F43F5E' } : baseColors,
-      borderWidth: isCycle ? 2.5 : 1.2,
-      font: {
-        color: '#E2E8F0',
-        face: 'JetBrains Mono, monospace',
-        size: 11,
-        strokeWidth: 2,
-        strokeColor: '#08090C',
-      },
-      shadow: {
-        enabled: true,
-        color: 'rgba(0, 0, 0, 0.4)',
-        size: 3,
-        x: 0,
-        y: 1,
-      },
-      moduleData: m,
-    };
-  });
-
-  const formattedEdges = edges.map((e, idx) => {
-    const isCycleEdge = (e.source.includes('audit') && e.target.includes('audit'));
-    return {
-      id: `edge-${idx}`,
-      from: e.source,
-      to: e.target,
-      arrows: { to: { enabled: true, scaleFactor: 0.55 } },
-      color: isCycleEdge ? { color: '#F43F5E', highlight: '#FB7185' } : { color: 'rgba(148, 163, 184, 0.28)', highlight: '#5E6AD2' },
-      dashes: isCycleEdge,
-      width: isCycleEdge ? 1.8 : 1.1,
-      smooth: { type: 'curvedCW', roundness: 0.15 },
-    };
-  });
-
-  nodesDataSet = new vis.DataSet(nodes);
-  edgesDataSet = new vis.DataSet(formattedEdges);
-
-  const options = {
-    physics: {
-      enabled: true,
-      barnesHut: {
-        gravitationalConstant: -2400,
-        centralGravity: 0.35,
-        springLength: 115,
-        springConstant: 0.05,
-        damping: 0.12,
-        avoidOverlap: 0.3,
-      },
-      stabilization: {
-        enabled: true,
-        iterations: 150,
-      },
-    },
-    nodes: {
-      shape: 'dot',
-      scaling: { min: 14, max: 32 },
-    },
-    interaction: {
-      hover: true,
-      tooltipDelay: 80,
-      zoomView: true,
-    },
-    autoResize: true,
-    height: '100%',
-    width: '100%',
-  };
-
-  network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
-
-  // Hairline Compass Ring around Active Targets
-  network.on('afterDrawing', (ctx) => {
-    if (!activeTargetPaths.length) return;
-
-    try {
-      const positions = network.getPositions(activeTargetPaths);
-      for (const path of activeTargetPaths) {
-        const pos = positions[path];
-        if (!pos) continue;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 18 + radarPulseRadius, 0, 2 * Math.PI, false);
-        const alpha = Math.max(0, 0.5 - (radarPulseRadius / 20));
-        ctx.strokeStyle = `rgba(94, 106, 210, ${alpha})`;
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
-        ctx.restore();
+  // Group SCC cycle members (sccSize > 1) into compound parent clusters
+  const sccClusters = new Map();
+  for (const m of modules) {
+    const sccId = m.sccId ?? 0;
+    const sccSize = m.sccSize ?? 1;
+    if (sccSize > 1) {
+      if (!sccClusters.has(sccId)) {
+        sccClusters.set(sccId, []);
       }
-    } catch {
-      // Ignore transient canvas exceptions
+      sccClusters.get(sccId).push(m);
     }
+  }
+
+  const elements = [];
+
+  // 1. Add Compound Parent Nodes for Circular Tarjan SCC Cycles
+  for (const [sccId, members] of sccClusters) {
+    elements.push({
+      group: 'nodes',
+      data: {
+        id: `scc-cluster-${sccId}`,
+        label: `Tarjan Cycle (SCC #${sccId} · ${members.length} modules)`,
+        isCompoundParent: true,
+      },
+      classes: 'compound-scc-parent',
+    });
+  }
+
+  // 2. Add Module Nodes
+  for (const m of modules) {
+    const isCycle = (m.sccSize ?? 1) > 1;
+    const label = m.path.replace(/^src\//, '');
+    const size = Math.max(28, Math.min(54, Math.round((m.pagerank || 0.1) * 160 + 26)));
+    const parentId = isCycle ? `scc-cluster-${m.sccId}` : undefined;
+
+    elements.push({
+      group: 'nodes',
+      data: {
+        id: m.path,
+        label,
+        status: m.status,
+        pagerank: Number(m.pagerank ?? 0),
+        pendingCallers: Number(m.pendingCallers ?? 0),
+        sccSize: Number(m.sccSize ?? 1),
+        sccId: Number(m.sccId ?? 0),
+        inDegree: Number(m.inDegree ?? 0),
+        size,
+        parent: parentId,
+        fullPath: m.path,
+        moduleData: m,
+      },
+      classes: `status-${m.status.toLowerCase()}${isCycle ? ' scc-member' : ''}${activeTargetPaths.includes(m.path) ? ' active-target' : ''}`,
+    });
+  }
+
+  // 3. Add Import & Cycle Edges
+  edges.forEach((e, idx) => {
+    const isCycleEdge = (e.source.includes('audit') && e.target.includes('audit')) ||
+      (modules.find(m => m.path === e.source)?.sccId === modules.find(m => m.path === e.target)?.sccId && (modules.find(m => m.path === e.source)?.sccSize ?? 1) > 1);
+
+    elements.push({
+      group: 'edges',
+      data: {
+        id: `edge-${idx}`,
+        source: e.source,
+        target: e.target,
+        relationship: ':IMPORTS',
+        isCycleEdge,
+      },
+      classes: `edge-imports${isCycleEdge ? ' cycle-edge' : ''}`,
+    });
   });
 
-  network.once('stabilizationIterationsDone', () => {
-    network.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+  if (cy) {
+    cy.destroy();
+  }
+
+  cy = cytoscape({
+    container,
+    elements,
+    boxSelectionEnabled: false,
+    autounselectify: false,
+    style: [
+      // 1. Base Module Node (Crisp White Hardware Chip)
+      {
+        selector: 'node',
+        style: {
+          'shape': 'round-rectangle',
+          'width': 195,
+          'height': 52,
+          'background-color': '#FFFFFF',
+          'border-width': 1.5,
+          'border-color': '#D4D4D8',
+          'label': 'data(label)',
+          'text-wrap': 'wrap',
+          'text-max-width': 175,
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'color': '#09090B',
+          'font-family': 'JetBrains Mono, monospace',
+          'font-size': 11.5,
+          'font-weight': 600,
+          'transition-property': 'background-color, border-color, border-width, opacity',
+          'transition-duration': '220ms',
+        },
+      },
+
+      // 2. Pending Node State
+      {
+        selector: 'node[status="PENDING"], node.pending, node.status-pending',
+        style: {
+          'background-color': '#FFFFFF',
+          'border-color': '#D4D4D8',
+          'color': '#09090B',
+        },
+      },
+
+      // 3. Active / Claimed / Hop-Active Node (Pure Black Pill with Crisp White Text)
+      {
+        selector: 'node[status="CLAIMED"], node.claimed, node.hop-active, node:selected, node.active-target, node.status-in_progress',
+        style: {
+          'background-color': '#09090B',
+          'border-color': '#09090B',
+          'border-width': 2.5,
+          'color': '#FFFFFF',
+          'z-index': 999,
+        },
+      },
+
+      // 4. Verified Node State (Rich Emerald Tint)
+      {
+        selector: 'node[status="VERIFIED"], node.verified, node.status-verified',
+        style: {
+          'background-color': '#ECFDF5',
+          'border-color': '#10B981',
+          'border-width': 2,
+          'color': '#065F46',
+        },
+      },
+
+      // 5. Atomic Cycle Member Node (Crisp White with Refined Rose Border)
+      {
+        selector: 'node[status="CYCLE"], node.cycle, node.scc-member',
+        style: {
+          'background-color': '#FFFFFF',
+          'border-color': '#F43F5E',
+          'border-width': 1.5,
+          'color': '#881337',
+        },
+      },
+
+      // 6. SCC Compound Parent Box (Airy Rose Tint with Bottom Label to prevent edge collision)
+      {
+        selector: ':parent, node.cluster, node.scc-cluster, .compound-scc-parent',
+        style: {
+          'shape': 'round-rectangle',
+          'background-color': '#FFF1F2',
+          'background-opacity': 0.45,
+          'border-color': '#FDA4AF',
+          'border-width': 1.5,
+          'border-style': 'dashed',
+          'padding': 28,
+          'label': 'data(label)',
+          'text-valign': 'bottom',
+          'text-halign': 'center',
+          'text-margin-y': 8,
+          'font-family': 'Inter, sans-serif',
+          'font-size': 11,
+          'font-weight': 600,
+          'color': '#BE123C',
+        },
+      },
+
+      // 7. Base Directed Edges
+      {
+        selector: 'edge',
+        style: {
+          'width': 1.75,
+          'curve-style': 'bezier',
+          'line-color': '#A1A1AA',
+          'target-arrow-color': '#A1A1AA',
+          'target-arrow-shape': 'triangle',
+          'arrow-scale': 0.9,
+          'font-family': 'JetBrains Mono, monospace',
+          'font-size': 9.5,
+          'color': '#52525B',
+          'text-background-opacity': 1,
+          'text-background-color': '#F7F7F5',
+          'text-background-padding': 3,
+          'transition-property': 'line-color, width, opacity',
+          'transition-duration': '220ms',
+        },
+      },
+
+      // 8. Active Hop Traversal Edge
+      {
+        selector: 'edge.hop-active, edge.active, edge.hop-active-edge',
+        style: {
+          'width': 3,
+          'line-color': '#09090B',
+          'target-arrow-color': '#09090B',
+          'line-style': 'dashed',
+          'line-dash-pattern': [7, 4],
+          'color': '#09090B',
+          'font-weight': 700,
+          'z-index': 999,
+        },
+      },
+
+      // 9. SCC Cycle Edge
+      {
+        selector: 'edge.cycle-edge',
+        style: {
+          'width': 2.2,
+          'line-color': '#F43F5E',
+          'target-arrow-color': '#F43F5E',
+          'line-style': 'dashed',
+        },
+      },
+
+      // 10. Dimmed Non-Active Elements (Keep 100% Legible at 0.48 Opacity!)
+      {
+        selector: '.dimmed',
+        style: {
+          'opacity': 0.48,
+        },
+      },
+    ],
   });
 
-  setTimeout(() => {
-    if (network) {
-      network.redraw();
-      network.fit();
-    }
-  }, 200);
+  runDagreLayout(false);
 
   // Click handler
-  network.on('click', (params) => {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0];
-      highlightBlastRadius(nodeId);
-      openNodeInspector(nodeId);
-      inspectNodeInDiffViewer(nodeId);
-    } else {
+  cy.on('tap', 'node', (evt) => {
+    const node = evt.target;
+    if (node.isParent()) return;
+    const nodeId = node.id();
+    highlightBlastRadius(nodeId);
+    openNodeInspector(nodeId);
+    inspectNodeInDiffViewer(nodeId);
+    parseAndAnimateProof(null, [nodeId], { targetPaths: [nodeId], phase: 'INSPECT' });
+  });
+
+  // Background tap handler
+  cy.on('tap', (evt) => {
+    if (evt.target === cy) {
       clearBlastRadius();
       closeNodeInspector();
       renderMissionDeck();
     }
   });
 
-  // Hover handler
-  network.on('hoverNode', (params) => {
+  // Hover handlers
+  cy.on('mouseover', 'node', (evt) => {
+    const node = evt.target;
+    if (node.isParent()) return;
     if (!blastRadiusActiveNode) {
-      showFloatingHud(params.node);
+      showFloatingHud(node.id());
     }
   });
 
-  network.on('blurNode', () => {
+  cy.on('mouseout', 'node', () => {
     if (!blastRadiusActiveNode) {
       hideFloatingHud();
     }
   });
 
-  startRadarPulse();
+  bindCanvasControls();
+
+  // Backward compatibility object
+  window.network = {
+    fit: () => cy && cy.fit(undefined, 45),
+    focus: (nodeId, opts) => {
+      if (!cy) return;
+      const el = cy.getElementById(nodeId);
+      if (el && el.length) {
+        cy.animate({ center: { eles: el }, zoom: 1.25 }, { duration: opts?.animation?.duration ?? 350 });
+      }
+    },
+    redraw: () => {},
+  };
+}
+
+// ── Run Dagre Hierarchical Layout ─────────────────────────
+function runDagreLayout(animate = true) {
+  if (!cy) return;
+  const layout = cy.layout({
+    name: 'dagre',
+    rankDir: currentRankDir || 'TB', // Top-to-Bottom clean flow
+    nodeSep: 60,
+    rankSep: 78,
+    animate: animate,
+    animationDuration: 380,
+    fit: true,
+    padding: 45,
+  });
+  layout.run();
+  setTimeout(() => {
+    if (cy) cy.fit(undefined, 45);
+  }, 450);
+}
+
+// ── Floating Canvas Controls & Filters ────────────────────
+let canvasControlsBound = false;
+function bindCanvasControls() {
+  if (canvasControlsBound) return;
+  canvasControlsBound = true;
+
+  document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
+    if (cy) cy.zoom({ level: cy.zoom() * 1.25, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+  });
+
+  document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
+    if (cy) cy.zoom({ level: cy.zoom() * 0.8, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+  });
+
+  document.getElementById('btn-zoom-fit')?.addEventListener('click', () => {
+    if (cy) cy.fit(undefined, 45);
+  });
+
+  document.getElementById('btn-toggle-direction')?.addEventListener('click', () => {
+    currentRankDir = currentRankDir === 'BT' ? 'TB' : 'BT';
+    runDagreLayout(true);
+    showToast('Layout Orientation', `Switched layout to ${currentRankDir === 'BT' ? 'Callee-First (Bottom-Up)' : 'Top-Down'}`);
+  });
+
+  // Filter chips
+  document.querySelectorAll('.filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      const filter = chip.dataset.filter;
+      currentStatusFilter = filter;
+      applyStatusFilter(filter);
+    });
+  });
+
+  // Search input
+  document.getElementById('input-search-node')?.addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    if (!cy) return;
+    if (!q) {
+      applyStatusFilter(currentStatusFilter);
+      return;
+    }
+    cy.batch(() => {
+      cy.nodes().forEach((n) => {
+        if (n.isParent()) return;
+        const match = n.id().toLowerCase().includes(q) || (n.data('label') || '').toLowerCase().includes(q);
+        if (match) {
+          n.removeClass('dimmed');
+        } else {
+          n.addClass('dimmed');
+        }
+      });
+    });
+  });
+
+  // Replay Traversal Button
+  document.getElementById('btn-replay-traversal')?.addEventListener('click', () => {
+    if (lastProofHops.length > 0) {
+      animateTraversal(lastProofHops);
+    } else if (blastRadiusActiveNode) {
+      highlightBlastRadius(blastRadiusActiveNode);
+    }
+  });
+}
+
+function applyStatusFilter(filter) {
+  if (!cy) return;
+  cy.batch(() => {
+    cy.elements().removeClass('dimmed');
+    if (filter === 'all') return;
+
+    if (filter === 'cycles') {
+      cy.nodes().forEach((n) => {
+        if (n.isParent()) {
+          n.removeClass('dimmed');
+          return;
+        }
+        if ((n.data('sccSize') ?? 1) > 1) {
+          n.removeClass('dimmed');
+        } else {
+          n.addClass('dimmed');
+        }
+      });
+      return;
+    }
+
+    const targetStatus = filter.toUpperCase();
+    cy.nodes().forEach((n) => {
+      if (n.isParent()) return;
+      if (n.data('status') === targetStatus) {
+        n.removeClass('dimmed');
+      } else {
+        n.addClass('dimmed');
+      }
+    });
+  });
 }
 
 // ── Interactive Blast Radius Traversal ────────────────────
@@ -298,42 +541,417 @@ function highlightBlastRadius(nodeId) {
   const callers = getTransitiveCallers(nodeId);
   const callersSet = new Set(callers);
 
-  const updates = allModulesCache.map((m) => {
-    const isTarget = m.path === nodeId;
-    const isCaller = callersSet.has(m.path);
+  if (!cy) return;
 
-    if (isTarget) {
-      return {
-        id: m.path,
-        color: { background: '#3730A3', border: '#818CF8' },
-        borderWidth: 2,
-        opacity: 1.0,
-      };
-    } else if (isCaller) {
-      return {
-        id: m.path,
-        color: { background: '#78350F', border: '#F59E0B' },
-        borderWidth: 1.8,
-        opacity: 1.0,
-      };
-    } else {
-      return {
-        id: m.path,
-        color: { background: '#10131B', border: '#1C212E' },
-        borderWidth: 1,
-        opacity: 0.18,
-      };
-    }
+  // Build hop sequence from callers to target
+  const hops = callers.map((c, i) => ({
+    hopIndex: i + 1,
+    nodeId: c,
+    note: i === 0 ? 'Direct caller' : `Transitive caller (${i + 1} hops)`,
+  }));
+  hops.push({ hopIndex: hops.length + 1, nodeId, note: 'Target Module' });
+  lastProofHops = hops;
+
+  animateTraversal(hops, {
+    onComplete: () => {
+      cy.batch(() => {
+        cy.nodes().forEach((n) => {
+          if (n.isParent()) return;
+          const p = n.id();
+          if (p === nodeId) {
+            n.removeClass('dimmed').addClass('active-target');
+          } else if (callersSet.has(p)) {
+            n.removeClass('dimmed').addClass('hop-active');
+          } else {
+            n.addClass('dimmed').removeClass('active-target hop-active');
+          }
+        });
+        cy.edges().forEach((e) => {
+          if (callersSet.has(e.source().id()) && (callersSet.has(e.target().id()) || e.target().id() === nodeId)) {
+            e.removeClass('dimmed').addClass('hop-active-edge');
+          } else {
+            e.addClass('dimmed').removeClass('hop-active-edge');
+          }
+        });
+      });
+    },
   });
 
-  nodesDataSet.update(updates);
   showFloatingHud(nodeId, callers);
 }
 
 function clearBlastRadius() {
   blastRadiusActiveNode = null;
+  if (activeTraversalTimer) {
+    clearTimeout(activeTraversalTimer);
+    activeTraversalTimer = null;
+  }
   hideFloatingHud();
-  updateNetworkTopology(allModulesCache);
+  if (cy) {
+    cy.batch(() => {
+      cy.elements().removeClass('dimmed hop-active hop-active-edge');
+    });
+  }
+}
+
+// ── Hop-by-Hop Sequential Traversal Animator ──────────────
+function animateTraversal(hops, options = {}) {
+  if (!cy || !hops || !hops.length) return;
+  if (activeTraversalTimer) {
+    clearTimeout(activeTraversalTimer);
+    activeTraversalTimer = null;
+  }
+
+  // Dim all elements first
+  cy.batch(() => {
+    cy.elements().removeClass('dimmed hop-active hop-active-edge active-target');
+    cy.elements().addClass('dimmed');
+  });
+
+  const stepMs = options.stepMs ?? 450;
+  let idx = 0;
+
+  function step() {
+    if (idx >= hops.length) {
+      document.querySelectorAll('#hop-pipeline .hop-card').forEach((c) => c.classList.remove('hop-pulse-active'));
+      if (options.onComplete) options.onComplete();
+      return;
+    }
+
+    const currentHop = hops[idx];
+    const nodeEl = cy.getElementById(currentHop.nodeId);
+
+    // Synchronize glowing pulse on upper panel hop card
+    const hopCards = document.querySelectorAll('#hop-pipeline .hop-card');
+    hopCards.forEach((c, cIdx) => {
+      if (cIdx === idx) {
+        c.classList.add('hop-pulse-active');
+      } else {
+        c.classList.remove('hop-pulse-active');
+      }
+    });
+
+    cy.batch(() => {
+      if (nodeEl && nodeEl.length) {
+        nodeEl.removeClass('dimmed').addClass('hop-active');
+      }
+
+      if (currentHop.viaEdgeId) {
+        const edgeEl = cy.getElementById(currentHop.viaEdgeId);
+        if (edgeEl && edgeEl.length) {
+          edgeEl.removeClass('dimmed').addClass('hop-active-edge');
+        }
+      } else if (idx > 0) {
+        const prevHop = hops[idx - 1];
+        const edgeEl = cy.edges(`[source = "${prevHop.nodeId}"][target = "${currentHop.nodeId}"]`)
+          .union(cy.edges(`[source = "${currentHop.nodeId}"][target = "${prevHop.nodeId}"]`));
+        if (edgeEl && edgeEl.length) {
+          edgeEl.removeClass('dimmed').addClass('hop-active-edge');
+        }
+      }
+    });
+
+    const proofTextEl = document.getElementById('proof-text');
+    const proofContainer = document.getElementById('proof-container');
+    if (proofTextEl && proofContainer) {
+      proofContainer.style.display = 'flex';
+      proofTextEl.innerHTML = `<span style="color:#F59E0B;font-weight:600;">Hop ${idx + 1}/${hops.length}:</span> ${currentHop.nodeId.replace(/^src\//, '')} ${currentHop.note ? `<span style="color:#94A3B8;">(${currentHop.note})</span>` : ''}`;
+    }
+
+    idx++;
+    activeTraversalTimer = setTimeout(step, stepMs);
+  }
+
+  step();
+}
+
+// ── Human-Readable Module Metadata ────────────────────────
+function getHumanModuleInfo(path) {
+  const short = (path || '').replace(/^src\//, '');
+  if (short === 'server.ts') {
+    return {
+      role: 'Root Server',
+      summary: 'Entrypoint: binds the HTTP listener and loads application routes.',
+      layer: 'Root Entrypoint',
+    };
+  }
+  if (short === 'app.ts') {
+    return {
+      role: 'App Router',
+      summary: 'Central router: dispatches incoming requests to orders and users handlers.',
+      layer: 'Router Layer',
+    };
+  }
+  if (short.includes('orders.ts')) {
+    return {
+      role: 'Orders Service',
+      summary: 'Handles order checkout; calls Auth middleware on every request.',
+      layer: 'Route Handler',
+    };
+  }
+  if (short.includes('users.ts')) {
+    return {
+      role: 'Users Service',
+      summary: 'Manages user accounts; requires authentication token verification.',
+      layer: 'Route Handler',
+    };
+  }
+  if (short.includes('auth.ts')) {
+    return {
+      role: 'Auth Middleware',
+      summary: 'Validates API keys and formats error envelopes via response helper.',
+      layer: 'Security Middleware',
+    };
+  }
+  if (short.includes('auditA.ts')) {
+    return {
+      role: 'Audit Service A',
+      summary: 'Circular loop with auditB.ts. Formats request telemetry headers.',
+      layer: 'Service Layer (Cycle)',
+    };
+  }
+  if (short.includes('auditB.ts')) {
+    return {
+      role: 'Audit Service B',
+      summary: 'Circular loop with auditA.ts. Computes telemetry request hashes.',
+      layer: 'Service Layer (Cycle)',
+    };
+  }
+  if (short.includes('response.ts')) {
+    return {
+      role: 'Response Formatter',
+      summary: 'Foundation helper for JSON responses and errors. Zero outgoing dependencies!',
+      layer: 'Foundation Leaf',
+    };
+  }
+  if (short.includes('hash.ts')) {
+    return {
+      role: 'Hash Utility',
+      summary: 'Cryptographic hashing helper for tokens and identifiers.',
+      layer: 'Foundation Leaf',
+    };
+  }
+  return {
+    role: 'Module',
+    summary: `Source module at ${short}.`,
+    layer: 'Codebase Module',
+  };
+}
+
+// ── Plain-English Step Narrative Generator ─────────────────
+function getStepStory(claim, stepNum) {
+  if (!claim || !claim.targetPaths || !claim.targetPaths.length) return null;
+  const paths = claim.targetPaths.map((p) => p.replace(/^src\//, ''));
+  const phase = claim.phase || 'SHIM';
+  const isCycle = paths.length > 1;
+
+  if (phase === 'INSPECT') {
+    const info = getHumanModuleInfo(paths[0]);
+    return {
+      title: `Inspecting: ${info.role} (${paths[0]})`,
+      why: info.summary,
+      what: `Architectural Layer: ${info.layer}. Click 'Step' or 'Auto Play' above to run the verified migration pipeline.`,
+      guarantee: `Topological guard: FalkorDB ensures this module is only migrated when safe.`,
+    };
+  }
+
+  if (phase === 'SHIM') {
+    if (isCycle) {
+      return {
+        title: `Step ${stepNum}: Circular Loop (${paths.join(' ↔ ')})`,
+        why: `These ${paths.length} files depend on each other in a mutual cycle. Migrating them separately would break the compiler. We transform both simultaneously in this atomic step.`,
+        what: `Added dual-signature Fastify support while preserving internal circular Express imports.`,
+        guarantee: `Zero broken imports: circular references stay intact throughout migration.`,
+      };
+    }
+    if (paths[0].includes('response')) {
+      return {
+        title: `Step ${stepNum}: Foundation Response Leaf`,
+        why: `This module has zero dependencies. Migrating foundation leaves first ensures no underlying code breaks when callers above are migrated.`,
+        what: `Converted JSON response helpers to Fastify with dual-signature Express fallback bridges.`,
+        guarantee: `Express callers (auth, routes) continue functioning without any modifications.`,
+      };
+    }
+    if (paths[0].includes('auth')) {
+      return {
+        title: `Step ${stepNum}: Authentication Middleware`,
+        why: `Auth is called by route handlers (orders, users). Shimmed before routes so incoming Fastify and legacy Express requests can both be authenticated.`,
+        what: `Updated requireAuth() to accept FastifyRequest / FastifyReply alongside Express req / res.`,
+        guarantee: `Upstream route callers can now accept both frameworks safely.`,
+      };
+    }
+    return {
+      title: `Step ${stepNum}: Route Handler (${paths[0]})`,
+      why: `Underlying middleware is prepared. We now add the Fastify route handler while preserving legacy Express routing.`,
+      what: `Converted route handler signatures to Fastify plugin format with compat-shim fallback.`,
+      guarantee: `All HTTP routes maintain 100% parameter and header parity.`,
+    };
+  } else if (phase === 'DE_SHIM') {
+    return {
+      title: `Step ${stepNum}: Clean Up Legacy Shims (${paths.join(', ')})`,
+      why: `All callers above this module have been verified on Fastify. Temporary backward-compatibility bridges are no longer needed.`,
+      what: `Removed @bkb-shim fallback branches and Express types. Pure Fastify code remains.`,
+      guarantee: `Codebase simplified to native Fastify with zero runtime regressions.`,
+    };
+  } else {
+    return {
+      title: `Step ${stepNum}: Main Application Server Cutover`,
+      why: `All underlying routes and services are dual-compatible. It is now safe to switch the root HTTP server from Express to native Fastify.`,
+      what: `Switched HTTP listener in app.ts to fastify.listen().`,
+      guarantee: `All 6 API routes continue passing integration tests.`,
+    };
+  }
+}
+
+// ── Render Vertical Hop Pipeline ──────────────────────────
+function renderHopPipeline(hops, claim, stepNum) {
+  const container = document.getElementById('hop-pipeline');
+  const storyCard = document.getElementById('step-story-card');
+  if (!container) return;
+
+  if (!hops || !hops.length) {
+    container.innerHTML = `
+      <div class="journey-empty-state-editorial">
+        <div class="empty-state-header">
+          <div class="empty-state-title">Topological Migration Stepper</div>
+          <div class="empty-state-desc">
+            Click <strong>Step</strong> above or tap any module on the graph to watch the sequential caller-to-target dependency traversal in real time.
+          </div>
+        </div>
+        <div class="editorial-principles-list">
+          <div class="editorial-principle-item">
+            <span class="principle-number">1</span>
+            <div class="principle-content">
+              <strong>Leaves First:</strong> Modules with 0 outgoing dependencies are migrated first so upstream callers never break.
+            </div>
+          </div>
+          <div class="editorial-principle-item">
+            <span class="principle-number">2</span>
+            <div class="principle-content">
+              <strong>Atomic Cycles:</strong> Circular dependencies (auditA ↔ auditB) are migrated together to prevent compile errors.
+            </div>
+          </div>
+          <div class="editorial-principle-item">
+            <span class="principle-number">3</span>
+            <div class="principle-content">
+              <strong>100% Gate Verification:</strong> TypeScript compiler &amp; 6/6 route tests run before and after every step.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    if (storyCard) storyCard.style.display = 'none';
+    return;
+  }
+
+  const targetPath = (claim?.targetPaths && claim.targetPaths[0]) || hops[hops.length - 1].nodeId;
+  const isTarget = (id) => claim?.targetPaths?.includes(id) || id === targetPath;
+
+  let html = '';
+  for (let i = 0; i < hops.length; i++) {
+    const h = hops[i];
+    const isTargetHop = isTarget(h.nodeId);
+    const info = getHumanModuleInfo(h.nodeId);
+    const short = h.nodeId.replace(/^src\//, '');
+    const numStr = (i + 1).toString().padStart(2, '0');
+
+    let badgeClass = 'hop-pill-caller';
+    let badgeText = 'Caller';
+    if (isTargetHop) {
+      badgeClass = 'hop-pill-target';
+      badgeText = claim?.phase || 'Target';
+    } else if (h.note?.toLowerCase().includes('root')) {
+      badgeClass = 'hop-pill-root';
+      badgeText = 'Root';
+    } else {
+      badgeClass = 'hop-pill-caller';
+      badgeText = 'Caller';
+    }
+
+    const layerText = info.layer || 'Module';
+    const roleText = h.note || info.role || 'Dependency';
+    const statusText = isTargetHop ? '0 Blockers' : 'Verified';
+
+    html += `
+      <div class="hop-node-row ${isTargetHop ? 'target-row' : ''}">
+        <div class="hop-card ${isTargetHop ? 'active-target-hop' : ''}" data-node-id="${escapeHtml(h.nodeId)}" title="Click to locate on graph">
+          <div class="hop-card-top">
+            <div class="hop-card-identity">
+              <span class="hop-index-pill">${numStr}</span>
+              <span class="hop-card-path" title="${escapeHtml(short)}">${escapeHtml(short)}</span>
+            </div>
+            <span class="hop-card-pill ${badgeClass}">${escapeHtml(badgeText)}</span>
+          </div>
+          <div class="hop-card-bottom">
+            <span class="hop-card-meta">${escapeHtml(layerText)} • ${escapeHtml(roleText)}</span>
+            <span class="hop-card-status ${isTargetHop ? 'text-status-target' : ''}">${statusText}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+
+  container.querySelectorAll('.hop-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const nodeId = card.getAttribute('data-node-id');
+      if (nodeId && network) {
+        network.focus(nodeId, { scale: 1.2, animation: { duration: 350 } });
+        highlightBlastRadius(nodeId);
+      }
+    });
+  });
+
+  if (storyCard) {
+    storyCard.style.display = 'none';
+  }
+}
+
+// ── Proof Traversal Parser & Animator ─────────────────────
+function parseAndAnimateProof(proofStr, targetPaths, claimObj) {
+  if (!proofStr && (!targetPaths || !targetPaths.length)) return;
+
+  const match = proofStr && proofStr.match(/Dependency proof:\s*([^\r\n]+)/);
+  if (match) {
+    const parts = match[1].split('→').map((s) => s.trim());
+    const hops = [];
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const found = allModulesCache.find((m) => {
+        const shortM = m.path.replace(/^src\//, '').replace(/\.[^/.]+$/, '');
+        return shortM === p || m.path.includes(p);
+      });
+      if (found) {
+        hops.push({
+          hopIndex: i + 1,
+          nodeId: found.path,
+          note: i === parts.length - 1 ? 'Target Module' : (i === 0 ? 'Root Caller' : 'Intermediate Caller'),
+        });
+      }
+    }
+    if (hops.length > 0) {
+      lastProofHops = hops;
+      renderHopPipeline(hops, claimObj || { targetPaths }, currentStepNumber);
+      animateTraversal(hops);
+      return;
+    }
+  }
+
+  // Fallback: if no linear proof chain or for Tarjan SCC cycles / de-shim
+  if (targetPaths && targetPaths.length > 0) {
+    const target = targetPaths[0];
+    const callers = getTransitiveCallers(target);
+    const hops = callers.slice(0, 3).reverse().map((c, i) => ({
+      hopIndex: i + 1,
+      nodeId: c,
+      note: i === 0 ? 'Upstream Root' : 'Caller',
+    }));
+    hops.push({ hopIndex: hops.length + 1, nodeId: target, note: 'Target Module' });
+    lastProofHops = hops;
+    renderHopPipeline(hops, claimObj || { targetPaths }, currentStepNumber);
+    animateTraversal(hops);
+  }
 }
 
 function showFloatingHud(nodeId, transitiveCallers) {
@@ -371,32 +989,19 @@ function hideFloatingHud() {
 // ── Update Network Nodes ──────────────────────────────────
 function updateNetworkTopology(modules) {
   allModulesCache = modules;
-  if (!nodesDataSet) return;
+  if (!cy) return;
 
-  const updates = modules.map((m) => {
-    const isCycle = (m.sccSize ?? 1) > 1;
-    const baseColors = STATUS_COLORS[m.status] || STATUS_COLORS.PENDING;
-    const size = Math.max(15, Math.min(32, Math.round((m.pagerank || 0.1) * 150 + 14)));
-
-    return {
-      id: m.path,
-      size,
-      value: size,
-      color: isCycle ? { ...baseColors, border: '#F43F5E' } : baseColors,
-      borderWidth: isCycle ? 2.5 : 1.2,
-      opacity: 1.0,
-      shadow: {
-        enabled: true,
-        color: 'rgba(0, 0, 0, 0.4)',
-        size: 3,
-        x: 0,
-        y: 1,
-      },
-      moduleData: m,
-    };
+  cy.batch(() => {
+    for (const m of modules) {
+      const node = cy.getElementById(m.path);
+      if (node && node.length) {
+        node.data('status', m.status);
+        node.data('pagerank', Number(m.pagerank ?? 0));
+        node.data('pendingCallers', Number(m.pendingCallers ?? 0));
+        node.classes(`status-${m.status.toLowerCase()}${(m.sccSize ?? 1) > 1 ? ' scc-member' : ''}${activeTargetPaths.includes(m.path) ? ' active-target' : ''}`);
+      }
+    }
   });
-
-  nodesDataSet.update(updates);
 }
 
 // ── Refresh Status Counts & Header Progress ───────────────
@@ -421,7 +1026,7 @@ function updateStatusCounts(counts) {
 
   if (progressFill) progressFill.style.width = `${pct}%`;
   if (progressPercent) progressPercent.textContent = `${pct}%`;
-  if (stepBadge) stepBadge.textContent = `${migratedCount} / ${total} Migrated`;
+  if (stepBadge) stepBadge.textContent = `${migratedCount} of ${total} verified`;
 
   const flightTitle = document.getElementById('flight-milestone');
   if (flightTitle && !flightTitle.textContent.startsWith('Claimed') && !flightTitle.textContent.startsWith('Gate') && !flightTitle.textContent.startsWith('Verified')) {
@@ -439,103 +1044,44 @@ function updateStatusCounts(counts) {
 
 // ── Toast Notification Manager ────────────────────────────
 function showToast(title, message, type = 'info', durationMs = 4000) {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const item = document.createElement('div');
-  item.className = `toast-item toast-${type}`;
-
-  const icons = {
-    info: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
-    success: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
-    error: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F43F5E" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
-    warn: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-  };
-
-  item.innerHTML = `
-    <div style="flex-shrink: 0; margin-top: 1px;">${icons[type] || icons.info}</div>
-    <div class="toast-content">
-      <div class="toast-title">${escapeHtml(title)}</div>
-      <div class="toast-msg">${escapeHtml(message)}</div>
-    </div>
-  `;
-
-  container.appendChild(item);
-
-  setTimeout(() => {
-    item.classList.add('toast-leave');
-    setTimeout(() => item.remove(), 250);
-  }, durationMs);
+  // Disabled: toast update notifications removed per user request
+  return;
 }
 
 // ── Mission Control Deck for Idle State ───────────────────
 function renderMissionDeck() {
   const targetTitle = document.getElementById('target-title');
+  const targetEyebrow = document.getElementById('target-eyebrow');
   const phaseBadge = document.getElementById('phase-badge');
-  const targetMeta = document.getElementById('target-meta');
   const diffFileLabel = document.getElementById('diff-file-label');
   const diffTabs = document.getElementById('diff-tabs');
   const diffViewer = document.getElementById('diff-viewer');
   const proofContainer = document.getElementById('proof-container');
 
-  if (targetTitle) targetTitle.textContent = 'Active Migration Target';
+  if (targetEyebrow) {
+    targetEyebrow.textContent = 'MIGRATION PIPELINE';
+  }
+  if (targetTitle) {
+    targetTitle.textContent = 'Topological Migration Stepper';
+    targetTitle.title = 'Topological Migration Stepper';
+  }
   if (phaseBadge) {
     phaseBadge.textContent = 'READY';
     phaseBadge.className = 'phase-pill phase-idle';
   }
-  if (targetMeta) targetMeta.style.display = 'none';
   if (diffFileLabel) diffFileLabel.style.display = 'none';
   if (diffTabs) diffTabs.style.display = 'none';
   if (proofContainer) proofContainer.style.display = 'none';
 
-  const repoDisplay = currentAppInfo?.displayRepo || 'demo-repo';
-  const packDisplay = currentAppInfo?.currentPackId || 'express-to-fastify';
+  const storyCard = document.getElementById('step-story-card');
+  if (storyCard) storyCard.style.display = 'none';
+
+  renderHopPipeline([], null, 0);
 
   if (diffViewer) {
     diffViewer.innerHTML = `
-      <div class="mission-deck">
-        <div class="mission-header">
-          <div class="mission-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-              <polyline points="2 17 12 22 22 17"/>
-              <polyline points="2 12 12 17 22 12"/>
-            </svg>
-          </div>
-          <div class="mission-details">
-            <div class="mission-title">Graph-Governed Migration Deck</div>
-            <div class="mission-subtitle">${escapeHtml(repoDisplay)} &middot; ${escapeHtml(packDisplay)}</div>
-          </div>
-        </div>
-
-        <div class="mission-invariants-grid">
-          <div class="invariant-card">
-            <div class="inv-icon">🔒</div>
-            <div class="inv-info">
-              <div class="inv-title">Route Invariants</div>
-              <div class="inv-desc">HTTP signatures &amp; middleware parity verified 100%</div>
-            </div>
-          </div>
-          <div class="invariant-card">
-            <div class="inv-icon">🔄</div>
-            <div class="inv-info">
-              <div class="inv-title">Atomic Tarjan SCC</div>
-              <div class="inv-desc">Circular dependency cycles migrated simultaneously</div>
-            </div>
-          </div>
-          <div class="invariant-card">
-            <div class="inv-icon">🚦</div>
-            <div class="inv-info">
-              <div class="inv-title">Zero Broken Commits</div>
-              <div class="inv-desc">TypeScript compilation verified at every topological gate</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="mission-status-callout">
-          <span class="sync-indicator pulse"></span>
-          <span>Live Telemetry Synchronized. Listening for agent tool calls from <strong>OpenCode</strong> / <strong>Claude</strong> / <strong>CLI</strong>.</span>
-        </div>
+      <div class="target-empty">
+        <p>Ready to migrate. Click <strong>Step</strong> above to view live code transformations.</p>
       </div>
     `;
     diffViewer.scrollTop = 0;
@@ -631,7 +1177,14 @@ async function inspectNodeInDiffViewer(nodeId) {
     const data = await res.json();
     if (!data) return;
 
-    document.getElementById('target-title').textContent = `Inspecting: ${nodeId.replace(/^src\//, '')}`;
+    const targetEyebrow = document.getElementById('target-eyebrow');
+    if (targetEyebrow) targetEyebrow.textContent = 'INSPECTING';
+    const cleanId = nodeId.replace(/^src\//, '');
+    const titleEl = document.getElementById('target-title');
+    if (titleEl) {
+      titleEl.textContent = cleanId;
+      titleEl.title = cleanId;
+    }
     const phaseBadge = document.getElementById('phase-badge');
     if (phaseBadge) {
       phaseBadge.textContent = data.meta?.status || 'INSPECT';
@@ -659,45 +1212,53 @@ async function inspectNodeInDiffViewer(nodeId) {
 // ── Display Active Target & Diff ──────────────────────────
 function showActiveTarget(claim, claimLatencyMs) {
   const targetTitle = document.getElementById('target-title');
+  const targetEyebrow = document.getElementById('target-eyebrow');
   const phaseBadge = document.getElementById('phase-badge');
-  const targetMeta = document.getElementById('target-meta');
+  const diffFileLabel = document.getElementById('diff-file-label');
   const proofContainer = document.getElementById('proof-container');
   const proofText = document.getElementById('proof-text');
 
   if (!claim) return;
 
-  phaseBadge.textContent = claim.phase;
-  phaseBadge.className = `phase-pill phase-${claim.phase.toLowerCase().replace('_', '')}`;
+  if (phaseBadge) {
+    phaseBadge.textContent = claim.phase;
+    phaseBadge.className = `phase-pill phase-${claim.phase.toLowerCase().replace('_', '')}`;
+  }
 
   activeTargetPaths = claim.targetPaths || [];
+
+  const isCycle = claim.targetPaths.length > 1;
+  const paths = claim.targetPaths.map((p) => p.replace(/^src\//, ''));
+  const firstPath = claim.targetPaths[0] || '';
+  const human = getHumanModuleInfo(firstPath);
+
+  if (targetEyebrow) {
+    targetEyebrow.textContent = isCycle ? 'ATOMIC CYCLE' : 'TARGET MODULE';
+  }
+
+  if (targetTitle) {
+    const fullTargetText = paths.join(' ↔ ');
+    targetTitle.textContent = fullTargetText;
+    targetTitle.title = fullTargetText;
+  }
+
+  if (diffFileLabel) {
+    diffFileLabel.style.display = 'none';
+  }
 
   const latencyBadge = document.getElementById('graph-latency');
   if (latencyBadge && claimLatencyMs) {
     latencyBadge.textContent = `FalkorDB: ${claimLatencyMs} ms`;
   }
-  document.getElementById('gate-falkor').textContent = `${claimLatencyMs || '1.2'} ms`;
+  const falkorGate = document.getElementById('gate-falkor');
+  if (falkorGate) falkorGate.textContent = `${claimLatencyMs || '< 2'} ms`;
 
-  const isCycle = claim.targetPaths.length > 1;
-
-  if (isCycle) {
-    targetTitle.textContent = 'Atomic SCC Cycle';
-    targetMeta.style.display = 'block';
-    targetMeta.innerHTML = `
-      <div class="target-meta-grid">
-        <div class="meta-item"><span class="lbl">Cycle Size:</span> <span class="val phase-highlight">${claim.targetPaths.length} Nodes</span></div>
-        <div class="meta-item"><span class="lbl">Phase:</span> <span class="val">${escapeHtml(claim.phase)}</span></div>
-        <div class="meta-item"><span class="lbl">SLA:</span> <span class="val text-emerald">${claimLatencyMs || '1.2'} ms</span></div>
-      </div>
-    `;
-  } else {
-    targetTitle.textContent = claim.targetPaths[0] ? claim.targetPaths[0].replace(/^src\//, '') : 'Active Target';
-    targetMeta.style.display = 'none';
-  }
-
-  if (claim.proof) {
+  if (claim.proof && proofText && proofContainer) {
     proofContainer.style.display = 'flex';
-    proofText.textContent = `${claim.proof} (${claimLatencyMs || '1.2'} ms)`;
-  } else {
+    const lines = claim.proof.split('\n').filter(Boolean);
+    const depLine = lines.find((l) => l.includes('Dependency proof:') || l.includes('Target module(s):') || l.includes('pending_callers_count')) || lines[0] || 'Topological claim verified';
+    proofText.textContent = `${depLine} (${claimLatencyMs || '1.2'} ms)`;
+  } else if (proofContainer) {
     proofContainer.style.display = 'none';
   }
 }
@@ -745,45 +1306,169 @@ function renderCodeDiff(modifiedFiles) {
   }
 }
 
-function renderSingleFileDiff(f) {
-  const diffViewer = document.getElementById('diff-viewer');
-  if (!f) return;
+// ── Longest Common Subsequence Diff Engine ─────────────────
+function computeLCSDiff(oldLines, newLines) {
+  const m = oldLines.length;
+  const n = newLines.length;
+  const dp = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
 
-  const oldLines = f.oldCode.split('\n');
-  const newLines = f.newCode.split('\n');
-
-  let diffHtml = `<div style="font-weight: 600; color: #A5B4FC; margin-bottom: 8px; font-size: 0.75rem;">--- ${f.path}</div>`;
-
-  let diffCount = 0;
-  let lineNum = 1;
-  for (let i = 0; i < Math.max(oldLines.length, newLines.length); i++) {
-    const o = oldLines[i];
-    const n = newLines[i];
-
-    if (o === n) continue;
-
-    if (o !== undefined && (n === undefined || !newLines.includes(o))) {
-      diffCount++;
-      diffHtml += `<div class="diff-line diff-del"><span style="display:inline-block;width:28px;color:#64748B;font-size:0.65rem;user-select:none;">${lineNum++}</span><span>- ${escapeHtml(o)}</span></div>`;
-    }
-    if (n !== undefined && (o === undefined || !oldLines.includes(n))) {
-      diffCount++;
-      const isShim = n.includes('@bkb-shim') || n.includes('@shift-shim');
-      if (isShim) {
-        diffHtml += `
-          <div class="diff-line diff-shim">
-            <span style="display:inline-block;width:28px;color:#A78BFA;font-size:0.65rem;user-select:none;">${lineNum++}</span>
-            <span>+ ${escapeHtml(n)}</span>
-            <span class="shim-tag">compat-shim</span>
-          </div>
-        `;
+  for (let i = 0; i < m; i++) {
+    for (let j = 0; j < n; j++) {
+      if (oldLines[i] === newLines[j]) {
+        dp[i + 1][j + 1] = dp[i][j] + 1;
       } else {
-        diffHtml += `<div class="diff-line diff-add"><span style="display:inline-block;width:28px;color:#64748B;font-size:0.65rem;user-select:none;">${lineNum++}</span><span>+ ${escapeHtml(n)}</span></div>`;
+        dp[i + 1][j + 1] = Math.max(dp[i + 1][j], dp[i][j + 1]);
       }
     }
   }
 
-  diffViewer.innerHTML = diffCount > 0 ? diffHtml : `<div style="color: #64748B; padding: 10px;">Identical or whitespace-only changes</div>`;
+  let i = m;
+  let j = n;
+  const diff = [];
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      diff.unshift({ type: 'same', oldNum: i, newNum: j, text: oldLines[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      diff.unshift({ type: 'add', oldNum: null, newNum: j, text: newLines[j - 1] });
+      j--;
+    } else if (i > 0 && (j === 0 || dp[i][j - 1] < dp[i - 1][j])) {
+      diff.unshift({ type: 'del', oldNum: i, newNum: null, text: oldLines[i - 1] });
+      i--;
+    }
+  }
+
+  return diff;
+}
+
+function filterDiffHunks(diff, contextRadius = 3) {
+  const changedIndices = new Set();
+  diff.forEach((entry, idx) => {
+    if (entry.type !== 'same') {
+      for (let k = Math.max(0, idx - contextRadius); k <= Math.min(diff.length - 1, idx + contextRadius); k++) {
+        changedIndices.add(k);
+      }
+    }
+  });
+
+  if (changedIndices.size === 0) return [];
+
+  const result = [];
+  let inHunk = false;
+
+  for (let i = 0; i < diff.length; i++) {
+    if (changedIndices.has(i)) {
+      if (!inHunk) {
+        inHunk = true;
+        const entry = diff[i];
+        result.push({
+          type: 'hunk',
+          text: `@@ -${entry.oldNum || 1} +${entry.newNum || 1} @@`,
+        });
+      }
+      result.push(diff[i]);
+    } else {
+      inHunk = false;
+    }
+  }
+
+  return result;
+}
+
+function renderSingleFileDiff(f) {
+  const diffViewer = document.getElementById('diff-viewer');
+  if (!diffViewer || !f) return;
+
+  const oldLines = (f.oldCode || '').split('\n');
+  const newLines = (f.newCode || '').split('\n');
+  const shortPath = (f.path || '').replace(/^src\//, '');
+
+  const rawDiff = computeLCSDiff(oldLines, newLines);
+  const hunks = filterDiffHunks(rawDiff, 3);
+
+  const addsCount = rawDiff.filter((r) => r.type === 'add').length;
+  const delsCount = rawDiff.filter((r) => r.type === 'del').length;
+
+  if (addsCount === 0 && delsCount === 0) {
+    diffViewer.innerHTML = `
+      <div class="diff-card-wrapper">
+        <div class="diff-file-card-header">
+          <div class="diff-file-meta">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span class="diff-file-name">${escapeHtml(shortPath)}</span>
+          </div>
+          <span style="color: #64748B; font-size: 0.68rem;">Identical / No AST Changes</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let rowsHtml = '';
+  for (const item of hunks) {
+    if (item.type === 'hunk') {
+      rowsHtml += `
+        <div class="diff-row diff-row-hunk">
+          <span>${escapeHtml(item.text)}</span>
+        </div>
+      `;
+      continue;
+    }
+
+    const oldGutter = item.oldNum !== null ? item.oldNum : '';
+    const newGutter = item.newNum !== null ? item.newNum : '';
+    const isAdd = item.type === 'add';
+    const isDel = item.type === 'del';
+    const isShim = isAdd && (item.text.includes('@bkb-shim') || item.text.includes('@shift-shim'));
+
+    let rowClass = 'diff-row diff-row-same';
+    let sign = ' ';
+    if (isDel) {
+      rowClass = 'diff-row diff-row-del';
+      sign = '-';
+    } else if (isShim) {
+      rowClass = 'diff-row diff-row-shim';
+      sign = '+';
+    } else if (isAdd) {
+      rowClass = 'diff-row diff-row-add';
+      sign = '+';
+    }
+
+    rowsHtml += `
+      <div class="${rowClass}">
+        <span class="diff-gutter-old">${oldGutter}</span>
+        <span class="diff-gutter-new">${newGutter}</span>
+        <span class="diff-sign">${sign}</span>
+        <span class="diff-text">${escapeHtml(item.text)}${isShim ? '<span class="shim-tag">compat-shim</span>' : ''}</span>
+      </div>
+    `;
+  }
+
+  diffViewer.innerHTML = `
+    <div class="diff-card-wrapper">
+      <div class="diff-file-card-header">
+        <div class="diff-file-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="diff-file-name">${escapeHtml(shortPath)}</span>
+        </div>
+        <div class="diff-stats-pills">
+          <span class="diff-stat-add">+${addsCount}</span>
+          <span class="diff-stat-del">-${delsCount}</span>
+        </div>
+      </div>
+      <div class="diff-table">
+        ${rowsHtml}
+      </div>
+    </div>
+  `;
   diffViewer.scrollTop = 0;
 }
 
@@ -834,6 +1519,24 @@ function highlightCypherSyntax(rawQuery) {
   html = html.replace(/('[^']*')/g, '<span class="cypher-str">$1</span>');
 
   return `<code>${html}</code>`;
+}
+
+function setupControlsDrawer() {
+  const toggleBtn = document.getElementById('btn-toggle-controls');
+  const drawer = document.getElementById('controls-drawer');
+  const arrow = document.getElementById('controls-arrow');
+
+  if (!toggleBtn || !drawer) return;
+
+  toggleBtn.addEventListener('click', () => {
+    const isOpen = drawer.style.display !== 'none';
+    drawer.style.display = isOpen ? 'none' : 'block';
+    if (arrow) arrow.textContent = isOpen ? '▾' : '▴';
+
+    setTimeout(() => {
+      if (cy) cy.resize();
+    }, 50);
+  });
 }
 
 function setupCypherDrawer() {
@@ -908,18 +1611,19 @@ async function loadAuditTrail() {
 
 function renderAuditTrail(episodes) {
   const feed = document.getElementById('audit-feed');
+  const stepInd = document.getElementById('roadmap-step-indicator');
   if (!feed) return;
+
+  if (stepInd) {
+    stepInd.textContent = `Step ${currentStepNumber} of ${TOTAL_STEPS}`;
+  }
 
   if (!episodes || episodes.length === 0) {
     feed.innerHTML = `
-      <div class="audit-empty-state">
-        <div class="audit-empty-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-        </div>
-        <div class="audit-empty-title">Audit Ledger Standing By</div>
-        <div class="audit-empty-desc">FalkorDB cryptographically tracks every claimed module, gate evaluation, and verified commit.</div>
+      <div class="roadmap-empty-state">
+        <div class="roadmap-empty-icon">✓</div>
+        <div class="roadmap-empty-title">All Invariants Guarded</div>
+        <div class="roadmap-empty-desc">Click Step above to advance through the 11-stage verified migration roadmap.</div>
       </div>
     `;
     return;
@@ -929,18 +1633,18 @@ function renderAuditTrail(episodes) {
   const sorted = [...episodes].reverse();
   feed.innerHTML = sorted
     .map((ep) => {
-      const paths = (ep.modules || []).map((m) => m.replace(/^src\//, '')).join(', ');
+      const paths = (ep.modules || []).map((m) => m.replace(/^src\//, '')).join(' + ');
       const rawModulePaths = (ep.modules || []).join(',');
       const phaseStr = ep.phase || 'MIGRATE';
       const statusClass = (ep.newStatus || 'VERIFIED').replace(/[^A-Za-z0-9_-]/g, '');
       return `
-        <div class="audit-item" data-modules="${escapeHtml(rawModulePaths)}" title="Click to inspect module in viewer">
-          <div class="audit-item-left">
-            <span class="audit-step">#${ep.step}</span>
-            <span class="audit-phase">${escapeHtml(phaseStr)}</span>
-            <span class="audit-path" title="${escapeHtml(paths)}">${escapeHtml(paths)}</span>
+        <div class="roadmap-item" data-modules="${escapeHtml(rawModulePaths)}" title="Click to inspect module on graph">
+          <div style="display:flex;align-items:center;gap:6px;overflow:hidden;">
+            <span class="roadmap-step">#${ep.step}</span>
+            <span class="roadmap-phase">${escapeHtml(phaseStr)}</span>
+            <span class="roadmap-path" title="${escapeHtml(paths)}">${escapeHtml(paths)}</span>
           </div>
-          <div class="audit-status status-${statusClass}">${escapeHtml(ep.newStatus || 'VERIFIED')}</div>
+          <div class="audit-status status-${statusClass}">✓ ${escapeHtml(ep.newStatus || 'VERIFIED')}</div>
         </div>
       `;
     })
@@ -983,7 +1687,9 @@ async function fetchGraphData() {
 
 async function executeStep() {
   const btnStep = document.getElementById('btn-step');
-  btnStep.disabled = true;
+  const btnStepCard = document.getElementById('btn-step-card');
+  if (btnStep) btnStep.disabled = true;
+  if (btnStepCard) btnStepCard.disabled = true;
 
   try {
     const res = await fetch('/api/step', { method: 'POST' });
@@ -1031,13 +1737,18 @@ async function executeStep() {
       });
     }
 
+    if (data.claim) {
+      parseAndAnimateProof(data.claim.proof, data.claim.targetPaths, data.claim);
+    }
+
     return true;
   } catch (err) {
     console.error('Step failed:', err);
     stopAutoPlay();
     return false;
   } finally {
-    btnStep.disabled = false;
+    if (btnStep) btnStep.disabled = false;
+    if (btnStepCard) btnStepCard.disabled = false;
   }
 }
 
@@ -1138,9 +1849,54 @@ async function downloadAuditReport() {
   }
 }
 
-// ── Node Inspector Drawer ─────────────────────────────────
+// ── Node Inspector Drawer & Panel 2 Dossier ───────────────
 async function openNodeInspector(nodeId) {
   activeDrawerNode = nodeId;
+
+  // Populate Panel 2 Dossier
+  const dossier = document.getElementById('node-dossier');
+  const roadmap = document.getElementById('migration-roadmap-view');
+  if (dossier && roadmap) {
+    dossier.style.display = 'flex';
+    roadmap.style.display = 'none';
+
+    const info = getHumanModuleInfo(nodeId);
+    const mod = allModulesCache.find((m) => m.path === nodeId);
+
+    const layerEl = document.getElementById('dossier-layer');
+    if (layerEl) layerEl.textContent = info.layer;
+
+    const fileEl = document.getElementById('dossier-file');
+    if (fileEl) fileEl.textContent = nodeId.replace(/^src\//, '');
+
+    const statusEl = document.getElementById('dossier-status-text');
+    if (statusEl) statusEl.textContent = mod?.status || 'PENDING';
+
+    const loopAlert = document.getElementById('dossier-loop-alert');
+    const loopText = document.getElementById('dossier-loop-text');
+    if (loopAlert && loopText) {
+      if ((mod?.sccSize ?? 1) > 1) {
+        loopAlert.style.display = 'flex';
+        loopText.textContent = `2-File Circular Loop: Mutually imports peer module. Migrated simultaneously at Step 3 to prevent broken references.`;
+      } else {
+        loopAlert.style.display = 'none';
+      }
+    }
+
+    const callers = getTransitiveCallers(nodeId);
+    const countEl = document.getElementById('dossier-callers-count');
+    if (countEl) countEl.textContent = `${callers.length} File${callers.length !== 1 ? 's' : ''}`;
+
+    const chipsEl = document.getElementById('dossier-callers-chips');
+    if (chipsEl) {
+      if (callers.length > 0) {
+        chipsEl.innerHTML = callers.map((c) => `<span class="jump-chip" data-node-path="${escapeHtml(c)}">${escapeHtml(c.replace(/^src\//, ''))}</span>`).join('');
+      } else {
+        chipsEl.innerHTML = '<span style="color:#64748B;font-size:0.68rem;">None (Zero callers affected)</span>';
+      }
+    }
+  }
+
   const drawer = document.getElementById('node-inspector-drawer');
   if (!drawer) return;
 
@@ -1207,6 +1963,10 @@ async function openNodeInspector(nodeId) {
 function closeNodeInspector() {
   const drawer = document.getElementById('node-inspector-drawer');
   if (drawer) drawer.style.display = 'none';
+  const dossier = document.getElementById('node-dossier');
+  const roadmap = document.getElementById('migration-roadmap-view');
+  if (dossier) dossier.style.display = 'none';
+  if (roadmap) roadmap.style.display = 'flex';
   activeDrawerNode = null;
 }
 
@@ -1443,15 +2203,19 @@ async function handleLiveTelemetryEvent(event, flashBadge) {
   }
 
   if (event.type === 'claim') {
-    if (event.targetPaths?.length && nodesDataSet) {
-      event.targetPaths.forEach((path) => {
-        nodesDataSet.update({
-          id: path,
-          color: { border: '#3B82F6', background: 'rgba(59, 130, 246, 0.25)' },
-          borderWidth: 3,
-        });
-      });
+    if (event.targetPaths?.length) {
       activeTargetPaths = event.targetPaths;
+      if (cy) {
+        cy.batch(() => {
+          cy.nodes().removeClass('active-target');
+          event.targetPaths.forEach((path) => {
+            const node = cy.getElementById(path);
+            if (node && node.length) {
+              node.addClass('active-target');
+            }
+          });
+        });
+      }
 
       if (network && event.targetPaths[0]) {
         network.focus(event.targetPaths[0], { scale: 1.15, animation: { duration: 300 } });
@@ -1529,6 +2293,8 @@ async function handleLiveTelemetryEvent(event, flashBadge) {
 
     const targetTitle = document.getElementById('target-title');
     if (targetTitle) targetTitle.textContent = `Verified: ${names}`;
+    const diffFileLabel = document.getElementById('diff-file-label');
+    if (diffFileLabel) diffFileLabel.style.display = 'none';
 
     const phaseBadge = document.getElementById('phase-badge');
     if (phaseBadge) {
@@ -1551,12 +2317,13 @@ async function handleLiveTelemetryEvent(event, flashBadge) {
   }
 
   if (event.type === 'failure') {
-    if (event.targetPaths?.length && nodesDataSet) {
-      event.targetPaths.forEach((path) => {
-        nodesDataSet.update({
-          id: path,
-          color: { border: '#F43F5E', background: 'rgba(244, 63, 94, 0.25)' },
-          borderWidth: 3,
+    if (event.targetPaths?.length && cy) {
+      cy.batch(() => {
+        event.targetPaths.forEach((path) => {
+          const node = cy.getElementById(path);
+          if (node && node.length) {
+            node.addClass('node-failed');
+          }
         });
       });
     }
@@ -1712,6 +2479,52 @@ function setupDrawerTabs() {
   document.getElementById('btn-close-drawer')?.addEventListener('click', closeNodeInspector);
 }
 
+function setupViewSwitchTabs() {
+  const btnHops = document.getElementById('tab-btn-hops');
+  const btnDiff = document.getElementById('tab-btn-diff');
+  const journeyView = document.getElementById('journey-view');
+  const diffView = document.getElementById('diff-view');
+  const btnCloseDossier = document.getElementById('btn-close-dossier');
+  const btnDossierTrace = document.getElementById('btn-dossier-trace');
+
+  if (btnHops && btnDiff && journeyView && diffView) {
+    btnHops.addEventListener('click', () => {
+      btnHops.classList.add('active');
+      btnDiff.classList.remove('active');
+      journeyView.style.display = 'flex';
+      diffView.style.display = 'none';
+    });
+
+    btnDiff.addEventListener('click', () => {
+      btnDiff.classList.add('active');
+      btnHops.classList.remove('active');
+      journeyView.style.display = 'none';
+      diffView.style.display = 'flex';
+    });
+  }
+
+  if (btnCloseDossier) {
+    btnCloseDossier.addEventListener('click', () => {
+      closeNodeInspector();
+      clearBlastRadius();
+    });
+  }
+
+  if (btnDossierTrace) {
+    btnDossierTrace.addEventListener('click', () => {
+      if (activeDrawerNode) {
+        if (btnHops && btnDiff && journeyView && diffView) {
+          btnHops.classList.add('active');
+          btnDiff.classList.remove('active');
+          journeyView.style.display = 'flex';
+          diffView.style.display = 'none';
+        }
+        parseAndAnimateProof(null, [activeDrawerNode], { targetPaths: [activeDrawerNode], phase: 'INSPECT' });
+      }
+    });
+  }
+}
+
 function setupDelegatedClickHandlers() {
   document.addEventListener('click', (e) => {
     // 1. Jump chip click in node inspector drawer
@@ -1721,8 +2534,8 @@ function setupDelegatedClickHandlers() {
       return;
     }
 
-    // 2. Audit feed item click to inspect episode modules
-    const auditItem = e.target.closest('.audit-item');
+    // 2. Audit / Roadmap feed item click to inspect episode modules
+    const auditItem = e.target.closest('.roadmap-item, .audit-item');
     if (auditItem && auditItem.dataset.modules) {
       inspectEpisodeFiles(auditItem.dataset.modules);
       return;
@@ -1736,14 +2549,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     const data = await fetchGraphData();
     initNetwork(data.modules, data.edges);
     updateStatusCounts(data.statusCounts);
+    setupControlsDrawer();
     setupCypherDrawer();
     setupSettingsModal();
     setupDrawerTabs();
+    setupViewSwitchTabs();
     setupDelegatedClickHandlers();
     await loadSystemInfo();
     renderMissionDeck();
     await loadAuditTrail();
 
+    document.getElementById('btn-step')?.addEventListener('click', executeStep);
+    document.getElementById('btn-step-card')?.addEventListener('click', executeStep);
+    document.getElementById('btn-auto')?.addEventListener('click', toggleAutoPlay);
     document.getElementById('btn-reset')?.addEventListener('click', resetCodebase);
     document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
     document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
