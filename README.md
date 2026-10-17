@@ -154,8 +154,19 @@ bkb init --repo /path/to/your-repo --pack express-to-fastify
 bkb cockpit --repo /path/to/your-repo
 ```
 
-#### Step 3: Copy-Paste the Production Agent Prompt
-Paste this prompt into your agent's chat interface (Cursor Composer, Claude Desktop, or Windsurf Cascade). This is the exact prompt that successfully governed our automated end-to-end migrations:
+#### Step 3: Prompt Your AI Agent
+
+Paste one of these prompts into your agent's chat interface (Cursor Composer, Claude Desktop, Windsurf Cascade, or OpenCode):
+
+##### ⚡ Quick Try Prompt (Minimal 1-Liner)
+If you want to quickly test or kick off a run without extensive instructions:
+
+> *"Use the BKB MCP server to migrate this repository. Call `bkb_get_migration_status` to see current progress, then run the `advance_migration` loop to claim, transform, and verify each batch until 100% complete."*
+
+---
+
+##### 🛡️ Production Team Prompt (Full Invariant Governance & Milestone Commits)
+This is the battle-tested, structured prompt that reliably governs full multi-file migrations without deadlocks or token waste:
 
 ```markdown
 You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
@@ -282,6 +293,44 @@ For in-depth architectural details, custom framework extensions, and benchmark r
 | `bkb pack init` | `<pack-id> [--lang <ts\|py\|go>]` | Scaffolds a new schema-validated Migration Pack starter template. |
 | `bkb pack validate`| `<path-to-pack>` | Validates Migration Pack structure, Ajv schema, and compiles Tree-sitter AST queries. |
 | `bkb adapter init` | `<language>` | Scaffolds a new Language Adapter starter template extending `BaseLanguageAdapter`. |
+
+---
+
+## 🔄 Updating Bagwan Kai Bandey
+
+Stay up to date with the latest migration packs, AST language adapters, and graph engine improvements:
+
+### If Installed Globally:
+```bash
+npm install -g bagwan-kai-bandey@latest
+
+# Verify the updated version and environment diagnostics:
+bkb doctor
+```
+
+### If Using `npx`:
+`npx` automatically runs the latest version when `@latest` is appended:
+```bash
+npx bagwan-kai-bandey@latest doctor
+```
+
+### Refresh Editor & Agent MCP Configurations:
+After updating BKB, re-run the 1-click MCP installer so Cursor, Claude Desktop, VS Code, Windsurf, or OpenCode point to the newest binaries and tool definitions:
+```bash
+bkb mcp install all
+```
+
+### Update FalkorDB Graph Engine:
+```bash
+docker pull falkordb/falkordb:latest
+```
+
+### If Working From Source:
+```bash
+git pull origin main
+npm install
+npm test
+```
 
 ---
 

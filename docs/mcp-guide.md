@@ -145,7 +145,15 @@ opencode mcp list
 
 ## 5. Recommended Prompt for AI Agents
 
-When interacting with an AI coding assistant in chat (Cursor Composer, Claude Desktop, VS Code, Windsurf, or OpenCode), copy-paste this prompt to kick off the graph-governed migration:
+When interacting with an AI coding assistant in chat (Cursor Composer, Claude Desktop, VS Code, Windsurf, or OpenCode), use either the minimal quick-try prompt or the comprehensive production prompt:
+
+### Option A: ⚡ Quick Try Prompt (Minimal 1-Liner)
+> *"Use the BKB MCP server to migrate this repository. Call `bkb_get_migration_status` to see current progress, then run the `advance_migration` loop to claim, transform, and verify each batch until 100% complete."*
+
+---
+
+### Option B: 🛡️ Production Team Prompt (Full Invariant Governance & Milestone Commits)
+This is the battle-tested, structured prompt that reliably governs full multi-file migrations without deadlocks or token waste:
 
 ```markdown
 You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
