@@ -11,7 +11,17 @@
  *  - Synchronization of FalkorDB node states from committed Git manifests
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  closeSync,
+  renameSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { resolve, join } from 'node:path';
 import type { FalkorClient } from './falkorClient';
 import * as Q from './queries';
@@ -69,6 +79,38 @@ export interface MigrationManifest {
   history: ManifestHistoryEntry[];
 }
 
+export interface InitOrUpdateManifestOptions {
+  repoPath: string;
+  packId: string;
+  reset?: boolean;
+  baselineSnapshot: {
+    snapshotType: string;
+    entryCount: number;
+    entries: string[];
+    command?: string;
+    hash?: string;
+    snapshots?: Record<string, string>;
+    rawOutput?: string;
+  };
+  modules: Array<{
+    path: string;
+    status: 'PENDING' | 'CLEAN';
+    sccId?: number;
+    baselineSets?: Record<string, string[]>;
+  }>;
+}
+
+export interface RecordStepInput {
+  step: number;
+  phase: 'MIGRATE' | 'SHIM' | 'DE_SHIM';
+  modules: string[];
+  status: 'SHIMMED' | 'VERIFIED';
+  action: string;
+  verifiedBy?: string;
+  commitSha?: string;
+  invariants?: Record<string, unknown>;
+}
+
 /**
  * Returns the path to the repository-local `.bkb/manifest.json`.
  */
@@ -97,7 +139,9 @@ export function loadManifest(repoPath: string): MigrationManifest | null {
 }
 
 /**
- * Writes the manifest to `<repoPath>/.bkb/manifest.json`, ensuring parent directories exist.
+ * Writes the manifest to `<repoPath>/.bkb/manifest.json` atomically: the
+ * payload is written to a sibling temp file and then renamed into place, so a
+ * crash mid-write can never leave a truncated/corrupt manifest behind.
  */
 export function saveManifest(repoPath: string, manifest: MigrationManifest): void {
   const filePath = getManifestPath(repoPath);
@@ -106,33 +150,76 @@ export function saveManifest(repoPath: string, manifest: MigrationManifest): voi
     mkdirSync(dir, { recursive: true });
   }
 
-  writeFileSync(filePath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+  renameSync(tmpPath, filePath);
+}
+
+const MANIFEST_LOCK_TIMEOUT_MS = 5_000;
+const MANIFEST_LOCK_STALE_MS = 30_000;
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Serializes a read-modify-write of `.bkb/manifest.json` across processes using
+ * an advisory lock file. Stale locks (older than the staleness window) are
+ * reclaimed; if the lock cannot be acquired in time the callback still runs so
+ * a crashed peer can never permanently wedge the migration.
+ */
+export function withManifestLock<T>(repoPath: string, fn: () => T): T {
+  const dir = resolve(repoPath, '.bkb');
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const lockPath = join(dir, 'manifest.lock');
+
+  const start = Date.now();
+  let acquired = false;
+  while (Date.now() - start < MANIFEST_LOCK_TIMEOUT_MS) {
+    try {
+      const fd = openSync(lockPath, 'wx');
+      writeFileSync(fd, String(process.pid));
+      closeSync(fd);
+      acquired = true;
+      break;
+    } catch (err: any) {
+      if (err?.code !== 'EEXIST') throw err;
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > MANIFEST_LOCK_STALE_MS) {
+          rmSync(lockPath, { force: true });
+          continue;
+        }
+      } catch {
+        // Lock vanished between stat and rm; retry.
+      }
+      sleepSync(25);
+    }
+  }
+
+  try {
+    return fn();
+  } finally {
+    if (acquired) {
+      try {
+        rmSync(lockPath, { force: true });
+      } catch {
+        // Best-effort unlock.
+      }
+    }
+  }
 }
 
 /**
  * Creates or updates a manifest for an initialized migration.
  * Preserves existing history and verified module states if a manifest already exists.
  */
-export function initOrUpdateManifest(options: {
-  repoPath: string;
-  packId: string;
-  reset?: boolean;
-  baselineSnapshot: {
-    snapshotType: string;
-    entryCount: number;
-    entries: string[];
-    command?: string;
-    hash?: string;
-    snapshots?: Record<string, string>;
-    rawOutput?: string;
-  };
-  modules: Array<{
-    path: string;
-    status: 'PENDING' | 'CLEAN';
-    sccId?: number;
-    baselineSets?: Record<string, string[]>;
-  }>;
-}): MigrationManifest {
+export function initOrUpdateManifest(options: InitOrUpdateManifestOptions): MigrationManifest {
+  return withManifestLock(options.repoPath, () => initOrUpdateManifestUnlocked(options));
+}
+
+function initOrUpdateManifestUnlocked(options: InitOrUpdateManifestOptions): MigrationManifest {
   const existing = loadManifest(options.repoPath);
 
   if (!options.reset && existing && existing.packId === options.packId) {
@@ -208,16 +295,14 @@ export function initOrUpdateManifest(options: {
  */
 export function recordStepInManifest(
   repoPath: string,
-  record: {
-    step: number;
-    phase: 'MIGRATE' | 'SHIM' | 'DE_SHIM';
-    modules: string[];
-    status: 'SHIMMED' | 'VERIFIED';
-    action: string;
-    verifiedBy?: string;
-    commitSha?: string;
-    invariants?: Record<string, unknown>;
-  },
+  record: RecordStepInput,
+): MigrationManifest | null {
+  return withManifestLock(repoPath, () => recordStepInManifestUnlocked(repoPath, record));
+}
+
+function recordStepInManifestUnlocked(
+  repoPath: string,
+  record: RecordStepInput,
 ): MigrationManifest | null {
   const manifest = loadManifest(repoPath);
   if (!manifest) return null;
@@ -263,36 +348,45 @@ export async function reconcileGraphWithManifest(
   client: FalkorClient,
   manifest: MigrationManifest,
 ): Promise<{ reconciledNodes: number; restoredBaselineSets: number }> {
-  let reconciledNodes = 0;
-  let restoredBaselineSets = 0;
+  const statusRows: Array<{ path: string; status: string; phase: string }> = [];
+  const baselineRows: Array<{ path: string; baselineSets: string }> = [];
 
   for (const [modPath, entry] of Object.entries(manifest.modules)) {
-    const setClauses: string[] = [];
-    const params: Record<string, unknown> = { path: modPath };
-
     if (entry.status === 'SHIMMED' || entry.status === 'VERIFIED') {
-      setClauses.push('m.status = $status', 'm.claimed_phase = $phase');
-      params.status = entry.status;
-      params.phase = entry.phase ?? (entry.status === 'SHIMMED' ? 'SHIM' : 'MIGRATE');
-      reconciledNodes++;
+      statusRows.push({
+        path: modPath,
+        status: entry.status,
+        phase: entry.phase ?? (entry.status === 'SHIMMED' ? 'SHIM' : 'MIGRATE'),
+      });
     }
-
     // Restore the true pre-migration invariant baseline for every module that
     // recorded one, so per-step invariant checks on a fresh clone compare
     // against the original baseline rather than the half-migrated disk state.
     if (entry.baselineSets) {
-      setClauses.push('m.baseline_sets = $baselineSets');
-      params.baselineSets = JSON.stringify(entry.baselineSets);
-      restoredBaselineSets++;
+      baselineRows.push({ path: modPath, baselineSets: JSON.stringify(entry.baselineSets) });
     }
+  }
 
-    if (!setClauses.length) continue;
-
+  // Batched writes (one round-trip each) instead of one query per module.
+  if (statusRows.length) {
     await client.query(
-      `MATCH (m:Module {path: $path}) SET ${setClauses.join(', ')}`,
-      params,
+      `UNWIND $rows AS row
+       MATCH (m:Module {path: row.path})
+       SET m.status = row.status, m.claimed_phase = row.phase`,
+      { rows: statusRows },
     );
   }
+  if (baselineRows.length) {
+    await client.query(
+      `UNWIND $rows AS row
+       MATCH (m:Module {path: row.path})
+       SET m.baseline_sets = row.baselineSets`,
+      { rows: baselineRows },
+    );
+  }
+
+  const reconciledNodes = statusRows.length;
+  const restoredBaselineSets = baselineRows.length;
 
   // Recompute global in_degree and pending_callers_count after reconciliation
   await client.query(Q.RECOMPUTE_DEGREES, {

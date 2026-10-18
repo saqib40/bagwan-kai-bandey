@@ -5,7 +5,7 @@
 
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -174,6 +174,33 @@ describe('Git-Native Migration Manifest Subsystem', () => {
       'export-surface': '["foo","bar"]',
     });
     assert.deepEqual(onDisk?.modules['src/a.ts'].baselineSets, { routes: ['GET /a'] });
+  });
+
+  test('saveManifest writes atomically and leaves no temp/lock artifacts', () => {
+    initOrUpdateManifest({
+      repoPath: tempRepo,
+      packId: 'express-to-fastify',
+      baselineSnapshot: { snapshotType: 'route-surface', entryCount: 0, entries: [] },
+      modules: [{ path: 'src/a.ts', status: 'PENDING' }],
+    });
+
+    for (let i = 0; i < 20; i++) {
+      recordStepInManifest(tempRepo, {
+        step: i + 1,
+        phase: 'SHIM',
+        modules: ['src/a.ts'],
+        status: 'SHIMMED',
+        action: `step ${i}`,
+      });
+    }
+
+    const bkbDir = join(tempRepo, '.bkb');
+    const leftovers = readdirSync(bkbDir).filter((f) => f.endsWith('.tmp') || f.endsWith('.lock'));
+    assert.deepEqual(leftovers, []);
+
+    const manifest = loadManifest(tempRepo);
+    assert.equal(manifest?.history.length, 21);
+    assert.equal(manifest?.modules['src/a.ts'].step, 20);
   });
 
   test('initOrUpdateManifest preserves existing verified module states on repeated init', () => {
