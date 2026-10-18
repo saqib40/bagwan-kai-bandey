@@ -9,7 +9,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -520,17 +520,23 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
     packId?: string;
   }) => {
     try {
-      const ops = await getOps(repoPath, packId);
-      const resolvedRepo = ops.repoPath;
-      const manifestPath = getManifestPath(resolvedRepo);
+      const resolvedRepo = resolve(repoPath ?? activeRepoPath);
 
-      let statusOut = '';
-      try {
-        statusOut = execSync('git status --porcelain', {
+      // Milestone commits are a pure Git operation and must not require
+      // FalkorDB to be running.
+      let manifest = loadManifest(resolvedRepo);
+      const resolvedPackId = manifest?.packId ?? packId ?? activePackId;
+
+      const git = (args: string[]): string =>
+        execFileSync('git', args, {
           cwd: resolvedRepo,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
         }).trim();
+
+      let statusOut: string;
+      try {
+        statusOut = git(['status', '--porcelain']);
       } catch (err: any) {
         throw new Error(
           `Target repository "${resolvedRepo}" is not a git repository or git failed: ${err.message}`,
@@ -553,49 +559,31 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
 
       if (createBranch) {
         try {
-          execSync(`git checkout -b "${createBranch}"`, {
-            cwd: resolvedRepo,
-            stdio: ['ignore', 'pipe', 'pipe'],
-          });
-        } catch (err: any) {
-          execSync(`git checkout "${createBranch}"`, {
-            cwd: resolvedRepo,
-            stdio: ['ignore', 'pipe', 'pipe'],
-          });
+          git(['checkout', '-b', createBranch]);
+        } catch {
+          git(['checkout', createBranch]);
         }
       }
 
-      const filesToStage: string[] = [];
-      if (existsSync(manifestPath)) {
-        filesToStage.push('.bkb/manifest.json');
-      }
-
+      const manifestPath = getManifestPath(resolvedRepo);
       const requestedPaths = targetPaths ?? modulePaths;
+      const stagedFiles: string[] = [];
+
       if (requestedPaths && requestedPaths.length) {
-        for (const p of requestedPaths) {
-          filesToStage.push(p);
-        }
-      }
-
-      if (filesToStage.length) {
-        execSync(`git add ${filesToStage.map((f) => `"${f}"`).join(' ')}`, {
-          cwd: resolvedRepo,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
+        // `--` terminates option parsing so a path cannot be read as a flag.
+        git(['add', '--', ...requestedPaths]);
+        stagedFiles.push(...requestedPaths);
       } else {
-        execSync('git add -u', {
-          cwd: resolvedRepo,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
-        if (existsSync(manifestPath)) {
-          execSync('git add .bkb/manifest.json', {
-            cwd: resolvedRepo,
-            stdio: ['ignore', 'pipe', 'pipe'],
-          });
-        }
+        git(['add', '-u']);
+      }
+      if (existsSync(manifestPath)) {
+        // Force-add so the Git-native manifest is committed even when the
+        // target repository ignores `.bkb/`.
+        git(['add', '-f', '--', '.bkb/manifest.json']);
+        stagedFiles.push('.bkb/manifest.json');
       }
 
-      const manifest = loadManifest(resolvedRepo);
+      manifest = loadManifest(resolvedRepo);
       const lastHistory = manifest?.history?.length
         ? manifest.history[manifest.history.length - 1]
         : null;
@@ -604,11 +592,11 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         message ||
         (lastHistory
           ? `chore(migration): step ${lastHistory.step} [${lastHistory.phase}] ${lastHistory.modules.join(', ')}`
-          : `chore(migration): advance migration milestone [${ops.pack.id}]`);
+          : `chore(migration): advance migration milestone [${resolvedPackId}]`);
 
       const bodyLines: string[] = [
         '',
-        `- Migration Pack: ${ops.pack.id}`,
+        `- Migration Pack: ${resolvedPackId}`,
         `- Verified Status: 100% Invariants Preserved`,
         `- Manifest: .bkb/manifest.json updated`,
       ];
@@ -619,36 +607,18 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
 
       const fullMessage = `${subject}\n${bodyLines.join('\n')}`;
 
-      execSync(`git commit -m ${JSON.stringify(fullMessage)}`, {
-        cwd: resolvedRepo,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      git(['commit', '-m', fullMessage]);
 
-      let commitSha = execSync('git rev-parse HEAD', {
-        cwd: resolvedRepo,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }).trim();
-
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
-        cwd: resolvedRepo,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }).trim();
+      let commitSha = git(['rev-parse', 'HEAD']);
+      const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
 
       if (manifest && lastHistory) {
         lastHistory.commitSha = commitSha;
         saveManifest(resolvedRepo, manifest);
         try {
-          execSync('git add .bkb/manifest.json && git commit --amend --no-edit', {
-            cwd: resolvedRepo,
-            stdio: ['ignore', 'pipe', 'pipe'],
-          });
-          commitSha = execSync('git rev-parse HEAD', {
-            cwd: resolvedRepo,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-          }).trim();
+          git(['add', '-f', '--', '.bkb/manifest.json']);
+          git(['commit', '--amend', '--no-edit']);
+          commitSha = git(['rev-parse', 'HEAD']);
         } catch {
           // Keep commitSha from previous commit if amend is not needed
         }
@@ -664,7 +634,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
                 commitSha,
                 branch,
                 commitSubject: subject,
-                stagedFiles: filesToStage,
+                stagedFiles,
                 message: `Successfully created Git commit ${commitSha.slice(0, 7)} on branch ${branch}.`,
               },
               null,
