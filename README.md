@@ -1,12 +1,16 @@
-# Bagwan Kai Bandey: Graph-Governed Codebase Migration Engine
+<div align="center">
+
+# Bagwan Kai Bandey
 
 [![npm version](https://img.shields.io/npm/v/bagwan-kai-bandey.svg?color=cb3837)](https://www.npmjs.com/package/bagwan-kai-bandey)
 [![Powered by FalkorDB](https://img.shields.io/badge/Powered%20by-FalkorDB-purple.svg)](https://www.falkordb.com/)
 [![Protocol: Model Context Protocol](https://img.shields.io/badge/Protocol-MCP-blue.svg)](https://modelcontextprotocol.io/)
-[![Tests: 170+ Passing](https://img.shields.io/badge/Tests-170%2B%20Pass-brightgreen.svg)]()
+[![Tests: 176 Passing](https://img.shields.io/badge/Tests-176%20Pass-brightgreen.svg)]()
 [![Typecheck: Clean](https://img.shields.io/badge/Typecheck-tsc%20green-success.svg)]()
 [![Languages: TypeScript & Python](https://img.shields.io/badge/Languages-TypeScript%20%7C%20Python-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+</div>
 
 > **The graph-governed codebase migration engine that prevents AI agents from breaking your build.**  
 > Powered by **FalkorDB**, Bagwan Kai Bandey (BKB) computes topological callee-first execution order, groups circular dependency cycles into atomic batches via Tarjan's SCC algorithm, enforces dual-signature Strangler Fig shims, and verifies invariant snapshots at every step—keeping compilers green, test suites intact, and API surfaces 100% identical.
