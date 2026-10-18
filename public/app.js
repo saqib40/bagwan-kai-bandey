@@ -1720,7 +1720,7 @@ function setupStandbyDeck() {
 
   btnDismiss?.addEventListener('click', dismissStandby);
   btnShow?.addEventListener('click', showStandby);
-  document.getElementById('btn-explore-graph')?.addEventListener('click', dismissStandby);
+  document.getElementById('standby-center-brand')?.addEventListener('click', dismissStandby);
 }
 
 function setupControlsDrawer() {
