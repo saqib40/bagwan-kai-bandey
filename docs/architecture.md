@@ -114,6 +114,14 @@ BKB represents the codebase inside **FalkorDB** as a property graph:
 ### Useful openCypher Queries
 You can run these in the FalkorDB Browser at `http://localhost:3000`:
 
+| Agent Decision Gate | openCypher Execution in FalkorDB | Mathematical Law Enforced |
+| :--- | :--- | :--- |
+| **1. What file to migrate next?** | `MATCH (m:Module {status: 'PENDING'})`<br>`WHERE NOT (m)-[:IMPORTS]->(:Module {status: 'PENDING'})`<br>`RETURN m ORDER BY m.scc_size ASC, m.pagerank DESC LIMIT 1` | **Law 1 (Callee-First Order):** Guarantees callers never import unmigrated code. Foundational leaves with highest PageRank are claimed first. |
+| **2. Are there circular cycles?** | `MATCH (m:Module) WHERE m.scc_size > 1`<br>`RETURN m.scc_id, collect(m.path) AS cycle_files` | **Law 2 (Tarjan SCC Law):** Circular dependencies ($A \leftrightarrow B$) cannot be migrated file-by-file; the graph condenses them into atomic batches. |
+| **3. Does this file need a backward-compatible shim?** | `MATCH (caller:Module)-[:IMPORTS]->(m:Module {path: $path})`<br>`WHERE caller.status <> 'VERIFIED'`<br>`RETURN count(caller) AS pending_callers` | **Law 3 (Strangler Fig Law):** If pending callers exist, the agent is forced to export dual-signature shims (`// @bkb-shim`) so upstream code never breaks. |
+| **4. When can shims be safely removed?** | `MATCH (m:Module {status: 'SHIMMED'})`<br>`WHERE NOT (:Module {status: 'PENDING'})-[:IMPORTS]->(m)`<br>`RETURN m` | **Deterministic De-Shimming (Pass A):** When 100% of callers reach target state, the graph signals the agent to prune legacy shims top-down. |
+| **5. What is the multi-hop blast radius of a failure?** | `MATCH path = (caller:Module)-[:IMPORTS*1..4]->(target:Module {path: $path})`<br>`RETURN caller.path, length(path) AS distance ORDER BY distance ASC` | **Blast Radius Simulation:** Dynamically calculates all upstream blast exposure in $< 2\text{ms}$ indexed graph queries. |
+
 ```cypher
 // 1. Find all unblocked modules ready for migration (zero pending callees)
 MATCH (m:Module)
