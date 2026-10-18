@@ -10,11 +10,11 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import net from 'node:net';
 import { FalkorClient } from '../engine/falkorClient';
 import { adapterRegistry } from '../adapters/registry';
+import { discoverPackIds } from '../engine/packLoader';
 
 export interface DoctorCheckResult {
   title: string;
@@ -183,18 +183,7 @@ export async function runDiagnostics(repoRoot = process.cwd()): Promise<DoctorRe
   const discoveredPacks = new Set<string>();
 
   for (const d of packDirs) {
-    if (existsSync(d)) {
-      try {
-        const files = readdirSync(d);
-        for (const f of files) {
-          if ((f.endsWith('.json') || f.endsWith('.ts') || f.endsWith('.js')) && !f.includes('.schema.')) {
-            discoveredPacks.add(f.replace(/\.(json|ts|js)$/, ''));
-          }
-        }
-      } catch {
-        // ignore dir read error
-      }
-    }
+    for (const id of discoverPackIds(d)) discoveredPacks.add(id);
   }
 
   checks.push({

@@ -10,7 +10,7 @@
  *    across user-configurable search directories and environment paths.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, join, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { MigrationPack } from '../adapters/types';
@@ -86,6 +86,25 @@ export function validatePack(pack: any): { valid: boolean; errors: string[] } {
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+const PACK_FILE_RE = /\.(json|ts|js)$/;
+const PACK_SCHEMA_FILE_RE = /\.schema\.(json|ts|js)$/;
+
+/**
+ * Lists the pack ids discoverable in a directory by file name. Schema sidecar
+ * files (e.g. `PACK_SPEC.schema.json`) are skipped, as are non-pack files.
+ * Returns an empty array when the directory is missing or unreadable.
+ */
+export function discoverPackIds(packsDir: string): string[] {
+  if (!existsSync(packsDir)) return [];
+  try {
+    return readdirSync(packsDir)
+      .filter((f) => PACK_FILE_RE.test(f) && !PACK_SCHEMA_FILE_RE.test(f))
+      .map((f) => f.replace(PACK_FILE_RE, ''));
+  } catch {
+    return [];
+  }
 }
 
 const registeredPackDirs: string[] = [];

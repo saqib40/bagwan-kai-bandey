@@ -5,8 +5,8 @@
 
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { existsSync, readdirSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve } from 'node:path';
+import { discoverPackIds } from '../engine/packLoader';
 
 export interface WizardOptions {
   repoPath: string;
@@ -31,16 +31,8 @@ export async function runInteractiveInit(defaultRepo = './demo-repo'): Promise<W
     // 2. Discover available packs
     const packsDir = resolve(process.cwd(), 'packs');
     let availablePacks: string[] = ['express-to-fastify'];
-    if (existsSync(packsDir)) {
-      try {
-        const found = readdirSync(packsDir)
-          .filter((f) => (f.endsWith('.json') || f.endsWith('.ts')) && !f.includes('.schema.'))
-          .map((f) => f.replace(/\.(json|ts)$/, ''));
-        if (found.length) availablePacks = Array.from(new Set([...availablePacks, ...found]));
-      } catch {
-        // ignore
-      }
-    }
+    const found = discoverPackIds(packsDir);
+    if (found.length) availablePacks = Array.from(new Set([...availablePacks, ...found]));
 
     output.write('\n  \x1b[1m2. Select Migration Pack:\x1b[0m\n');
     availablePacks.forEach((p, idx) => {

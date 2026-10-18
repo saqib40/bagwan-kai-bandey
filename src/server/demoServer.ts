@@ -16,7 +16,7 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
-import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, readdirSync, statSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync, symlinkSync, existsSync, statSync, realpathSync } from 'node:fs';
 import { resolve, join, extname, basename, relative, isAbsolute, dirname } from 'node:path';
 import { ensureFalkorDB } from '../engine/docker';
 import { FalkorClient } from '../engine/falkorClient';
@@ -24,7 +24,7 @@ import { MigrationGraphManager, getGraphNameForRepo as getEngineGraphName } from
 import { MigrationOps, type Phase } from '../engine/operations';
 import { LlmClient } from '../runner/llmClient';
 import { saveCheckpoint, listCheckpoints, rollbackToCheckpoint } from '../runner/rollback';
-import { loadPack } from '../engine/packLoader';
+import { loadPack, discoverPackIds } from '../engine/packLoader';
 import { getShimStrategy } from '../adapters/types';
 import * as Q from '../engine/queries';
 
@@ -764,11 +764,7 @@ export function startDemoServer(
     if (pathname === '/api/info' && req.method === 'GET') {
       try {
         const packsDir = resolve(WORKSPACE, 'packs');
-        const availablePacks = existsSync(packsDir)
-          ? readdirSync(packsDir)
-              .filter((f) => (f.endsWith('.json') || f.endsWith('.ts')) && !f.includes('.schema.'))
-              .map((f) => f.replace(/\.(json|ts)$/, ''))
-          : ['express-to-fastify'];
+        const availablePacks = discoverPackIds(packsDir);
 
         if (!availablePacks.includes('express-to-fastify')) {
           availablePacks.unshift('express-to-fastify');
