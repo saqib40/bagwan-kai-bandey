@@ -766,7 +766,7 @@ export function startDemoServer(
         const packsDir = resolve(WORKSPACE, 'packs');
         const availablePacks = existsSync(packsDir)
           ? readdirSync(packsDir)
-              .filter((f) => f.endsWith('.json') || f.endsWith('.ts'))
+              .filter((f) => (f.endsWith('.json') || f.endsWith('.ts')) && !f.includes('.schema.'))
               .map((f) => f.replace(/\.(json|ts)$/, ''))
           : ['express-to-fastify'];
 

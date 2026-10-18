@@ -34,7 +34,7 @@ export async function runInteractiveInit(defaultRepo = './demo-repo'): Promise<W
     if (existsSync(packsDir)) {
       try {
         const found = readdirSync(packsDir)
-          .filter((f) => f.endsWith('.json') || f.endsWith('.ts'))
+          .filter((f) => (f.endsWith('.json') || f.endsWith('.ts')) && !f.includes('.schema.'))
           .map((f) => f.replace(/\.(json|ts)$/, ''));
         if (found.length) availablePacks = Array.from(new Set([...availablePacks, ...found]));
       } catch {

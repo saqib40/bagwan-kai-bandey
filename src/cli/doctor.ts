@@ -187,7 +187,7 @@ export async function runDiagnostics(repoRoot = process.cwd()): Promise<DoctorRe
       try {
         const files = readdirSync(d);
         for (const f of files) {
-          if (f.endsWith('.json') || f.endsWith('.ts') || f.endsWith('.js')) {
+          if ((f.endsWith('.json') || f.endsWith('.ts') || f.endsWith('.js')) && !f.includes('.schema.')) {
             discoveredPacks.add(f.replace(/\.(json|ts|js)$/, ''));
           }
         }
