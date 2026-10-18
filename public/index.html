@@ -119,7 +119,7 @@
             </button>
 
             <!-- Circular / Pill Prompt Copy Button (Modeled after Round White Play Button) -->
-            <button id="btn-copy-prompt" class="dock-play-btn" title="Copy AI Agent MCP Prompt to clipboard">
+            <button id="btn-copy-prompt" class="dock-play-btn" title="Copy Editor Prompt (Cursor • Claude • Windsurf • VS Code)">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
@@ -135,9 +135,8 @@
             </button>
           </div>
 
-          <!-- Hidden Prompt Template for Copy Action -->
-          <pre id="agent-prompt-text" style="display: none;">You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
-First call bkb_get_migration_status to inspect current progress, then claim and verify batches until 100% complete.</pre>
+          <!-- Hidden Prompt Template for Copy Action (Short Prompt from README for Cursor / Claude / Windsurf / VS Code) -->
+          <pre id="agent-prompt-text" style="display: none;">Use the BKB MCP server to migrate this repository. Call bkb_get_migration_status to see current progress, then run the advance_migration loop to claim, transform, and verify each batch until 100% complete.</pre>
         </div>
 
         <div id="network-container" class="network-canvas"></div>

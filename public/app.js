@@ -1577,8 +1577,9 @@ function setupStandbyDeck() {
 
   btnCopy?.addEventListener('click', async () => {
     if (!promptText) return;
+    const textToCopy = promptText.textContent.trim();
     try {
-      await navigator.clipboard.writeText(promptText.textContent);
+      await navigator.clipboard.writeText(textToCopy);
       if (copyText) copyText.textContent = 'Copied! ✓';
       btnCopy.classList.add('copied');
       setTimeout(() => {
