@@ -844,7 +844,7 @@ function renderHopPipeline(hops, claim, stepNum) {
         <div class="empty-state-header">
           <div class="empty-state-title">Topological Migration Telemetry</div>
           <div class="empty-state-desc">
-            Run <code>bkb run</code> in terminal or prompt your AI agent (via MCP) to stream autonomous migration episodes in real time. Tap any module on the graph to inspect its dependency path.
+            Prompt your AI agent (via MCP in Cursor, Claude, or VS Code) to stream autonomous migration episodes in real time. Tap any module on the graph to inspect its dependency path.
           </div>
         </div>
         <div class="editorial-principles-list">
@@ -1148,7 +1148,7 @@ function renderMissionDeck() {
   if (diffViewer) {
     diffViewer.innerHTML = `
       <div class="target-empty">
-        <p>Ready for autonomous migration. Run <code>bkb run</code> or prompt your agent to stream real-time code transformations.</p>
+        <p>Ready for autonomous migration. Prompt your AI agent via MCP to stream real-time code transformations.</p>
       </div>
     `;
     diffViewer.scrollTop = 0;
@@ -1657,7 +1657,7 @@ function setupStandbyDeck() {
   });
 
   btnCopyCmd?.addEventListener('click', async () => {
-    const textToCopy = cmdRun ? cmdRun.textContent.trim() : 'bkb run';
+    const textToCopy = cmdRun ? cmdRun.textContent.trim() : 'bkb mcp install all';
     try {
       await navigator.clipboard.writeText(textToCopy);
       btnCopyCmd.classList.add('copied');
@@ -1779,7 +1779,7 @@ function renderAuditTrail(episodes) {
       <div class="roadmap-empty-state">
         <div class="roadmap-empty-icon">✓</div>
         <div class="roadmap-empty-title">All Invariants Guarded</div>
-        <div class="roadmap-empty-desc">Run <code>bkb run</code> or stream migration episodes via AI agent MCP tools.</div>
+        <div class="roadmap-empty-desc">Connect your AI agent via MCP to stream real-time verified migration episodes.</div>
       </div>
     `;
     return;
@@ -2226,10 +2226,10 @@ function renderPackMeta(pack) {
       shimBadge.style.display = 'none';
     }
 
-    // Update Standby CLI commands with actual active pack
+    // Update Standby CLI command to 1-click MCP setup for LLM agents
     const cmdRun = document.getElementById('cmd-run-code');
     if (cmdRun) {
-      cmdRun.textContent = `bkb run --pack ${pack.id}`;
+      cmdRun.textContent = 'bkb mcp install all';
     }
   } else {
     if (navSlash) navSlash.style.display = 'none';

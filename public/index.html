@@ -85,10 +85,10 @@
           <!-- Center: Track Information Equivalent (Status, Prompt, Hairline Telemetry Bar) -->
           <div class="dock-info">
             <div class="dock-title-line">
-              <span class="dock-title">Awaiting execution in terminal...</span>
+              <span class="dock-title">Awaiting AI Agent execution (MCP)...</span>
             </div>
             <div class="dock-subtitle-line">
-              <span class="dock-subtitle">Run <strong class="dock-highlight">bkb run</strong> or prompt your AI agent</span>
+              <span class="dock-subtitle">Connect <strong class="dock-highlight">Cursor, Claude, or VS Code</strong> via MCP</span>
             </div>
             <div class="dock-scrubber-line">
               <div class="dock-scrubber-track">
@@ -100,10 +100,10 @@
 
           <!-- Right: Player Action Controls (Quick-Copy Chip, Play Prompt Button, Dismiss) -->
           <div class="dock-actions">
-            <!-- Command Chip (One-click copy bkb run) -->
-            <button id="btn-copy-dock-cmd" class="dock-cmd-chip" title="Click to copy command">
+            <!-- Command Chip (One-click copy 1-click MCP setup) -->
+            <button id="btn-copy-dock-cmd" class="dock-cmd-chip" title="Click to copy 1-click MCP setup command for Cursor, Claude & VS Code">
               <span class="dock-cmd-prefix" id="dock-chip-prefix">$</span>
-              <code id="cmd-run-code">bkb run</code>
+              <code id="cmd-run-code">bkb mcp install all</code>
               <svg class="dock-chip-icon icon-copy" id="dock-chip-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -363,7 +363,7 @@
               <div class="empty-state-header">
                 <div class="empty-state-title">Topological Migration Telemetry</div>
                 <div class="empty-state-desc">
-                  Run <code>bkb run</code> in terminal or prompt your AI agent (via MCP) to stream autonomous migration episodes in real time. Tap any module on the graph to inspect its dependency path.
+                  Prompt your AI agent (via MCP in Cursor, Claude, or VS Code) to stream autonomous migration episodes in real time. Tap any module on the graph to inspect its dependency path.
                 </div>
               </div>
               <div class="editorial-principles-list">
