@@ -1,6 +1,6 @@
 {
   "name": "bagwan-kai-bandey",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Bagwan Kai Bandey (BKB): graph-governed codebase migration engine powered by FalkorDB.",
   "type": "module",
   "main": "./src/index.ts",
