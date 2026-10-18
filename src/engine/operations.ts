@@ -9,7 +9,7 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, relative, resolve, isAbsolute } from 'node:path';
+import { dirname, relative, resolve, isAbsolute, delimiter } from 'node:path';
 import { FalkorClient } from './falkorClient';
 import { tarjanScc } from './scc';
 import { adapterRegistry } from '../adapters/registry';
@@ -972,6 +972,12 @@ export class MigrationOps {
     try {
       const env = { ...process.env };
       delete env.NODE_TEST_CONTEXT;
+      const venvBin = resolve(this.repoPath, process.platform === 'win32' ? '.venv/Scripts' : '.venv/bin');
+      const nodeBin = resolve(this.repoPath, 'node_modules/.bin');
+      const extraPaths = [venvBin, nodeBin].filter(existsSync);
+      if (extraPaths.length > 0) {
+        env.PATH = extraPaths.join(delimiter) + (env.PATH ? delimiter + env.PATH : '');
+      }
       const output = execSync(cmd, {
         cwd: this.repoPath,
         encoding: 'utf8',
