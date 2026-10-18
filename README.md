@@ -16,7 +16,10 @@
 
 <br>
 
-<img src="docs/assets/cockpit-flight-deck.jpeg" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="100%">
+<p align="center">
+  <img src="docs/assets/cockpit-flight-deck.jpeg" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="49%">&nbsp;
+  <img src="docs/assets/terminal.jpeg" alt="Bagwan Kai Bandey Autonomous Migration CLI Stream" width="49%">
+</p>
 
 </div>
 
