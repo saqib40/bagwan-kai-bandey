@@ -23,6 +23,12 @@ export interface ModuleManifestEntry {
   sccId?: number | string;
   verifiedCommit?: string;
   lastModified?: string;
+  /**
+   * The module's pre-migration invariant sets (per invariant id). Persisted so a
+   * fresh clone can restore the true baseline instead of re-capturing it against
+   * an already half-migrated codebase.
+   */
+  baselineSets?: Record<string, string[]>;
   invariants?: {
     compilerErrors?: number;
     matchedRoutes?: number;
@@ -37,6 +43,8 @@ export interface BaselineManifestEntry {
   command?: string;
   entryCount: number;
   entries: string[];
+  /** All declared pack snapshots, keyed by snapshot id, as normalized output. */
+  snapshots?: Record<string, string>;
   rawOutput?: string;
 }
 
@@ -115,9 +123,15 @@ export function initOrUpdateManifest(options: {
     entries: string[];
     command?: string;
     hash?: string;
+    snapshots?: Record<string, string>;
     rawOutput?: string;
   };
-  modules: Array<{ path: string; status: 'PENDING' | 'CLEAN'; sccId?: number }>;
+  modules: Array<{
+    path: string;
+    status: 'PENDING' | 'CLEAN';
+    sccId?: number;
+    baselineSets?: Record<string, string[]>;
+  }>;
 }): MigrationManifest {
   const existing = loadManifest(options.repoPath);
 
@@ -130,6 +144,13 @@ export function initOrUpdateManifest(options: {
         mergedModules[mod.path] = {
           status: mod.status,
           sccId: mod.sccId,
+          baselineSets: mod.baselineSets,
+        };
+      } else if (!mergedModules[mod.path].baselineSets && mod.baselineSets) {
+        // Backfill legacy manifests that predate baseline-set persistence.
+        mergedModules[mod.path] = {
+          ...mergedModules[mod.path],
+          baselineSets: mod.baselineSets,
         };
       }
     }
@@ -147,6 +168,7 @@ export function initOrUpdateManifest(options: {
     initialModules[mod.path] = {
       status: mod.status,
       sccId: mod.sccId,
+      baselineSets: mod.baselineSets,
     };
   }
 
@@ -162,6 +184,7 @@ export function initOrUpdateManifest(options: {
       entries: options.baselineSnapshot.entries,
       command: options.baselineSnapshot.command,
       hash: options.baselineSnapshot.hash,
+      snapshots: options.baselineSnapshot.snapshots,
       rawOutput: options.baselineSnapshot.rawOutput,
     },
     modules: initialModules,
@@ -239,24 +262,36 @@ export function recordStepInManifest(
 export async function reconcileGraphWithManifest(
   client: FalkorClient,
   manifest: MigrationManifest,
-): Promise<{ reconciledNodes: number }> {
+): Promise<{ reconciledNodes: number; restoredBaselineSets: number }> {
   let reconciledNodes = 0;
+  let restoredBaselineSets = 0;
 
   for (const [modPath, entry] of Object.entries(manifest.modules)) {
+    const setClauses: string[] = [];
+    const params: Record<string, unknown> = { path: modPath };
+
     if (entry.status === 'SHIMMED' || entry.status === 'VERIFIED') {
-      await client.query(
-        `MATCH (m:Module {path: $path})
-         SET m.status = $status,
-             m.claimed_phase = $phase
-         RETURN count(m) AS cnt`,
-        {
-          path: modPath,
-          status: entry.status,
-          phase: entry.phase ?? (entry.status === 'SHIMMED' ? 'SHIM' : 'MIGRATE'),
-        },
-      );
+      setClauses.push('m.status = $status', 'm.claimed_phase = $phase');
+      params.status = entry.status;
+      params.phase = entry.phase ?? (entry.status === 'SHIMMED' ? 'SHIM' : 'MIGRATE');
       reconciledNodes++;
     }
+
+    // Restore the true pre-migration invariant baseline for every module that
+    // recorded one, so per-step invariant checks on a fresh clone compare
+    // against the original baseline rather than the half-migrated disk state.
+    if (entry.baselineSets) {
+      setClauses.push('m.baseline_sets = $baselineSets');
+      params.baselineSets = JSON.stringify(entry.baselineSets);
+      restoredBaselineSets++;
+    }
+
+    if (!setClauses.length) continue;
+
+    await client.query(
+      `MATCH (m:Module {path: $path}) SET ${setClauses.join(', ')}`,
+      params,
+    );
   }
 
   // Recompute global in_degree and pending_callers_count after reconciliation
@@ -264,5 +299,5 @@ export async function reconcileGraphWithManifest(
     legacyCallers: [...Q.LEGACY_CALLER_STATUSES],
   });
 
-  return { reconciledNodes };
+  return { reconciledNodes, restoredBaselineSets };
 }

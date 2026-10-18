@@ -143,6 +143,39 @@ describe('Git-Native Migration Manifest Subsystem', () => {
     assert.equal(loadManifest(tempRepo)?.phase, 'DE_SHIM');
   });
 
+  test('initOrUpdateManifest persists all snapshots and per-module baseline sets', () => {
+    const manifest = initOrUpdateManifest({
+      repoPath: tempRepo,
+      packId: 'express-to-fastify',
+      baselineSnapshot: {
+        snapshotType: 'route-surface',
+        entryCount: 1,
+        entries: ['GET /a'],
+        snapshots: { 'route-surface': '["GET /a"]', 'export-surface': '["foo","bar"]' },
+      },
+      modules: [
+        {
+          path: 'src/a.ts',
+          status: 'PENDING',
+          baselineSets: { routes: ['GET /a'] },
+        },
+      ],
+    });
+
+    assert.deepEqual(manifest.baseline.snapshots, {
+      'route-surface': '["GET /a"]',
+      'export-surface': '["foo","bar"]',
+    });
+    assert.deepEqual(manifest.modules['src/a.ts'].baselineSets, { routes: ['GET /a'] });
+
+    const onDisk = loadManifest(tempRepo);
+    assert.deepEqual(onDisk?.baseline.snapshots, {
+      'route-surface': '["GET /a"]',
+      'export-surface': '["foo","bar"]',
+    });
+    assert.deepEqual(onDisk?.modules['src/a.ts'].baselineSets, { routes: ['GET /a'] });
+  });
+
   test('initOrUpdateManifest preserves existing verified module states on repeated init', () => {
     initOrUpdateManifest({
       repoPath: tempRepo,
@@ -259,6 +292,7 @@ describe('Git-Native Migration Manifest Subsystem', () => {
             status: 'SHIMMED',
             phase: 'SHIM',
             step: 1,
+            baselineSets: { routes: ['GET /a'] },
           },
           'src/b.ts': {
             status: 'PENDING',
@@ -267,17 +301,19 @@ describe('Git-Native Migration Manifest Subsystem', () => {
         history: [],
       };
 
-      const { reconciledNodes } = await reconcileGraphWithManifest(client, manifest);
+      const { reconciledNodes, restoredBaselineSets } = await reconcileGraphWithManifest(client, manifest);
       assert.equal(reconciledNodes, 1);
+      assert.equal(restoredBaselineSets, 1);
 
       // Verify node status in FalkorDB
-      const rows = await client.roQuery<{ path: string; status: string; phase: string }>(
-        `MATCH (m:Module) RETURN m.path AS path, m.status AS status, m.claimed_phase AS phase ORDER BY m.path`,
+      const rows = await client.roQuery<{ path: string; status: string; phase: string; baselineSets: string }>(
+        `MATCH (m:Module) RETURN m.path AS path, m.status AS status, m.claimed_phase AS phase, m.baseline_sets AS baselineSets ORDER BY m.path`,
       );
 
       assert.equal(rows[0].path, 'src/a.ts');
       assert.equal(rows[0].status, 'SHIMMED');
       assert.equal(rows[0].phase, 'SHIM');
+      assert.deepEqual(JSON.parse(rows[0].baselineSets), { routes: ['GET /a'] });
 
       assert.equal(rows[1].path, 'src/b.ts');
       assert.equal(rows[1].status, 'PENDING');

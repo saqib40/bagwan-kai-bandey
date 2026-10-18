@@ -112,6 +112,22 @@ export class MigrationGraphManager {
         snapshots.find((s) => s.kind === 'set') ??
         snapshots[0];
 
+      const captureSnapshot = (snap: (typeof snapshots)[number]): string => {
+        console.error(`[bkb] Capturing baseline snapshot "${snap.id}" via "${snap.command}"...`);
+        try {
+          const out = execSync(snap.command, {
+            cwd: absRepoPath,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout: pack.verification.timeoutMs ?? 60_000,
+          });
+          return normalizeSnapshotOutput(snap.kind, out);
+        } catch (err) {
+          console.error(`[bkb] Warning: Failed to run snapshot "${snap.id}":`, err);
+          return normalizeSnapshotOutput(snap.kind, '');
+        }
+      };
+
       // If manifest already exists with a baseline and we are not resetting, preserve it
       if (
         existingManifest &&
@@ -120,26 +136,22 @@ export class MigrationGraphManager {
         existingManifest.baseline?.entries
       ) {
         console.error(
-          `[bkb] Reusing committed baseline snapshot from .bkb/manifest.json (${existingManifest.baseline.entryCount} entries)...`,
+          `[bkb] Reusing committed baseline snapshots from .bkb/manifest.json (${existingManifest.baseline.entryCount} entries)...`,
         );
-        if (primarySnap) {
-          baselineSnapshots[primarySnap.id] = JSON.stringify(existingManifest.baseline.entries);
+        const savedSnapshots = existingManifest.baseline.snapshots ?? {};
+        for (const snap of snapshots) {
+          if (primarySnap && snap.id === primarySnap.id) {
+            baselineSnapshots[snap.id] = JSON.stringify(existingManifest.baseline.entries);
+          } else if (typeof savedSnapshots[snap.id] === 'string') {
+            baselineSnapshots[snap.id] = savedSnapshots[snap.id];
+          } else {
+            // Legacy manifest predating multi-snapshot persistence: capture best-effort.
+            baselineSnapshots[snap.id] = captureSnapshot(snap);
+          }
         }
       } else {
         for (const snap of snapshots) {
-          console.error(`[bkb] Capturing baseline snapshot "${snap.id}" via "${snap.command}"...`);
-          try {
-            const out = execSync(snap.command, {
-              cwd: absRepoPath,
-              encoding: 'utf8',
-              stdio: ['ignore', 'pipe', 'pipe'],
-              timeout: pack.verification.timeoutMs ?? 60_000,
-            });
-            baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, out);
-          } catch (err) {
-            console.error(`[bkb] Warning: Failed to run snapshot "${snap.id}":`, err);
-            baselineSnapshots[snap.id] = normalizeSnapshotOutput(snap.kind, '');
-          }
+          baselineSnapshots[snap.id] = captureSnapshot(snap);
         }
       }
       const baselineSnapshotsJson = JSON.stringify(baselineSnapshots);
@@ -323,6 +335,7 @@ export class MigrationGraphManager {
           entryCount: Array.isArray(baselineEntries) ? baselineEntries.length : 0,
           entries: Array.isArray(baselineEntries) ? baselineEntries : [],
           command: primarySnap?.command,
+          snapshots: baselineSnapshots,
         },
         modules: parsedModules.map((m) => {
           const sccId = sccResult.sccOf.get(m.path) ?? 0;
@@ -331,6 +344,7 @@ export class MigrationGraphManager {
             path: m.path,
             status: hasLegacy ? 'PENDING' : 'CLEAN',
             sccId,
+            baselineSets: m.invariantSets,
           };
         }),
       });
