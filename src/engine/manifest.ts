@@ -213,6 +213,11 @@ export function recordStepInManifest(
     };
   }
 
+  // Keep the top-level phase in lockstep with the most recent verified step so
+  // status reporting reflects the active phase (SHIM / MIGRATE / DE_SHIM)
+  // instead of being frozen at the value written during initialization.
+  manifest.phase = record.phase;
+
   manifest.history.push({
     step: record.step,
     phase: record.phase,

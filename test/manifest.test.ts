@@ -118,6 +118,31 @@ describe('Git-Native Migration Manifest Subsystem', () => {
     assert.equal(onDisk?.modules['src/utils/resp.ts'].status, 'SHIMMED');
   });
 
+  test('recordStepInManifest advances the top-level manifest phase', () => {
+    initOrUpdateManifest({
+      repoPath: tempRepo,
+      packId: 'express-to-fastify',
+      baselineSnapshot: {
+        snapshotType: 'route-surface',
+        entryCount: 1,
+        entries: ['GET /api/health'],
+      },
+      modules: [{ path: 'src/utils/resp.ts', status: 'PENDING' }],
+    });
+    assert.equal(loadManifest(tempRepo)?.phase, 'SHIM');
+
+    const updated = recordStepInManifest(tempRepo, {
+      step: 2,
+      phase: 'DE_SHIM',
+      modules: ['src/utils/resp.ts'],
+      status: 'VERIFIED',
+      action: 'Removed legacy shim',
+    });
+
+    assert.equal(updated?.phase, 'DE_SHIM');
+    assert.equal(loadManifest(tempRepo)?.phase, 'DE_SHIM');
+  });
+
   test('initOrUpdateManifest preserves existing verified module states on repeated init', () => {
     initOrUpdateManifest({
       repoPath: tempRepo,
