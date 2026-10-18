@@ -528,6 +528,29 @@ function getTransitiveCallers(targetNodeId) {
   return Array.from(callers);
 }
 
+// Computes a sequential path from an upstream entrypoint root down to targetId
+function getCallerPathToTarget(targetId) {
+  const path = [targetId];
+  let curr = targetId;
+  const visited = new Set([targetId]);
+
+  while (true) {
+    const parentEdges = allEdgesCache.filter((e) => e.target === curr && !visited.has(e.source));
+    if (!parentEdges.length) break;
+    // Prefer parent closer to root entrypoint (lowest inDegree)
+    parentEdges.sort((a, b) => {
+      const modA = allModulesCache.find((m) => m.path === a.source);
+      const modB = allModulesCache.find((m) => m.path === b.source);
+      return (modA?.inDegree ?? 99) - (modB?.inDegree ?? 99);
+    });
+    const parent = parentEdges[0].source;
+    visited.add(parent);
+    path.unshift(parent);
+    curr = parent;
+  }
+  return path;
+}
+
 function highlightBlastRadius(nodeId) {
   blastRadiusActiveNode = nodeId;
   const callers = getTransitiveCallers(nodeId);
@@ -535,14 +558,28 @@ function highlightBlastRadius(nodeId) {
 
   if (!cy) return;
 
-  // Build hop sequence from callers to target
-  const hops = callers.map((c, i) => ({
-    hopIndex: i + 1,
-    nodeId: c,
-    note: i === 0 ? 'Direct caller' : `Transitive caller (${i + 1} hops)`,
-  }));
-  hops.push({ hopIndex: hops.length + 1, nodeId, note: 'Target Module' });
+  // Build clean sequential hop path from root down to clicked target module
+  const chain = getCallerPathToTarget(nodeId);
+  const hops = chain.map((p, i) => {
+    const isTarget = i === chain.length - 1;
+    let note = 'Caller';
+    if (isTarget) {
+      note = 'Target Module';
+    } else if (i === 0) {
+      note = 'Upstream Root';
+    } else {
+      note = `Caller (Hop ${i})`;
+    }
+    return {
+      hopIndex: i + 1,
+      nodeId: p,
+      note,
+    };
+  });
   lastProofHops = hops;
+
+  const mod = allModulesCache.find((m) => m.path === nodeId);
+  renderHopPipeline(hops, { targetPaths: [nodeId], phase: mod?.status || 'INSPECT' }, currentStepNumber);
 
   animateTraversal(hops, {
     onComplete: () => {
@@ -860,9 +897,18 @@ function renderHopPipeline(hops, claim, stepNum) {
       badgeText = 'Caller';
     }
 
+    const mod = allModulesCache.find((m) => m.path === h.nodeId);
     const layerText = info.layer || 'Module';
     const roleText = h.note || info.role || 'Dependency';
-    const statusText = isTargetHop ? '0 Blockers' : 'Verified';
+    const isVerified = mod?.status === 'VERIFIED';
+    const statusText = isVerified
+      ? 'Verified'
+      : (isTargetHop
+          ? (mod?.status === 'PENDING' ? '0 Blockers' : (mod?.status || 'Active Target'))
+          : (mod?.status || 'Active'));
+    const statusClass = isVerified
+      ? 'text-status-verified'
+      : (isTargetHop ? 'text-status-target' : '');
 
     html += `
       <div class="hop-node-row ${isTargetHop ? 'target-row' : ''}">
@@ -876,7 +922,7 @@ function renderHopPipeline(hops, claim, stepNum) {
           </div>
           <div class="hop-card-bottom">
             <span class="hop-card-meta">${escapeHtml(layerText)} • ${escapeHtml(roleText)}</span>
-            <span class="hop-card-status ${isTargetHop ? 'text-status-target' : ''}">${statusText}</span>
+            <span class="hop-card-status ${statusClass}">${escapeHtml(statusText)}</span>
           </div>
         </div>
       </div>
@@ -912,17 +958,28 @@ function parseAndAnimateProof(proofStr, targetPaths, claimObj) {
       const p = parts[i];
       const found = allModulesCache.find((m) => {
         const shortM = m.path.replace(/^src\//, '').replace(/\.[^/.]+$/, '');
-        return shortM === p || m.path.includes(p);
+        return shortM === p || m.path.includes(p) || p.includes(shortM);
       });
       if (found) {
         hops.push({
           hopIndex: i + 1,
           nodeId: found.path,
-          note: i === parts.length - 1 ? 'Target Module' : (i === 0 ? 'Root Caller' : 'Intermediate Caller'),
+          note: i === parts.length - 1 ? 'Target Module' : (i === 0 ? 'Upstream Root' : 'Caller'),
         });
       }
     }
     if (hops.length > 0) {
+      if (targetPaths) {
+        targetPaths.forEach((tp) => {
+          if (!hops.some((h) => h.nodeId === tp)) {
+            hops.push({
+              hopIndex: hops.length + 1,
+              nodeId: tp,
+              note: targetPaths.length > 1 ? 'Atomic Cycle Target' : 'Target Module',
+            });
+          }
+        });
+      }
       lastProofHops = hops;
       renderHopPipeline(hops, claimObj || { targetPaths }, currentStepNumber);
       animateTraversal(hops);
@@ -933,13 +990,31 @@ function parseAndAnimateProof(proofStr, targetPaths, claimObj) {
   // Fallback: if no linear proof chain or for Tarjan SCC cycles / de-shim
   if (targetPaths && targetPaths.length > 0) {
     const target = targetPaths[0];
-    const callers = getTransitiveCallers(target);
-    const hops = callers.slice(0, 3).reverse().map((c, i) => ({
-      hopIndex: i + 1,
-      nodeId: c,
-      note: i === 0 ? 'Upstream Root' : 'Caller',
-    }));
-    hops.push({ hopIndex: hops.length + 1, nodeId: target, note: 'Target Module' });
+    const chain = getCallerPathToTarget(target);
+    const hops = chain.map((nodeId, i) => {
+      const isTargetNode = targetPaths.includes(nodeId) || i === chain.length - 1;
+      let note = 'Caller';
+      if (isTargetNode) {
+        note = targetPaths.length > 1 ? 'Atomic Cycle Target' : 'Target Module';
+      } else if (i === 0) {
+        note = 'Upstream Root';
+      }
+      return {
+        hopIndex: i + 1,
+        nodeId,
+        note,
+      };
+    });
+    targetPaths.forEach((tp) => {
+      if (!hops.some((h) => h.nodeId === tp)) {
+        hops.push({
+          hopIndex: hops.length + 1,
+          nodeId: tp,
+          note: 'Atomic Cycle Target',
+        });
+      }
+    });
+
     lastProofHops = hops;
     renderHopPipeline(hops, claimObj || { targetPaths }, currentStepNumber);
     animateTraversal(hops);
@@ -2364,6 +2439,14 @@ async function handleLiveTelemetryEvent(event, flashBadge) {
         `;
       }
 
+      // Update Topological Hops immediately for active claim
+      const claimObj = {
+        targetPaths: event.targetPaths,
+        phase: event.phase || 'MIGRATE',
+        proof: event.proof,
+      };
+      parseAndAnimateProof(event.proof, event.targetPaths, claimObj);
+
       // Fetch file content to display preview immediately
       try {
         const res = await fetch(`/api/file?path=${encodeURIComponent(event.targetPaths[0])}`);
@@ -2412,6 +2495,9 @@ async function handleLiveTelemetryEvent(event, flashBadge) {
       phaseBadge.textContent = event.status || 'VERIFIED';
       phaseBadge.className = 'phase-pill status-VERIFIED';
     }
+
+    // Refresh next unblocked claim in Topological Hops
+    await loadInitialTopologicalState();
 
     if (event.targetPaths && event.targetPaths[0]) {
       try {
@@ -2655,6 +2741,22 @@ function setupDelegatedClickHandlers() {
   });
 }
 
+async function loadInitialTopologicalState() {
+  try {
+    const res = await fetch('/api/claim', { method: 'POST' });
+    const data = await res.json();
+    if (data && data.claim && data.claim.targetPaths?.length) {
+      showActiveTarget(data.claim, data.queryLatencyMs);
+      parseAndAnimateProof(data.claim.proof, data.claim.targetPaths, data.claim);
+    } else {
+      renderMissionDeck();
+    }
+  } catch (err) {
+    console.error('Failed to load initial claim:', err);
+    renderMissionDeck();
+  }
+}
+
 // ── Application Bootstrapper ──────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -2670,9 +2772,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     setupStandbyDeck();
     await loadSystemInfo();
     checkStandbyState(data.modules);
-    renderMissionDeck();
+    await loadInitialTopologicalState();
     await loadAuditTrail();
 
+    document.getElementById('btn-step')?.addEventListener('click', executeStep);
     document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
     document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
 

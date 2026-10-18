@@ -1791,6 +1791,11 @@ code, pre, .font-mono {
   font-weight: 600;
 }
 
+.hop-card-status.text-status-verified {
+  color: #10B981;
+  font-weight: 600;
+}
+
 /* Section 5.4: Code Changes Diff Tab */
 .diff-view-pane {
   flex: 1 1 0;

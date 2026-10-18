@@ -155,16 +155,17 @@ export class MigrationOps {
       await this.db.query(Q.SET_CLAIMED_PHASE, { paths: targetPaths, phase });
     }
 
+    // Build human-readable proof via shortestPath
+    const proof = await this.buildProof(targetPaths, phase);
+
     broadcastLiveEvent({
       type: 'claim',
       repoPath: this.repoPath,
       packId: this.pack.id,
       targetPaths,
       phase,
+      proof,
     });
-
-    // Build human-readable proof via shortestPath
-    const proof = await this.buildProof(targetPaths, phase);
 
     return {
       phase,
@@ -207,12 +208,15 @@ export class MigrationOps {
       await this.db.query(Q.SET_CLAIMED_PHASE, { paths: targetPaths, phase });
     }
 
+    const proof = await this.buildProof(targetPaths, phase);
+
     broadcastLiveEvent({
       type: 'claim',
       repoPath: this.repoPath,
       packId: this.pack.id,
       targetPaths,
       phase,
+      proof,
     });
 
     return {
@@ -222,7 +226,7 @@ export class MigrationOps {
       targetPaths,
       pendingCallersCount,
       pendingCallerPaths,
-      proof: await this.buildProof(targetPaths, phase),
+      proof,
     };
   }
 

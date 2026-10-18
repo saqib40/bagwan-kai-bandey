@@ -24,6 +24,7 @@ export interface LiveEvent {
   totalSteps?: number;
   agentSummary?: string;
   errors?: string[];
+  proof?: string;
   timestamp?: number;
 }
 
