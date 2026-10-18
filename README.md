@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/bagwan-kai-bandey.svg?color=cb3837)](https://www.npmjs.com/package/bagwan-kai-bandey)
 [![Powered by FalkorDB](https://img.shields.io/badge/Powered%20by-FalkorDB-purple.svg)](https://www.falkordb.com/)
 [![Protocol: Model Context Protocol](https://img.shields.io/badge/Protocol-MCP-blue.svg)](https://modelcontextprotocol.io/)
-[![Tests: 176 Passing](https://img.shields.io/badge/Tests-176%20Pass-brightgreen.svg)]()
+[![Tests: 182 Passing](https://img.shields.io/badge/Tests-182%20Pass-brightgreen.svg)]()
 [![Typecheck: Clean](https://img.shields.io/badge/Typecheck-tsc%20green-success.svg)]()
 [![Languages: TypeScript & Python](https://img.shields.io/badge/Languages-TypeScript%20%7C%20Python-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -23,7 +23,44 @@
 
 ---
 
+## 🗺️ How the Graph Governs the Agent: FalkorDB Architecture
+
+FalkorDB is not an auxiliary log store in BKB — **it is the central brain and decision governor**. Standard LLM agents fail on complex migrations because they crawl files randomly or edit top-down, breaking compilers and route invariants. 
+
+BKB translates your codebase into a **topological knowledge graph** inside FalkorDB. Every agent decision (what to edit, what context to inspect, when to enforce dual-signature shims, and when to clean up) is strictly governed by openCypher graph queries:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              FalkorDB Knowledge Graph                                  │
+│                                                                                        │
+│     (:MigrationEpisode)                               (:ExternalAPI)                   │
+│             │                                               ▲                          │
+│             │ [:AFFECTED]                                   │ [:USES_API]              │
+│             ▼                                               │                          │
+│        (:Module) ─────────────── [:IMPORTS] ───────────► (:Module)                     │
+│       (Caller Node)                                    (Callee Leaf)                   │
+│             │                                                                          │
+│             │ [:DECLARES]                                                              │
+│             ▼                                                                          │
+│        (:Symbol)                                                                       │
+│     (Signatures/Types)                                                                 │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 🛡️ How FalkorDB Drives Agent Decisions (openCypher Execution)
+
+| Agent Decision Gate | openCypher Execution in FalkorDB | Mathematical Law Enforced |
+| :--- | :--- | :--- |
+| **1. What file to migrate next?** | `MATCH (m:Module {status: 'PENDING'})`<br>`WHERE NOT (m)-[:IMPORTS]->(:Module {status: 'PENDING'})`<br>`RETURN m ORDER BY m.scc_size ASC, m.pagerank DESC LIMIT 1` | **Law 1 (Callee-First Order):** Guarantees callers never import unmigrated code. Foundational leaves with highest PageRank are claimed first. |
+| **2. Are there circular cycles?** | `MATCH (m:Module) WHERE m.scc_size > 1`<br>`RETURN m.scc_id, collect(m.path) AS cycle_files` | **Law 2 (Tarjan SCC Law):** Circular dependencies ($A \leftrightarrow B$) cannot be migrated file-by-file; the graph condenses them into atomic batches. |
+| **3. Does this file need a backward-compatible shim?** | `MATCH (caller:Module)-[:IMPORTS]->(m:Module {path: $path})`<br>`WHERE caller.status <> 'VERIFIED'`<br>`RETURN count(caller) AS pending_callers` | **Law 3 (Strangler Fig Law):** If pending callers exist, the agent is forced to export dual-signature shims (`// @bkb-shim`) so upstream code never breaks. |
+| **4. When can shims be safely removed?** | `MATCH (m:Module {status: 'SHIMMED'})`<br>`WHERE NOT (:Module {status: 'PENDING'})-[:IMPORTS]->(m)`<br>`RETURN m` | **Deterministic De-Shimming (Pass A):** When 100% of callers reach target state, the graph signals the agent to prune legacy shims top-down. |
+| **5. What is the multi-hop blast radius of a failure?** | `MATCH path = (caller:Module)-[:IMPORTS*1..4]->(target:Module {path: $path})`<br>`RETURN caller.path, length(path) AS distance ORDER BY distance ASC` | **Blast Radius Simulation:** Dynamically calculates all upstream blast exposure in $< 2\text{ms}$ indexed graph queries. |
+
+---
+
 ### Table of Contents
+- [🗺️ How the Graph Governs the Agent: FalkorDB Architecture](#️-how-the-graph-governs-the-agent-falkordb-architecture)
 - [Installation & Prerequisites](#installation--prerequisites)
 - [Quickstart (Sandbox Demo)](#quickstart-sandbox-demo)
 - [Using BKB on Your Codebase](#using-bkb-on-your-codebase)
