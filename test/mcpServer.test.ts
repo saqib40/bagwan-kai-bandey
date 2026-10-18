@@ -6,18 +6,33 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { rmSync, mkdirSync, cpSync, symlinkSync, existsSync } from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createShiftMcpServer } from '../src/mcp/server';
 
-const repoPath = resolve(import.meta.dirname, '../demo-repo');
+const sourceRepo = resolve(import.meta.dirname, '../demo-repo');
+const scratchRepo = resolve(import.meta.dirname, '../scratch/mcp-server-test-repo');
 const packId = 'express-to-fastify';
 const testGraphName = 'shift_mcp_test';
+
+function setupScratchRepo() {
+  rmSync(scratchRepo, { recursive: true, force: true });
+  mkdirSync(scratchRepo, { recursive: true });
+  cpSync(resolve(sourceRepo, 'src'), resolve(scratchRepo, 'src'), { recursive: true });
+  cpSync(resolve(sourceRepo, 'scripts'), resolve(scratchRepo, 'scripts'), { recursive: true });
+  cpSync(resolve(sourceRepo, 'test'), resolve(scratchRepo, 'test'), { recursive: true });
+  cpSync(resolve(sourceRepo, 'package.json'), resolve(scratchRepo, 'package.json'));
+  cpSync(resolve(sourceRepo, 'tsconfig.json'), resolve(scratchRepo, 'tsconfig.json'));
+  if (existsSync(resolve(sourceRepo, 'node_modules'))) {
+    symlinkSync(resolve(sourceRepo, 'node_modules'), resolve(scratchRepo, 'node_modules'), 'junction');
+  }
+}
 
 test('verify_and_commit_node accepts a call that omits agentSummary', async () => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createShiftMcpServer({
-    defaultRepoPath: repoPath,
+    defaultRepoPath: sourceRepo,
     defaultPackId: packId,
     graphName: testGraphName,
   });
@@ -47,10 +62,11 @@ test('verify_and_commit_node accepts a call that omits agentSummary', async () =
 });
 
 test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async () => {
+  setupScratchRepo();
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
   const server = createShiftMcpServer({
-    defaultRepoPath: repoPath,
+    defaultRepoPath: scratchRepo,
     defaultPackId: packId,
     graphName: testGraphName,
   });
@@ -88,7 +104,7 @@ test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async 
     const initRes = await client.callTool({
       name: 'init_migration_graph',
       arguments: {
-        repoPath,
+        repoPath: scratchRepo,
         packId,
         reset: true,
       },
@@ -180,5 +196,6 @@ test('BKB MCP Server exposes 6 tools and executes end-to-end tool calls', async 
   } finally {
     await client.close();
     await server.close();
+    rmSync(scratchRepo, { recursive: true, force: true });
   }
 });

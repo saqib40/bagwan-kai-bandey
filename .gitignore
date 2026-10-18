@@ -1,6 +1,7 @@
 node_modules/
-demo-repo/node_modules/
-demo-repo-flask/.venv/
+demo-repo*/node_modules/
+demo-repo*/.venv/
+demo-repo*/.pytest_cache/
 .venv/
 __pycache__/
 .pytest_cache/

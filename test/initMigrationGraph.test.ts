@@ -1,20 +1,33 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { rmSync, mkdirSync, cpSync, symlinkSync, existsSync } from 'node:fs';
 import { FalkorClient } from '../src/engine/falkorClient';
 import { MigrationGraphManager } from '../src/engine/graphManager';
 import * as Q from '../src/engine/queries';
 
-const repoPath = resolve(import.meta.dirname, '../demo-repo');
+const sourceRepo = resolve(import.meta.dirname, '../demo-repo');
+const scratchRepo = resolve(import.meta.dirname, '../scratch/init-graph-test-repo');
 const packId = 'express-to-fastify';
 const testGraphName = 'shift_m1_test';
 
 test('initMigrationGraph initializes demo-repo in FalkorDB', async () => {
+  rmSync(scratchRepo, { recursive: true, force: true });
+  mkdirSync(scratchRepo, { recursive: true });
+  cpSync(resolve(sourceRepo, 'src'), resolve(scratchRepo, 'src'), { recursive: true });
+  cpSync(resolve(sourceRepo, 'scripts'), resolve(scratchRepo, 'scripts'), { recursive: true });
+  cpSync(resolve(sourceRepo, 'test'), resolve(scratchRepo, 'test'), { recursive: true });
+  cpSync(resolve(sourceRepo, 'package.json'), resolve(scratchRepo, 'package.json'));
+  cpSync(resolve(sourceRepo, 'tsconfig.json'), resolve(scratchRepo, 'tsconfig.json'));
+  if (existsSync(resolve(sourceRepo, 'node_modules'))) {
+    symlinkSync(resolve(sourceRepo, 'node_modules'), resolve(scratchRepo, 'node_modules'), 'junction');
+  }
+
   const client = await FalkorClient.connect({ graphName: testGraphName });
 
   try {
     const summary = await MigrationGraphManager.initMigrationGraph({
-      repoPath,
+      repoPath: scratchRepo,
       packId,
       client,
       reset: true,
@@ -29,7 +42,7 @@ test('initMigrationGraph initializes demo-repo in FalkorDB', async () => {
     // 1. Verify :MigrationMeta node
     const metaRows = await client.query<any>(
       `MATCH (meta:MigrationMeta {repo_path: $repoPath, pack_id: $packId}) RETURN meta.baseline_routes AS routes`,
-      { repoPath, packId },
+      { repoPath: scratchRepo, packId },
     );
     assert.equal(metaRows.length, 1);
     const routes = JSON.parse(metaRows[0].routes);
@@ -86,5 +99,6 @@ test('initMigrationGraph initializes demo-repo in FalkorDB', async () => {
   } finally {
     await client.reset();
     await client.close();
+    rmSync(scratchRepo, { recursive: true, force: true });
   }
 });
