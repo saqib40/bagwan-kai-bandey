@@ -10,10 +10,18 @@
 [![Languages: TypeScript & Python](https://img.shields.io/badge/Languages-TypeScript%20%7C%20Python-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-</div>
+<br>
 
-> **The graph-governed codebase migration engine that prevents AI agents from breaking your build.**  
-> Powered by **FalkorDB**, Bagwan Kai Bandey (BKB) computes topological callee-first execution order, groups circular dependency cycles into atomic batches via Tarjan's SCC algorithm, enforces dual-signature Strangler Fig shims, and verifies invariant snapshots at every step—keeping compilers green, test suites intact, and API surfaces 100% identical.
+**The graph flight controller for autonomous codebase migrations.**
+
+<p align="center">
+  <b>Sequence</b> — Callee-first topological traversal ensures callers never import unmigrated code.<br>
+  <b>Isolate</b> — Resolves circular dependency cycles into atomic batches via Tarjan's SCC and Strangler Fig shims.<br>
+  <b>Verify</b> — Proves compilers, unit test counts, and API route surfaces remain 100% invariant at every step.<br>
+  <b>Handoff</b> — Git-native per-pack manifests enable phased, multi-sprint migrations across distributed teams.
+</p>
+
+</div>
 
 ---
 
