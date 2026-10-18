@@ -14,14 +14,12 @@
 
 **The graph flight controller for autonomous codebase migrations.**
 
-<p align="center">
-  <b>Sequence</b> — Callee-first topological traversal ensures callers never import unmigrated code.<br>
-  <b>Isolate</b> — Resolves circular dependency cycles into atomic batches via Tarjan's SCC and Strangler Fig shims.<br>
-  <b>Verify</b> — Proves compilers, unit test counts, and API route surfaces remain 100% invariant at every step.<br>
-  <b>Handoff</b> — Git-native per-pack manifests enable phased, multi-sprint migrations across distributed teams.
-</p>
-
 </div>
+
+- **Sequence** — Callee-first topological traversal ensures callers never import unmigrated code.
+- **Isolate** — Resolves circular dependency cycles into atomic batches via Tarjan's SCC and Strangler Fig shims.
+- **Verify** — Proves compilers, unit test counts, and API route surfaces remain 100% invariant at every step.
+- **Handoff** — Git-native per-pack manifests enable phased, multi-sprint migrations across distributed teams.
 
 ---
 
