@@ -12,7 +12,7 @@
 
 <br>
 
-**The graph flight controller for autonomous codebase migrations.**
+**Autonomous codebase migrations that never break your build.**
 
 </div>
 
