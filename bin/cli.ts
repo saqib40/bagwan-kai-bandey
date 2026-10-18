@@ -347,6 +347,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       total: number;
       clean: number;
       pending: number;
+      inProgress: number;
       shimmed: number;
       verified: number;
       unblocked: Array<{ path: string; status: string; inDegree: number; pagerank: number }>;
@@ -377,6 +378,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
         total,
         clean: counts.get('CLEAN') ?? 0,
         pending: counts.get('PENDING') ?? 0,
+        inProgress: counts.get('IN_PROGRESS') ?? 0,
         shimmed: counts.get('SHIMMED') ?? 0,
         verified: counts.get('VERIFIED') ?? 0,
         unblocked: unblockedRows.map((r) => ({
@@ -395,6 +397,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     let total = 0;
     let clean = 0;
     let pending = 0;
+    let inProgress = 0;
     let shimmed = 0;
     let verified = 0;
 
@@ -402,6 +405,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       total = falkorStats.total;
       clean = falkorStats.clean;
       pending = falkorStats.pending;
+      inProgress = falkorStats.inProgress;
       shimmed = falkorStats.shimmed;
       verified = falkorStats.verified;
     } else if (manifest) {
@@ -409,11 +413,14 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
       total = modValues.length;
       clean = modValues.filter((m) => m.status === 'CLEAN').length;
       pending = modValues.filter((m) => m.status === 'PENDING').length;
+      inProgress = modValues.filter((m) => m.status === 'CLAIMED').length;
       shimmed = modValues.filter((m) => m.status === 'SHIMMED').length;
       verified = modValues.filter((m) => m.status === 'VERIFIED').length;
     }
 
-    const percentVal = total > 0 ? ((verified + clean + shimmed * 0.5) / total) * 100 : 0;
+    // Complete = VERIFIED/CLEAN; half = SHIMMED or in-flight (so claiming a
+    // PENDING module never makes reported progress go backwards).
+    const percentVal = total > 0 ? ((verified + clean + (shimmed + inProgress) * 0.5) / total) * 100 : 0;
     const percentStr = percentVal.toFixed(1) + '%';
 
     const lastMilestone = manifest?.history?.length
@@ -428,6 +435,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
         totalModules: total,
         clean,
         pending,
+        inProgress,
         shimmed,
         verified,
         percentComplete: percentStr,

@@ -423,6 +423,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
       const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
       const clean = counts.get('CLEAN') ?? 0;
       const pending = counts.get('PENDING') ?? 0;
+      const inProgress = counts.get('IN_PROGRESS') ?? 0;
       const shimmed = counts.get('SHIMMED') ?? 0;
       const verified = counts.get('VERIFIED') ?? 0;
 
@@ -442,9 +443,11 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         ? manifest.history[manifest.history.length - 1]
         : null;
 
+      // Complete = VERIFIED/CLEAN; half = SHIMMED or in-flight (so claiming a
+      // PENDING module never makes reported progress go backwards).
       const percentComplete =
         total > 0
-          ? (((verified + clean + shimmed * 0.5) / total) * 100).toFixed(1) + '%'
+          ? (((verified + clean + (shimmed + inProgress) * 0.5) / total) * 100).toFixed(1) + '%'
           : '0%';
 
       const result = {
@@ -455,6 +458,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
           totalModules: total,
           clean,
           pending,
+          inProgress,
           shimmed,
           verified,
           percentComplete,
