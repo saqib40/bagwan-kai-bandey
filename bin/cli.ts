@@ -6,7 +6,7 @@
  */
 
 import { resolve, join } from 'node:path';
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { ensureFalkorDB } from '../src/engine/docker';
 import { MigrationGraphManager } from '../src/engine/graphManager';
 import { MigrationOps } from '../src/engine/operations';
@@ -133,8 +133,22 @@ function parseArgs(args: string[]) {
 
 let activeConfig: BkbConfig | null = null;
 
+function resolveTargetRepo(cliRepoFlag?: string | boolean): string {
+  if (typeof cliRepoFlag === 'string' && cliRepoFlag.trim()) {
+    return resolve(cliRepoFlag);
+  }
+  if (activeConfig?.defaultRepo) {
+    return resolve(activeConfig.defaultRepo);
+  }
+  const localDemoRepo = resolve(process.cwd(), 'demo-repo');
+  if (existsSync(localDemoRepo) && statSync(localDemoRepo).isDirectory()) {
+    return localDemoRepo;
+  }
+  return process.cwd();
+}
+
 async function createOps(flags: Record<string, string | boolean>): Promise<MigrationOps> {
-  const repoPath = resolve(String(flags.repo ?? activeConfig?.defaultRepo ?? './demo-repo'));
+  const repoPath = resolveTargetRepo(flags.repo);
   const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
   const graphName = typeof flags.graph === 'string' ? flags.graph : activeConfig?.falkor?.graphName;
   const mgr = await MigrationGraphManager.create(repoPath, packId, { graphName });
@@ -291,12 +305,12 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     let reset = flags.reset !== undefined ? Boolean(flags.reset) : undefined;
 
     if (flags.interactive || (!flags.repo && !flags.pack && process.stdin.isTTY && flags.reset === undefined)) {
-      const wizardRes = await runInteractiveInit(repoPath ?? activeConfig?.defaultRepo ?? './demo-repo');
+      const wizardRes = await runInteractiveInit(repoPath ?? resolveTargetRepo());
       repoPath = wizardRes.repoPath;
       packId = wizardRes.packId;
       reset = wizardRes.reset;
     } else {
-      repoPath = repoPath ?? activeConfig?.defaultRepo ?? './demo-repo';
+      repoPath = repoPath ?? resolveTargetRepo();
       packId = packId ?? activeConfig?.defaultPack ?? 'express-to-fastify';
       reset = reset ?? false;
     }
@@ -336,7 +350,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
   }
 
   if (command === 'status') {
-    const repoPath = resolve(String(flags.repo ?? activeConfig?.defaultRepo ?? './demo-repo'));
+    const repoPath = resolveTargetRepo(flags.repo);
     const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
     const isJson = Boolean(flags.json);
 
@@ -615,7 +629,7 @@ Total Modules:      ${total}
 
   if (command === 'cockpit' || command === 'ui') {
     const port = Number(flags.port ?? process.env.PORT ?? 4200);
-    const repoPath = resolve(String(flags.repo ?? activeConfig?.defaultRepo ?? './demo-repo'));
+    const repoPath = resolveTargetRepo(flags.repo);
     const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
     const { startDemoServer } = await import('../src/server/demoServer');
 
@@ -640,7 +654,7 @@ Total Modules:      ${total}
   }
 
   if (command === 'rollback') {
-    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve(activeConfig?.defaultRepo ?? './demo-repo');
+    const repoPath = resolveTargetRepo(flags.repo);
     const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
 
     if (flags.list) {
@@ -679,7 +693,7 @@ Total Modules:      ${total}
   }
 
   if (command === 'run' || command === 'auto') {
-    const repoPath = flags.repo ? resolve(String(flags.repo)) : resolve(activeConfig?.defaultRepo ?? './demo-repo');
+    const repoPath = resolveTargetRepo(flags.repo);
     const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
     const dryRun = Boolean(flags['dry-run'] || flags.dryRun);
     const provider = dryRun ? 'mock' : ((flags.provider ? String(flags.provider) : undefined) as any);

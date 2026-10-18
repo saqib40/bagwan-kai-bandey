@@ -125,8 +125,13 @@ export class MigrationGraphManager {
             env,
           });
           return normalizeSnapshotOutput(snap.kind, out);
-        } catch (err) {
-          console.error(`[bkb] Warning: Failed to run snapshot "${snap.id}":`, err);
+        } catch (err: any) {
+          const raw = (err?.stderr || err?.message || String(err)).toString();
+          const detail = raw
+            .split('\n')
+            .map((l: string) => l.trim())
+            .find((l: string) => l.length > 0 && !l.startsWith('Command failed') && !l.startsWith('node:')) || 'command failed';
+          console.error(`[bkb] Notice: Optional snapshot "${snap.id}" skipped (${detail})`);
           return normalizeSnapshotOutput(snap.kind, '');
         }
       };
