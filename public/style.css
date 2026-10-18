@@ -453,40 +453,6 @@ code, pre, .font-mono {
   font-variant-numeric: tabular-nums;
 }
 
-/* ==========================================================================
-   Standby Phase Layout: Minimal, Centered, Distraction-Free
-   ========================================================================== */
-
-/* Navbar: Center "Bagwan Kai Bandey" only, hide breadcrumbs & progress */
-body.standby-phase .navbar {
-  position: relative;
-  justify-content: flex-end;
-}
-
-body.standby-phase .nav-brand-group {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  gap: 0;
-}
-
-body.standby-phase .nav-slash,
-body.standby-phase .nav-repo-label,
-body.standby-phase .nav-pack-label,
-body.standby-phase .nav-badge-subtle,
-body.standby-phase .header-progress {
-  display: none !important;
-}
-
-/* Main workspace: 100% full-width canvas, hide right telemetry pane */
-body.standby-phase .cockpit-grid {
-  grid-template-columns: 1fr !important;
-}
-
-body.standby-phase .sidebar-pane {
-  display: none !important;
-}
-
 /* Minimal Floating Standby Terminal Capsule (Modeled after bottom music player) */
 .standby-dock {
   position: absolute;
@@ -518,6 +484,7 @@ body.standby-phase .sidebar-pane {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  display: none !important;
 }
 
 /* Left: Circular Avatar Thumbnail */

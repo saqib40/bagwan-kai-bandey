@@ -1517,7 +1517,10 @@ function highlightCypherSyntax(rawQuery) {
 function dismissStandby() {
   document.body.classList.remove('standby-phase');
   const dock = document.getElementById('standby-dock') || document.getElementById('standby-overlay');
-  if (dock) dock.classList.add('dismissed');
+  if (dock) {
+    dock.classList.add('dismissed');
+    dock.style.display = 'none';
+  }
   const legDock = document.querySelector('.graph-floating-dock');
   if (legDock) legDock.classList.remove('dock-hidden');
   if (window.cy) {
@@ -1526,37 +1529,21 @@ function dismissStandby() {
         window.cy.resize();
         window.cy.fit(undefined, 40);
       } catch {}
-    }, 280);
+    }, 150);
   }
 }
 
 function showStandby() {
-  document.body.classList.add('standby-phase');
   const dock = document.getElementById('standby-dock') || document.getElementById('standby-overlay');
-  if (dock) dock.classList.remove('dismissed');
-  const legDock = document.querySelector('.graph-floating-dock');
-  if (legDock) legDock.classList.add('dock-hidden');
-  if (window.cy) {
-    setTimeout(() => {
-      try {
-        window.cy.resize();
-        window.cy.fit(undefined, 40);
-      } catch {}
-    }, 280);
+  if (dock) {
+    dock.style.display = 'flex';
+    dock.classList.remove('dismissed');
   }
 }
 
 function checkStandbyState(modules) {
-  if (!modules || modules.length === 0) {
-    showStandby();
-    return;
-  }
-  const hasActiveProgress = modules.some((m) => m.status === 'CLAIMED' || m.status === 'VERIFIED');
-  if (hasActiveProgress) {
-    dismissStandby();
-  } else {
-    showStandby();
-  }
+  // Always dismiss standby dock when graph is loaded, keeping sidebar and full cockpit visible
+  dismissStandby();
 }
 
 function setupStandbyDeck() {
