@@ -1584,12 +1584,10 @@ function setupStandbyDeck() {
       btnCopy.classList.add('copied');
       if (promptIconCopy) promptIconCopy.style.display = 'none';
       if (promptIconCheck) promptIconCheck.style.display = 'inline-block';
-      if (copyText) copyText.textContent = 'Copied!';
       setTimeout(() => {
         btnCopy.classList.remove('copied');
         if (promptIconCopy) promptIconCopy.style.display = 'inline-block';
         if (promptIconCheck) promptIconCheck.style.display = 'none';
-        if (copyText) copyText.textContent = 'Prompt';
       }, 1800);
     } catch {
       const range = document.createRange();
@@ -1597,7 +1595,6 @@ function setupStandbyDeck() {
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      if (copyText) copyText.textContent = 'Press ⌘+C';
     }
   });
 
