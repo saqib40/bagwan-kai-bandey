@@ -431,19 +431,24 @@ function bindCanvasControls() {
     if (cy) cy.fit(undefined, 45);
   });
 
-  // Reset selection / return to landing overview on brand click or Escape
+  // Toggle landing page / flight deck on brand click
   document.querySelector('.nav-brand')?.addEventListener('click', () => {
-    clearBlastRadius();
-    closeNodeInspector();
-    renderMissionDeck();
-    if (cy) cy.fit(undefined, 45);
+    if (document.body.classList.contains('standby-phase')) {
+      dismissStandby();
+    } else {
+      showStandby();
+    }
   });
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      clearBlastRadius();
-      closeNodeInspector();
-      renderMissionDeck();
+      if (document.body.classList.contains('standby-phase')) {
+        dismissStandby();
+      } else {
+        clearBlastRadius();
+        closeNodeInspector();
+        renderMissionDeck();
+      }
     }
   });
 
@@ -1612,6 +1617,11 @@ function dismissStandby() {
     dock.classList.add('dismissed');
     dock.style.display = 'none';
   }
+  const centerBrand = document.getElementById('standby-center-brand');
+  if (centerBrand) {
+    centerBrand.classList.add('dismissed');
+    centerBrand.style.display = 'none';
+  }
   const legDock = document.querySelector('.graph-floating-dock');
   if (legDock) legDock.classList.remove('dock-hidden');
   if (window.cy) {
@@ -1625,10 +1635,29 @@ function dismissStandby() {
 }
 
 function showStandby() {
+  document.body.classList.add('standby-phase');
   const dock = document.getElementById('standby-dock') || document.getElementById('standby-overlay');
   if (dock) {
     dock.style.display = 'flex';
     dock.classList.remove('dismissed');
+  }
+  const centerBrand = document.getElementById('standby-center-brand');
+  if (centerBrand) {
+    centerBrand.style.display = 'flex';
+    centerBrand.classList.remove('dismissed');
+  }
+  const legDock = document.querySelector('.graph-floating-dock');
+  if (legDock) legDock.classList.add('dock-hidden');
+  clearBlastRadius();
+  closeNodeInspector();
+  renderMissionDeck();
+  if (window.cy) {
+    setTimeout(() => {
+      try {
+        window.cy.resize();
+        window.cy.fit(undefined, 40);
+      } catch {}
+    }, 150);
   }
 }
 
@@ -1691,6 +1720,7 @@ function setupStandbyDeck() {
 
   btnDismiss?.addEventListener('click', dismissStandby);
   btnShow?.addEventListener('click', showStandby);
+  document.getElementById('btn-explore-graph')?.addEventListener('click', dismissStandby);
 }
 
 function setupControlsDrawer() {

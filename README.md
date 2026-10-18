@@ -16,7 +16,7 @@
 
 <br>
 
-<img src="docs/assets/cockpit-flight-deck.png" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="100%">
+<img src="docs/assets/cockpit-flight-deck.jpeg" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="100%">
 
 </div>
 
@@ -270,7 +270,7 @@ bkb cockpit --repo /path/to/your-repo
 ```
 
 <p align="center">
-  <img src="docs/assets/cockpit-flight-deck.png" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="100%">
+  <img src="docs/assets/cockpit-flight-deck.jpeg" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="100%">
 </p>
 
 - **Editorial Minimalist Craft**: High-definition Alabaster and warm stone interface inspired by Vercel Geist and Linear, powered by a Cytoscape.js & Dagre hierarchical layout, hairline dividers, and tactile pill controls.
