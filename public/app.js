@@ -1518,8 +1518,6 @@ function dismissStandby() {
   document.body.classList.remove('standby-phase');
   const dock = document.getElementById('standby-dock') || document.getElementById('standby-overlay');
   if (dock) dock.classList.add('dismissed');
-  const centerBrand = document.getElementById('standby-center-brand');
-  if (centerBrand) centerBrand.classList.add('dismissed');
   const legDock = document.querySelector('.graph-floating-dock');
   if (legDock) legDock.classList.remove('dock-hidden');
   if (window.cy) {
@@ -1536,8 +1534,6 @@ function showStandby() {
   document.body.classList.add('standby-phase');
   const dock = document.getElementById('standby-dock') || document.getElementById('standby-overlay');
   if (dock) dock.classList.remove('dismissed');
-  const centerBrand = document.getElementById('standby-center-brand');
-  if (centerBrand) centerBrand.classList.remove('dismissed');
   const legDock = document.querySelector('.graph-floating-dock');
   if (legDock) legDock.classList.add('dock-hidden');
   if (window.cy) {
