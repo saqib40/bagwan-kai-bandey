@@ -786,6 +786,29 @@ body:not(.standby-phase) .standby-center-brand {
   color: #FFFFFF;
 }
 
+.dock-prompt-icon {
+  flex-shrink: 0;
+  transition: transform 140ms ease;
+}
+
+.dock-play-btn.copied .icon-copy {
+  display: none !important;
+}
+
+.dock-play-btn.copied .icon-check {
+  display: inline-block !important;
+  color: #FFFFFF;
+}
+
+.dock-cmd-chip.copied .icon-copy {
+  display: none !important;
+}
+
+.dock-cmd-chip.copied .icon-check {
+  display: inline-block !important;
+  color: #A7F3D0;
+}
+
 /* Dismiss / Close Icon Button */
 .dock-dismiss-btn {
   width: 24px;

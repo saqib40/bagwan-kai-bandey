@@ -111,17 +111,23 @@
             <button id="btn-copy-dock-cmd" class="dock-cmd-chip" title="Click to copy command">
               <span class="dock-cmd-prefix" id="dock-chip-prefix">$</span>
               <code id="cmd-run-code">bkb run</code>
-              <span id="dock-chip-status" style="display: none; font-weight: 600; color: #A7F3D0;">Copied! ✓</span>
-              <svg class="dock-chip-icon" id="dock-chip-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg class="dock-chip-icon icon-copy" id="dock-chip-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
+              <svg class="dock-chip-icon icon-check" id="dock-chip-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
             </button>
 
-            <!-- Circular / Pill Prompt Copy Button (Modeled after Round White Play Button) -->
+            <!-- Pill Prompt Copy Button with Copy/Tick transformation -->
             <button id="btn-copy-prompt" class="dock-play-btn" title="Copy Editor Prompt (Cursor • Claude • Windsurf • VS Code)">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"/>
+              <svg id="prompt-icon-copy" class="dock-prompt-icon icon-copy" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <svg id="prompt-icon-check" class="dock-prompt-icon icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                <polyline points="20 6 9 17 4 12"/>
               </svg>
               <span id="btn-copy-text">Prompt</span>
             </button>

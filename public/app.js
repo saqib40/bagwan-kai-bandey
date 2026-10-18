@@ -1566,33 +1566,38 @@ function checkStandbyState(modules) {
 function setupStandbyDeck() {
   const btnCopy = document.getElementById('btn-copy-prompt');
   const copyText = document.getElementById('btn-copy-text');
+  const promptIconCopy = document.getElementById('prompt-icon-copy');
+  const promptIconCheck = document.getElementById('prompt-icon-check');
   const promptText = document.getElementById('agent-prompt-text');
   const btnDismiss = document.getElementById('btn-dismiss-standby');
   const btnShow = document.getElementById('btn-show-standby');
   const btnCopyCmd = document.getElementById('btn-copy-dock-cmd');
   const cmdRun = document.getElementById('cmd-run-code');
-  const chipStatus = document.getElementById('dock-chip-status');
-  const chipPrefix = document.getElementById('dock-chip-prefix');
   const chipIcon = document.getElementById('dock-chip-icon');
+  const chipCheck = document.getElementById('dock-chip-check');
 
   btnCopy?.addEventListener('click', async () => {
     if (!promptText) return;
     const textToCopy = promptText.textContent.trim();
     try {
       await navigator.clipboard.writeText(textToCopy);
-      if (copyText) copyText.textContent = 'Copied! ✓';
       btnCopy.classList.add('copied');
+      if (promptIconCopy) promptIconCopy.style.display = 'none';
+      if (promptIconCheck) promptIconCheck.style.display = 'inline-block';
+      if (copyText) copyText.textContent = 'Copied!';
       setTimeout(() => {
-        if (copyText) copyText.textContent = 'Prompt';
         btnCopy.classList.remove('copied');
-      }, 2000);
+        if (promptIconCopy) promptIconCopy.style.display = 'inline-block';
+        if (promptIconCheck) promptIconCheck.style.display = 'none';
+        if (copyText) copyText.textContent = 'Prompt';
+      }, 1800);
     } catch {
       const range = document.createRange();
       range.selectNodeContents(promptText);
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      if (copyText) copyText.textContent = 'Press ⌘+C / Ctrl+C';
+      if (copyText) copyText.textContent = 'Press ⌘+C';
     }
   });
 
@@ -1601,16 +1606,12 @@ function setupStandbyDeck() {
     try {
       await navigator.clipboard.writeText(textToCopy);
       btnCopyCmd.classList.add('copied');
-      if (chipPrefix) chipPrefix.style.display = 'none';
-      if (cmdRun) cmdRun.style.display = 'none';
       if (chipIcon) chipIcon.style.display = 'none';
-      if (chipStatus) chipStatus.style.display = 'inline';
+      if (chipCheck) chipCheck.style.display = 'inline-block';
       setTimeout(() => {
         btnCopyCmd.classList.remove('copied');
-        if (chipPrefix) chipPrefix.style.display = 'inline';
-        if (cmdRun) cmdRun.style.display = 'inline';
-        if (chipIcon) chipIcon.style.display = 'inline';
-        if (chipStatus) chipStatus.style.display = 'none';
+        if (chipIcon) chipIcon.style.display = 'inline-block';
+        if (chipCheck) chipCheck.style.display = 'none';
       }, 1800);
     } catch {
       // fallback
