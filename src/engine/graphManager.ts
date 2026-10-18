@@ -6,12 +6,12 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve, basename, delimiter } from 'node:path';
+import { resolve, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { FalkorClient } from './falkorClient';
 import { tarjanScc } from './scc';
 import { loadPack } from './packLoader';
+import { buildRepoExecEnv } from './execEnv';
 import { adapterRegistry } from '../adapters/registry';
 import type { MigrationPack, ParsedModule } from '../adapters/types';
 import { broadcastLiveEvent } from './telemetry';
@@ -116,13 +116,7 @@ export class MigrationGraphManager {
       const captureSnapshot = (snap: (typeof snapshots)[number]): string => {
         console.error(`[bkb] Capturing baseline snapshot "${snap.id}" via "${snap.command}"...`);
         try {
-          const env = { ...process.env };
-          const venvBin = resolve(absRepoPath, process.platform === 'win32' ? '.venv/Scripts' : '.venv/bin');
-          const nodeBin = resolve(absRepoPath, 'node_modules/.bin');
-          const extraPaths = [venvBin, nodeBin].filter(existsSync);
-          if (extraPaths.length > 0) {
-            env.PATH = extraPaths.join(delimiter) + (env.PATH ? delimiter + env.PATH : '');
-          }
+          const env = buildRepoExecEnv(process.env, absRepoPath);
           const out = execSync(snap.command, {
             cwd: absRepoPath,
             encoding: 'utf8',
