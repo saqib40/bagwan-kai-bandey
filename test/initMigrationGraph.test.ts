@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { rmSync, mkdirSync, cpSync, symlinkSync, existsSync } from 'node:fs';
 import { FalkorClient } from '../src/engine/falkorClient';
 import { MigrationGraphManager } from '../src/engine/graphManager';
 import * as Q from '../src/engine/queries';
+import { setupScratchRepo, cleanupScratchRepo } from './helpers/scratchRepo';
 
 const sourceRepo = resolve(import.meta.dirname, '../demo-repo');
 const scratchRepo = resolve(import.meta.dirname, '../scratch/init-graph-test-repo');
@@ -12,16 +12,7 @@ const packId = 'express-to-fastify';
 const testGraphName = 'shift_m1_test';
 
 test('initMigrationGraph initializes demo-repo in FalkorDB', async () => {
-  rmSync(scratchRepo, { recursive: true, force: true });
-  mkdirSync(scratchRepo, { recursive: true });
-  cpSync(resolve(sourceRepo, 'src'), resolve(scratchRepo, 'src'), { recursive: true });
-  cpSync(resolve(sourceRepo, 'scripts'), resolve(scratchRepo, 'scripts'), { recursive: true });
-  cpSync(resolve(sourceRepo, 'test'), resolve(scratchRepo, 'test'), { recursive: true });
-  cpSync(resolve(sourceRepo, 'package.json'), resolve(scratchRepo, 'package.json'));
-  cpSync(resolve(sourceRepo, 'tsconfig.json'), resolve(scratchRepo, 'tsconfig.json'));
-  if (existsSync(resolve(sourceRepo, 'node_modules'))) {
-    symlinkSync(resolve(sourceRepo, 'node_modules'), resolve(scratchRepo, 'node_modules'), 'junction');
-  }
+  setupScratchRepo(sourceRepo, scratchRepo);
 
   const client = await FalkorClient.connect({ graphName: testGraphName });
 
@@ -99,6 +90,6 @@ test('initMigrationGraph initializes demo-repo in FalkorDB', async () => {
   } finally {
     await client.reset();
     await client.close();
-    rmSync(scratchRepo, { recursive: true, force: true });
+    cleanupScratchRepo(scratchRepo);
   }
 });
