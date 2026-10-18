@@ -1104,9 +1104,8 @@ function updateStatusCounts(counts) {
   document.getElementById('count-shimmed').textContent = shimmedCount;
   document.getElementById('count-verified').textContent = verifiedCount;
 
-  const total = (allModulesCache && allModulesCache.length) || (cleanCount + pendingCount + shimmedCount + verifiedCount) || 1;
-  const migratedCount = cleanCount + verifiedCount;
-  const pct = Math.min(100, Math.round((migratedCount / total) * 100));
+  const targetTotal = pendingCount + shimmedCount + verifiedCount;
+  const pct = targetTotal > 0 ? Math.min(100, Math.round((verifiedCount / targetTotal) * 100)) : 100;
 
   const progressFill = document.getElementById('progress-fill');
   const progressPercent = document.getElementById('progress-percent');
@@ -1114,7 +1113,7 @@ function updateStatusCounts(counts) {
 
   if (progressFill) progressFill.style.width = `${pct}%`;
   if (progressPercent) progressPercent.textContent = `${pct}%`;
-  if (stepBadge) stepBadge.textContent = `${migratedCount} of ${total} verified`;
+  if (stepBadge) stepBadge.textContent = `${verifiedCount} of ${targetTotal} verified`;
 
   const flightTitle = document.getElementById('flight-milestone');
   if (flightTitle && !flightTitle.textContent.startsWith('Claimed') && !flightTitle.textContent.startsWith('Gate') && !flightTitle.textContent.startsWith('Verified')) {
