@@ -1,14 +1,16 @@
-import type { Request } from 'express';
 import { shortHash } from '../utils/hash';
 import { formatAuditLine } from './auditB';
 
-/** Extracts stable request metadata. Forms an import cycle with auditB. */
-export function describeRequest(req: Request): string[] {
-  const agent = String(req.headers['user-agent'] ?? 'unknown');
-  return [req.method, shortHash(agent)];
+export interface AuditableRequest {
+  method?: string;
+  headers: Record<string, unknown>;
 }
 
-/** Builds an audit tag for a request (delegates formatting to auditB). */
-export function auditTag(req: Request): string {
+export function describeRequest(req: AuditableRequest): string[] {
+  const agent = String(req.headers?.['user-agent'] ?? 'unknown');
+  return [req.method ?? 'GET', shortHash(agent)];
+}
+
+export function auditTag(req: AuditableRequest): string {
   return formatAuditLine(describeRequest(req));
 }

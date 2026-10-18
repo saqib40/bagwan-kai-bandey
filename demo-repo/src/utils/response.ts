@@ -1,11 +1,9 @@
-import type { Response } from 'express';
+import type { FastifyReply } from 'fastify';
 
-/** Standard success envelope. */
-export function sendSuccess(res: Response, data: unknown, statusCode = 200) {
-  return res.status(statusCode).json({ ok: true, data });
+export function sendSuccess(reply: FastifyReply, data: unknown, statusCode = 200) {
+  return reply.code(statusCode).send({ ok: true, data });
 }
 
-/** Standard error envelope. */
-export function sendError(res: Response, message: string, statusCode = 400) {
-  return res.status(statusCode).json({ ok: false, error: message });
+export function sendError(reply: FastifyReply, message: string, statusCode = 400) {
+  return reply.code(statusCode).send({ ok: false, error: message });
 }

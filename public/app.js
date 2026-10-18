@@ -2775,7 +2775,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     await loadInitialTopologicalState();
     await loadAuditTrail();
 
-    document.getElementById('btn-step')?.addEventListener('click', executeStep);
     document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
     document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
 

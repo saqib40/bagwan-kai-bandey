@@ -1,4 +1,4 @@
-import express from 'express';
+import type { FastifyPluginAsync } from 'fastify';
 import { requireAuth } from '../middleware/auth';
 import { sendSuccess, sendError } from '../utils/response';
 import { auditRequest } from '../services/auditB';
@@ -14,16 +14,13 @@ const orders: Order[] = [
   { id: 101, userId: 2, total: 13.37 },
 ];
 
-const router = express.Router();
-
-router.get('/', requireAuth, (req, res) => {
-  return sendSuccess(res, { items: orders, audit: auditRequest(req) });
-});
-
-router.get('/:id', requireAuth, (req, res) => {
-  const order = orders.find((o) => o.id === Number(req.params.id));
-  if (!order) return sendError(res, 'Order not found', 404);
-  return sendSuccess(res, order);
-});
-
-export const ordersRouter = router;
+export const ordersRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get('/', { preHandler: requireAuth }, async (request, reply) => {
+    return sendSuccess(reply, { items: orders, audit: auditRequest(request) });
+  });
+  fastify.get<{ Params: { id: string } }>('/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const order = orders.find((o) => o.id === Number(request.params.id));
+    if (!order) return sendError(reply, 'Order not found', 404);
+    return sendSuccess(reply, order);
+  });
+};

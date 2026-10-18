@@ -1,4 +1,4 @@
-import express from 'express';
+import type { FastifyPluginAsync } from 'fastify';
 import { requireAuth } from '../middleware/auth';
 import { sendSuccess, sendError } from '../utils/response';
 import { auditRequest } from '../services/auditB';
@@ -13,24 +13,20 @@ const users: User[] = [
   { id: 2, name: 'Alan Turing' },
 ];
 
-const router = express.Router();
-
-router.get('/', requireAuth, (req, res) => {
-  return sendSuccess(res, { items: users, audit: auditRequest(req) });
-});
-
-router.get('/:id', requireAuth, (req, res) => {
-  const user = users.find((u) => u.id === Number(req.params.id));
-  if (!user) return sendError(res, 'User not found', 404);
-  return sendSuccess(res, user);
-});
-
-router.post('/', requireAuth, (req, res) => {
-  const name = typeof req.body?.name === 'string' ? req.body.name : '';
-  if (!name) return sendError(res, 'name is required', 400);
-  const user: User = { id: users.length + 1, name };
-  users.push(user);
-  return sendSuccess(res, user, 201);
-});
-
-export const usersRouter = router;
+export const usersRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get('/', { preHandler: requireAuth }, async (request, reply) => {
+    return sendSuccess(reply, { items: users, audit: auditRequest(request) });
+  });
+  fastify.get<{ Params: { id: string } }>('/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const user = users.find((u) => u.id === Number(request.params.id));
+    if (!user) return sendError(reply, 'User not found', 404);
+    return sendSuccess(reply, user);
+  });
+  fastify.post<{ Body: { name?: string } }>('/', { preHandler: requireAuth }, async (request, reply) => {
+    const name = request.body?.name;
+    if (!name) return sendError(reply, 'name is required', 400);
+    const user: User = { id: users.length + 1, name };
+    users.push(user);
+    return sendSuccess(reply, user, 201);
+  });
+};
