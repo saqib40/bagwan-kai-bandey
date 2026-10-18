@@ -431,6 +431,22 @@ function bindCanvasControls() {
     if (cy) cy.fit(undefined, 45);
   });
 
+  // Reset selection / return to landing overview on brand click or Escape
+  document.querySelector('.nav-brand')?.addEventListener('click', () => {
+    clearBlastRadius();
+    closeNodeInspector();
+    renderMissionDeck();
+    if (cy) cy.fit(undefined, 45);
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      clearBlastRadius();
+      closeNodeInspector();
+      renderMissionDeck();
+    }
+  });
+
   document.getElementById('btn-toggle-direction')?.addEventListener('click', () => {
     currentRankDir = currentRankDir === 'BT' ? 'TB' : 'BT';
     runDagreLayout(true);

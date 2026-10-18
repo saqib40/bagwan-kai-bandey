@@ -14,6 +14,10 @@
 
 **Autonomous codebase migrations that never break your build.**
 
+<br>
+
+<img src="docs/assets/cockpit-flight-deck.png" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="100%">
+
 </div>
 
 - **Sequence** — Callee-first topological traversal ensures callers never import unmigrated code.
@@ -264,6 +268,10 @@ Launch the dedicated **Live Sync Flight Deck & Visualizer**:
 ```bash
 bkb cockpit --repo /path/to/your-repo
 ```
+
+<p align="center">
+  <img src="docs/assets/cockpit-flight-deck.png" alt="Bagwan Kai Bandey Live Visual Migration Cockpit" width="100%">
+</p>
 
 - **Editorial Minimalist Craft**: High-definition Alabaster and warm stone interface inspired by Vercel Geist and Linear, powered by a Cytoscape.js & Dagre hierarchical layout, hairline dividers, and tactile pill controls.
 - **Real-Time SSE Synchronization**: Powered by a Server-Sent Events bus. Whenever your CLI (`bkb claim`, `bkb verify`, `bkb run`) or AI agent calls MCP tools, the browser visualizer immediately mirrors the action.
