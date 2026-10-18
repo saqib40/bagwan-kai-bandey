@@ -2,7 +2,7 @@
   "$schema": "https://bkb.dev/manifest.schema.json",
   "version": "1.0.0",
   "packId": "express-to-fastify",
-  "migrationEpoch": "2026-10-18T11:03:30.603Z",
+  "migrationEpoch": "2026-10-18T11:21:26.978Z",
   "phase": "SHIM",
   "baseline": {
     "snapshotType": "route-surface",
@@ -107,7 +107,7 @@
         "src/utils/response.ts"
       ],
       "action": "Initialized migration graph for pack \"express-to-fastify\" with 5 baseline entries",
-      "timestamp": "2026-10-18T11:03:30.603Z"
+      "timestamp": "2026-10-18T11:21:26.978Z"
     }
   ]
 }
