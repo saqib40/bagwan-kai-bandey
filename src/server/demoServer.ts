@@ -574,33 +574,46 @@ async function resetDemoState() {
 }
 
 async function getGraphTopology() {
-  const client = await getClient();
-
-  // Query modules
-  const modules = await client.roQuery<any>(`
-    MATCH (m:Module)
-    RETURN m.path AS path, m.status AS status, m.scc_id AS sccId, m.scc_size AS sccSize,
-           m.pagerank AS pagerank, m.pending_callers_count AS pendingCallers,
-           m.in_degree AS inDegree, m.shim_line_count AS shimLines
-    ORDER BY m.path ASC
-  `);
-
-  // Query import edges
-  const edges = await client.roQuery<any>(`
-    MATCH (a:Module)-[r:IMPORTS]->(b:Module)
-    RETURN a.path AS source, b.path AS target
-  `);
-
-  // Query status counts
-  const counts = await client.roQuery<any>(Q.STATUS_COUNTS);
-  const countMap: Record<string, number> = {};
-  for (const c of counts) {
-    countMap[c.status] = Number(c.n);
+  if (!existsSync(activeRepo)) {
+    activeRepo = DEFAULT_TARGET_REPO;
+    activePackId = DEFAULT_PACK_ID;
   }
 
-  // Query episodes count
-  const epRows = await client.roQuery<any>(`MATCH (e:MigrationEpisode) RETURN count(e) AS n`);
-  const episodeCount = Number(epRows[0]?.n ?? 0);
+  let modules: any[] = [];
+  let edges: any[] = [];
+  const countMap: Record<string, number> = {};
+  let episodeCount = 0;
+
+  try {
+    const client = await getClient();
+
+    // Query modules
+    modules = await client.roQuery<any>(`
+      MATCH (m:Module)
+      RETURN m.path AS path, m.status AS status, m.scc_id AS sccId, m.scc_size AS sccSize,
+             m.pagerank AS pagerank, m.pending_callers_count AS pendingCallers,
+             m.in_degree AS inDegree, m.shim_line_count AS shimLines
+      ORDER BY m.path ASC
+    `);
+
+    // Query import edges
+    edges = await client.roQuery<any>(`
+      MATCH (a:Module)-[r:IMPORTS]->(b:Module)
+      RETURN a.path AS source, b.path AS target
+    `);
+
+    // Query status counts
+    const counts = await client.roQuery<any>(Q.STATUS_COUNTS);
+    for (const c of counts) {
+      countMap[c.status] = Number(c.n);
+    }
+
+    // Query episodes count
+    const epRows = await client.roQuery<any>(`MATCH (e:MigrationEpisode) RETURN count(e) AS n`);
+    episodeCount = Number(epRows[0]?.n ?? 0);
+  } catch (err: any) {
+    console.warn(`[cockpit] Warning: Failed to query graph topology for "${activeRepo}": ${err.message}`);
+  }
 
   return {
     modules,

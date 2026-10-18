@@ -1882,9 +1882,18 @@ function hideVictoryModal() {
 // ── API Operations ────────────────────────────────────────
 
 async function fetchGraphData() {
-  const res = await fetch('/api/graph');
-  const data = await res.json();
-  return data;
+  try {
+    const res = await fetch('/api/graph');
+    if (!res.ok) {
+      console.warn(`[cockpit] /api/graph returned HTTP ${res.status}`);
+      return { modules: [], edges: [], statusCounts: {} };
+    }
+    const data = await res.json();
+    return data && Array.isArray(data.modules) ? data : { modules: [], edges: [], statusCounts: {} };
+  } catch (err) {
+    console.warn('[cockpit] Failed to fetch graph data:', err);
+    return { modules: [], edges: [], statusCounts: {} };
+  }
 }
 
 async function executeStep() {
@@ -2805,28 +2814,32 @@ async function loadInitialTopologicalState() {
 
 // ── Application Bootstrapper ──────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  // 1. Immediately bind all UI controls, canvas event listeners, and brand toggle
+  bindCanvasControls();
+  setupControlsDrawer();
+  setupCypherDrawer();
+  setupSettingsModal();
+  setupDrawerTabs();
+  setupViewSwitchTabs();
+  setupDelegatedClickHandlers();
+  setupStandbyDeck();
+
+  document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
+  document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
+
+  // 2. Connect real-time CLI/MCP event synchronization
+  initLiveStream();
+
+  // 3. Load graph data & telemetry with resilient fallbacks
   try {
     const data = await fetchGraphData();
-    initNetwork(data.modules, data.edges);
-    updateStatusCounts(data.statusCounts);
-    setupControlsDrawer();
-    setupCypherDrawer();
-    setupSettingsModal();
-    setupDrawerTabs();
-    setupViewSwitchTabs();
-    setupDelegatedClickHandlers();
-    setupStandbyDeck();
+    initNetwork(data.modules || [], data.edges || []);
+    updateStatusCounts(data.statusCounts || {});
     await loadSystemInfo();
-    checkStandbyState(data.modules);
+    checkStandbyState(data.modules || []);
     await loadInitialTopologicalState();
     await loadAuditTrail();
-
-    document.getElementById('btn-download-audit')?.addEventListener('click', downloadAuditReport);
-    document.getElementById('btn-modal-close')?.addEventListener('click', hideVictoryModal);
-
-    // Connect real-time CLI/MCP event synchronization
-    initLiveStream();
   } catch (err) {
-    console.error('Failed to initialize Cockpit:', err);
+    console.error('Failed to initialize Cockpit graph telemetry:', err);
   }
 });
