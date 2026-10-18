@@ -1,6 +1,7 @@
 /**
  * Layer 1 MCP Server (`src/mcp/server.ts`).
- * Exposes the 6 Bagwan Kai Bandey (BKB) Migration Engine tools defined in plan §8.
+ * Exposes the Bagwan Kai Bandey (BKB) Migration Engine tools: the original
+ * plan §8 set plus advance_migration, migration status, and milestone commit.
  *
  * Stdio discipline: Redirects all diagnostic logging to console.error so that
  * stdout is strictly reserved for JSON-RPC transport frames.

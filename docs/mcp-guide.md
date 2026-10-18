@@ -34,9 +34,11 @@ Rather than guessing which files to edit, an AI coding agent connected to BKB qu
 | **`init_migration_graph`** | `repoPath: string`<br>`packId: string`<br>`reset?: boolean` | Ingests the target codebase into FalkorDB, calculates Tarjan SCCs, captures baseline route invariants, and computes PageRank. |
 | **`claim_next_leaf`** | `repoPath?: string`<br>`packId?: string` | Evaluates graph state and atomically claims the next unblocked target (Pass A: De-shim candidates; Pass B: Foundational leaves or circular SCC clusters). |
 | **`get_migration_slice`** | `modulePaths: string[]`<br>`phase: "SHIM" \| "MIGRATE" \| "DE_SHIM"` | Generates a 1-hop contextual slice containing disk source code, callee symbol signatures, caller call-site snippets, and tailored pack guidance. |
-| **`simulate_blast_radius`** | `modulePath: string` | Runs a multi-hop reverse dependency traversal (`[:IMPORTS*1..6]`) to preview all upstream modules affected before making edits. |
+| **`simulate_blast_radius`** | `modulePath: string` | Runs a multi-hop reverse dependency traversal (`[:IMPORTS*1..10]`) to preview all upstream modules affected before making edits. |
 | **`verify_and_commit_node`** | `modulePaths: string[]`<br>`agentSummary?: string` | Strict 4-step validation: AST re-parse, invariant equality, `tsc --noEmit` gate, and graph degree recalculation in FalkorDB. |
 | **`get_migration_audit_trail`** | `runCheckpointNow?: boolean` | Returns a chronological log of completed migration steps, and optionally executes the full test suite and route snapshot diff. |
+| **`get_migration_status`**<br>*(alias `bkb_get_migration_status`)* | `repoPath?: string`<br>`packId?: string` | Reports progress (pending/in-progress/shimmed/verified/clean), the active phase, committed-manifest sync, and the next unblocked leaves for team handoff. |
+| **`commit_milestone`**<br>*(alias `bkb_commit_milestone`)* | `targetPaths?: string[]`<br>`message?: string`<br>`createBranch?: string` | Commits a verified batch to Git: first the migration code, then a follow-up commit recording that commit's SHA in `.bkb/manifest.json`. Pure Git; does not require FalkorDB. |
 
 ---
 
@@ -193,4 +195,4 @@ If you need finer control than the single-turn `advance_migration` loop:
 - Call `simulate_blast_radius` to see reverse upstream callers.
 - Call `verify_and_commit_node` to validate compilation and commit.
 - Call `get_migration_audit_trail` to run checkpoint test suites and route diffs.
-- Call `bkb_commit_milestone` to push the Git commit and update `.bkb/manifest.json`.
+- Call `bkb_commit_milestone` to create the Git commit and update `.bkb/manifest.json`.

@@ -31,7 +31,7 @@ Bagwan Kai Bandey decouples universal graph algorithms from language syntax and 
 │  - Zero framework or language specifics in src/engine/   │
 │  - FalkorDB graph state & native PageRank (algo.pageRank)│
 │  - Tarjan SCC atomic cycle condensation                  │
-│  - Model Context Protocol (MCP) server (6 tools)         │
+│  - Model Context Protocol (MCP) server (11 tools)        │
 └──────────────────────────────────────────────────────────┘
 ```
 

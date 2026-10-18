@@ -322,7 +322,7 @@ For in-depth architectural details, custom framework extensions, and benchmark r
 | **[Architecture & Universal Laws](docs/architecture.md)** | The 3-Layer engine design, The 5 Universal Laws of Topological Migration, and the FalkorDB openCypher graph schema. |
 | **[Phased Migrations & Team Handoff](docs/phased-migrations-and-team-handoff.md)** | The Git-native `.bkb/manifest.json` schema, baseline snapshot invariance, and MCP milestone commits across multi-sprint lifecycles. |
 | **[Extensibility: Custom Packs & Adapters](docs/extensibility.md)** | How to build custom Migration Packs (`defineMigrationPack`), custom Language Adapters (`BaseLanguageAdapter`), and `bkb.config.ts`. |
-| **[MCP Server & AI Agent Guide](docs/mcp-guide.md)** | Detailed reference for the 9 MCP tools, manual JSON-RPC configs, and optimal agent prompts. |
+| **[MCP Server & AI Agent Guide](docs/mcp-guide.md)** | Detailed reference for the 11 MCP tools, manual JSON-RPC configs, and optimal agent prompts. |
 | **[Benchmarks & Performance](docs/benchmarks.md)** | 150-Module scale evaluation ($< 25\text{ms}$ SLA) and Naive Grep vs. BKB MCP comparison (81% token reduction). |
 | **[Developer & Contributor Setup](docs/contributing.md)** | Development environment setup, running tests (`npm test`), and AST validators. |
 
