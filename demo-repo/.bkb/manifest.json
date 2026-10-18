@@ -1,0 +1,76 @@
+{
+  "$schema": "https://bkb.dev/manifest.schema.json",
+  "version": "1.0.0",
+  "packId": "express-to-fastify",
+  "migrationEpoch": "2026-10-17T18:53:33.726Z",
+  "phase": "SHIM",
+  "baseline": {
+    "snapshotType": "route-surface",
+    "entryCount": 5,
+    "entries": [
+      "GET /orders",
+      "GET /orders/:id",
+      "GET /users",
+      "GET /users/:id",
+      "POST /users"
+    ],
+    "command": "node scripts/dump-routes.mjs"
+  },
+  "modules": {
+    "src/app.ts": {
+      "status": "PENDING",
+      "sccId": 0
+    },
+    "src/middleware/auth.ts": {
+      "status": "PENDING",
+      "sccId": 1
+    },
+    "src/routes/orders.ts": {
+      "status": "PENDING",
+      "sccId": 2
+    },
+    "src/routes/users.ts": {
+      "status": "PENDING",
+      "sccId": 3
+    },
+    "src/server.ts": {
+      "status": "CLEAN",
+      "sccId": 4
+    },
+    "src/services/auditA.ts": {
+      "status": "PENDING",
+      "sccId": 5
+    },
+    "src/services/auditB.ts": {
+      "status": "PENDING",
+      "sccId": 5
+    },
+    "src/utils/hash.ts": {
+      "status": "CLEAN",
+      "sccId": 6
+    },
+    "src/utils/response.ts": {
+      "status": "PENDING",
+      "sccId": 7
+    }
+  },
+  "history": [
+    {
+      "step": 0,
+      "phase": "INIT",
+      "modules": [
+        "src/app.ts",
+        "src/middleware/auth.ts",
+        "src/routes/orders.ts",
+        "src/routes/users.ts",
+        "src/server.ts",
+        "src/services/auditA.ts",
+        "src/services/auditB.ts",
+        "src/utils/hash.ts",
+        "src/utils/response.ts"
+      ],
+      "action": "Initialized migration graph for pack \"express-to-fastify\" with 5 baseline entries",
+      "timestamp": "2026-10-17T18:53:33.727Z"
+    }
+  ]
+}
