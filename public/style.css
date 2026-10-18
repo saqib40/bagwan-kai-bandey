@@ -1623,6 +1623,19 @@ code, pre, .font-mono {
   color: #09090B;
 }
 
+.empty-state-desc code,
+.roadmap-empty-desc code,
+.target-empty code {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: #F4F4F5;
+  color: #18181B;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  border: 1px solid #E4E4E7;
+}
+
 .editorial-principles-list {
   border-top: 1px solid #F4F4F5;
 }

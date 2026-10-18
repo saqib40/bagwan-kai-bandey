@@ -2,8 +2,8 @@
   "$schema": "https://bkb.dev/manifest.schema.json",
   "version": "1.0.0",
   "packId": "express-to-fastify",
-  "migrationEpoch": "2026-10-18T11:21:26.978Z",
-  "phase": "DE_SHIM",
+  "migrationEpoch": "2026-10-18T11:45:47.723Z",
+  "phase": "SHIM",
   "baseline": {
     "snapshotType": "route-surface",
     "entryCount": 5,
@@ -21,52 +21,31 @@
   },
   "modules": {
     "src/app.ts": {
-      "status": "VERIFIED",
+      "status": "PENDING",
       "sccId": 0,
       "baselineSets": {
         "module-route-surface-preserved": []
-      },
-      "phase": "MIGRATE",
-      "step": 6,
-      "lastModified": "2026-10-18T11:30:17.170Z",
-      "invariants": {
-        "compilerErrors": 0,
-        "checkpointTriggered": false
       }
     },
     "src/middleware/auth.ts": {
-      "status": "VERIFIED",
+      "status": "PENDING",
       "sccId": 1,
       "baselineSets": {
         "module-route-surface-preserved": []
-      },
-      "phase": "DE_SHIM",
-      "step": 10,
-      "lastModified": "2026-10-18T11:30:30.485Z",
-      "invariants": {
-        "compilerErrors": 0,
-        "checkpointTriggered": true
       }
     },
     "src/routes/orders.ts": {
-      "status": "VERIFIED",
+      "status": "PENDING",
       "sccId": 2,
       "baselineSets": {
         "module-route-surface-preserved": [
           "GET /",
           "GET /:id"
         ]
-      },
-      "phase": "DE_SHIM",
-      "step": 7,
-      "lastModified": "2026-10-18T11:30:19.582Z",
-      "invariants": {
-        "compilerErrors": 0,
-        "checkpointTriggered": true
       }
     },
     "src/routes/users.ts": {
-      "status": "VERIFIED",
+      "status": "PENDING",
       "sccId": 3,
       "baselineSets": {
         "module-route-surface-preserved": [
@@ -74,13 +53,6 @@
           "GET /:id",
           "POST /"
         ]
-      },
-      "phase": "DE_SHIM",
-      "step": 8,
-      "lastModified": "2026-10-18T11:30:25.647Z",
-      "invariants": {
-        "compilerErrors": 0,
-        "checkpointTriggered": true
       }
     },
     "src/server.ts": {
@@ -91,31 +63,17 @@
       }
     },
     "src/services/auditA.ts": {
-      "status": "VERIFIED",
+      "status": "PENDING",
       "sccId": 5,
       "baselineSets": {
         "module-route-surface-preserved": []
-      },
-      "phase": "DE_SHIM",
-      "step": 9,
-      "lastModified": "2026-10-18T11:30:28.124Z",
-      "invariants": {
-        "compilerErrors": 0,
-        "checkpointTriggered": true
       }
     },
     "src/services/auditB.ts": {
-      "status": "VERIFIED",
+      "status": "PENDING",
       "sccId": 5,
       "baselineSets": {
         "module-route-surface-preserved": []
-      },
-      "phase": "DE_SHIM",
-      "step": 9,
-      "lastModified": "2026-10-18T11:30:28.124Z",
-      "invariants": {
-        "compilerErrors": 0,
-        "checkpointTriggered": true
       }
     },
     "src/utils/hash.ts": {
@@ -126,17 +84,10 @@
       }
     },
     "src/utils/response.ts": {
-      "status": "VERIFIED",
+      "status": "PENDING",
       "sccId": 7,
       "baselineSets": {
         "module-route-surface-preserved": []
-      },
-      "phase": "DE_SHIM",
-      "step": 11,
-      "lastModified": "2026-10-18T11:30:33.158Z",
-      "invariants": {
-        "compilerErrors": 0,
-        "checkpointTriggered": true
       }
     }
   },
@@ -156,119 +107,7 @@
         "src/utils/response.ts"
       ],
       "action": "Initialized migration graph for pack \"express-to-fastify\" with 5 baseline entries",
-      "timestamp": "2026-10-18T11:21:26.978Z"
-    },
-    {
-      "step": 1,
-      "phase": "SHIM",
-      "modules": [
-        "src/utils/response.ts"
-      ],
-      "action": "SHIM applied to src/utils/response.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:07.751Z"
-    },
-    {
-      "step": 2,
-      "phase": "SHIM",
-      "modules": [
-        "src/middleware/auth.ts"
-      ],
-      "action": "SHIM applied to src/middleware/auth.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:08.602Z"
-    },
-    {
-      "step": 3,
-      "phase": "SHIM",
-      "modules": [
-        "src/services/auditA.ts",
-        "src/services/auditB.ts"
-      ],
-      "action": "SHIM applied to src/services/auditA.ts, src/services/auditB.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:12.508Z"
-    },
-    {
-      "step": 4,
-      "phase": "SHIM",
-      "modules": [
-        "src/routes/orders.ts"
-      ],
-      "action": "SHIM applied to src/routes/orders.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:14.344Z"
-    },
-    {
-      "step": 5,
-      "phase": "SHIM",
-      "modules": [
-        "src/routes/users.ts"
-      ],
-      "action": "SHIM applied to src/routes/users.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:16.020Z"
-    },
-    {
-      "step": 6,
-      "phase": "MIGRATE",
-      "modules": [
-        "src/app.ts"
-      ],
-      "action": "MIGRATE applied to src/app.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:17.170Z"
-    },
-    {
-      "step": 7,
-      "phase": "DE_SHIM",
-      "modules": [
-        "src/routes/orders.ts"
-      ],
-      "action": "DE_SHIM applied to src/routes/orders.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:19.582Z"
-    },
-    {
-      "step": 8,
-      "phase": "DE_SHIM",
-      "modules": [
-        "src/routes/users.ts"
-      ],
-      "action": "DE_SHIM applied to src/routes/users.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:25.647Z"
-    },
-    {
-      "step": 9,
-      "phase": "DE_SHIM",
-      "modules": [
-        "src/services/auditA.ts",
-        "src/services/auditB.ts"
-      ],
-      "action": "DE_SHIM applied to src/services/auditA.ts, src/services/auditB.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:28.124Z"
-    },
-    {
-      "step": 10,
-      "phase": "DE_SHIM",
-      "modules": [
-        "src/middleware/auth.ts"
-      ],
-      "action": "DE_SHIM applied to src/middleware/auth.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:30.485Z"
-    },
-    {
-      "step": 11,
-      "phase": "DE_SHIM",
-      "modules": [
-        "src/utils/response.ts"
-      ],
-      "action": "DE_SHIM applied to src/utils/response.ts",
-      "verifiedBy": "BKB Verification Gate",
-      "timestamp": "2026-10-18T11:30:33.158Z"
+      "timestamp": "2026-10-18T11:45:47.723Z"
     }
   ]
 }

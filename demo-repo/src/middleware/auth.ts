@@ -1,10 +1,14 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { Request, Response, NextFunction } from 'express';
 import { sendError } from '../utils/response';
 
-/** Require auth preHandler (pure Fastify). */
-export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
-  const apiKey = request.headers['x-api-key'];
+/**
+ * API-key guard. Note: `req.get(...)` is a header read, NOT a route
+ * registration — route extractors must not misclassify it.
+ */
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const apiKey = req.get('x-api-key');
   if (apiKey !== 'secret-token') {
-    return sendError(reply, 'Unauthorized', 401);
+    return sendError(res, 'Unauthorized', 401);
   }
+  next();
 }

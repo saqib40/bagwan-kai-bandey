@@ -842,9 +842,9 @@ function renderHopPipeline(hops, claim, stepNum) {
     container.innerHTML = `
       <div class="journey-empty-state-editorial">
         <div class="empty-state-header">
-          <div class="empty-state-title">Topological Migration Stepper</div>
+          <div class="empty-state-title">Topological Migration Telemetry</div>
           <div class="empty-state-desc">
-            Click <strong>Step</strong> above or tap any module on the graph to watch the sequential caller-to-target dependency traversal in real time.
+            Run <code>bkb run</code> in terminal or prompt your AI agent (via MCP) to stream autonomous migration episodes in real time. Tap any module on the graph to inspect its dependency path.
           </div>
         </div>
         <div class="editorial-principles-list">
@@ -1126,11 +1126,11 @@ function renderMissionDeck() {
   const proofContainer = document.getElementById('proof-container');
 
   if (targetEyebrow) {
-    targetEyebrow.textContent = 'MIGRATION PIPELINE';
+    targetEyebrow.textContent = 'AUTONOMOUS FLIGHT DECK';
   }
   if (targetTitle) {
-    targetTitle.textContent = 'Topological Migration Stepper';
-    targetTitle.title = 'Topological Migration Stepper';
+    targetTitle.textContent = 'Topological Migration Telemetry';
+    targetTitle.title = 'Topological Migration Telemetry';
   }
   if (phaseBadge) {
     phaseBadge.textContent = 'READY';
@@ -1148,7 +1148,7 @@ function renderMissionDeck() {
   if (diffViewer) {
     diffViewer.innerHTML = `
       <div class="target-empty">
-        <p>Ready to migrate. Click <strong>Step</strong> above to view live code transformations.</p>
+        <p>Ready for autonomous migration. Run <code>bkb run</code> or prompt your agent to stream real-time code transformations.</p>
       </div>
     `;
     diffViewer.scrollTop = 0;
@@ -1779,7 +1779,7 @@ function renderAuditTrail(episodes) {
       <div class="roadmap-empty-state">
         <div class="roadmap-empty-icon">✓</div>
         <div class="roadmap-empty-title">All Invariants Guarded</div>
-        <div class="roadmap-empty-desc">Click Step above to advance through the 11-stage verified migration roadmap.</div>
+        <div class="roadmap-empty-desc">Run <code>bkb run</code> or stream migration episodes via AI agent MCP tools.</div>
       </div>
     `;
     return;
