@@ -74,57 +74,63 @@
           </button>
         </div>
 
-        <!-- Editorial Standby Flight Deck (Shows when idle / waiting for agent or CLI) -->
-        <div id="standby-overlay" class="standby-overlay">
-          <div class="standby-card">
-            <div class="standby-header">
-              <div class="standby-pulse-badge">
-                <span class="standby-radar-dot"></span>
-                <span>FLIGHT DECK STANDBY</span>
-              </div>
-              <h2 class="standby-title">Autonomous Migration Governor</h2>
-              <p class="standby-desc">
-                Connected to FalkorDB. Waiting for AI agent (MCP) or CLI execution...
-              </p>
-            </div>
+        <!-- Minimal Floating Standby Terminal Capsule (Modeled after bottom music player) -->
+        <div id="standby-dock" class="standby-dock">
+          <!-- Left: Circular Terminal Avatar / Radar Dot -->
+          <div class="dock-avatar" title="Engine Standby — Awaiting CLI or Agent execution">
+            <span class="dock-avatar-glyph">&gt;_</span>
+            <span class="dock-avatar-dot" title="SSE Telemetry Connected"></span>
+          </div>
 
-            <div class="standby-prompt-box">
-              <div class="prompt-box-header">
-                <div class="prompt-box-title">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  <span>AI Agent Prompt (Cursor • Claude • VS Code • Windsurf)</span>
-                </div>
-                <button id="btn-copy-prompt" class="btn-copy-prompt" title="Copy prompt to clipboard">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span id="btn-copy-text">Copy Prompt</span>
-                </button>
-              </div>
-              <pre class="prompt-content" id="agent-prompt-text">You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
-First call bkb_get_migration_status to inspect current progress, then claim and verify batches until 100% complete.</pre>
+          <!-- Center: Track Information Equivalent (Status, Prompt, Hairline Telemetry Bar) -->
+          <div class="dock-info">
+            <div class="dock-title-line">
+              <span class="dock-title">Awaiting execution in terminal...</span>
             </div>
-
-            <div class="standby-terminal-section">
-              <div class="terminal-col">
-                <span class="terminal-col-label">Run autonomously via CLI:</span>
-                <code class="terminal-col-code" id="cmd-run-code">bkb run</code>
-              </div>
-              <div class="terminal-col">
-                <span class="terminal-col-label">Claim first topological batch:</span>
-                <code class="terminal-col-code">bkb claim</code>
-              </div>
+            <div class="dock-subtitle-line">
+              <span class="dock-subtitle">Run <strong class="dock-highlight">bkb run</strong> or prompt your AI agent</span>
             </div>
-
-            <div class="standby-footer">
-              <button id="btn-dismiss-standby" class="btn-dismiss-standby" title="Inspect static graph structure">
-                <span>Explore Graph Canvas</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-              <div class="standby-footer-status">
-                <span class="status-dot-subtle"></span>
-                <span id="standby-status-label">SSE Stream Ready on localhost</span>
+            <div class="dock-scrubber-line">
+              <div class="dock-scrubber-track">
+                <div class="dock-scrubber-bar"></div>
               </div>
+              <span class="dock-scrubber-status" id="standby-status-label">ready • sse stream active</span>
             </div>
           </div>
+
+          <!-- Right: Player Action Controls (Quick-Copy Chip, Play Prompt Button, Dismiss) -->
+          <div class="dock-actions">
+            <!-- Command Chip (One-click copy bkb run) -->
+            <button id="btn-copy-dock-cmd" class="dock-cmd-chip" title="Click to copy command">
+              <span class="dock-cmd-prefix" id="dock-chip-prefix">$</span>
+              <code id="cmd-run-code">bkb run</code>
+              <span id="dock-chip-status" style="display: none; font-weight: 600; color: #A7F3D0;">Copied! ✓</span>
+              <svg class="dock-chip-icon" id="dock-chip-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+
+            <!-- Circular / Pill Prompt Copy Button (Modeled after Round White Play Button) -->
+            <button id="btn-copy-prompt" class="dock-play-btn" title="Copy AI Agent MCP Prompt to clipboard">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              <span id="btn-copy-text">Prompt</span>
+            </button>
+
+            <!-- Dismiss / Minimize Button -->
+            <button id="btn-dismiss-standby" class="dock-dismiss-btn" title="Dismiss to explore canvas">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Hidden Prompt Template for Copy Action -->
+          <pre id="agent-prompt-text" style="display: none;">You are an autonomous codebase migration engineer governed by Bagwan Kai Bandey (BKB) MCP tools.
+First call bkb_get_migration_status to inspect current progress, then claim and verify batches until 100% complete.</pre>
         </div>
 
         <div id="network-container" class="network-canvas"></div>
@@ -209,7 +215,7 @@ First call bkb_get_migration_status to inspect current progress, then claim and 
         </aside>
 
         <!-- Phase 5.2: Slimmed-Down Floating Dock -->
-        <div class="graph-floating-dock">
+        <div class="graph-floating-dock dock-hidden">
           <div class="graph-legend">
             <span class="leg-item"><span class="leg-dot dot-pending"></span> <span id="count-pending">7</span> Pending</span>
             <span class="leg-item"><span class="leg-dot dot-claimed"></span> <span id="count-shimmed">0</span> Active</span>

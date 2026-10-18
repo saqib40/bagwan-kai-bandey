@@ -453,228 +453,270 @@ code, pre, .font-mono {
   font-variant-numeric: tabular-nums;
 }
 
-/* Editorial Standby Flight Deck Overlay */
-.standby-overlay {
+/* Minimal Floating Standby Terminal Capsule (Modeled after bottom music player) */
+.standby-dock {
   position: absolute;
-  inset: 0;
-  z-index: 50;
-  background: rgba(247, 247, 245, 0.88);
-  backdrop-filter: blur(8px);
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  z-index: 45;
+  width: auto;
+  max-width: min(600px, 94%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
+  gap: 12px;
+  padding: 8px 12px 8px 10px;
+  background: rgba(18, 18, 22, 0.88);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25);
   opacity: 1;
   visibility: visible;
-  transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1), visibility 280ms;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 260ms;
 }
 
-.standby-overlay.dismissed {
+.standby-dock.dismissed {
+  transform: translateX(-50%) translateY(40px) scale(0.96);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
 
-.standby-card {
-  width: 100%;
-  max-width: 580px;
-  background: #FFFFFF;
-  border: 1px solid #E6E6E3;
-  border-radius: 16px;
-  padding: 28px;
-  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.09), 0 1px 3px rgba(0, 0, 0, 0.03);
+/* Left: Circular Avatar Thumbnail */
+.dock-avatar {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #27272A 0%, #09090B 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-  transform: translateY(0);
-  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.standby-overlay.dismissed .standby-card {
-  transform: translateY(8px) scale(0.98);
-}
-
-.standby-header {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.standby-pulse-badge {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #047857;
-  background: #ECFDF5;
-  border: 1px solid #A7F3D0;
-  padding: 3px 8px;
-  border-radius: 6px;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.standby-radar-dot {
-  width: 6px;
-  height: 6px;
+.dock-avatar-glyph {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: #10B981;
+  letter-spacing: -0.05em;
+  user-select: none;
+}
+
+.dock-avatar-dot {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #10B981;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
-  display: inline-block;
+  border: 1.5px solid #18181B;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
   animation: standby-pulse 2s infinite ease-in-out;
 }
 
 @keyframes standby-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.3); opacity: 0.7; }
+  50% { transform: scale(1.25); opacity: 0.7; }
 }
 
-.standby-title {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: #09090B;
-  margin: 0;
-}
-
-.standby-desc {
-  font-size: 12.5px;
-  color: #71717A;
-  margin: 0;
-  line-height: 1.5;
-}
-
-.standby-prompt-box {
-  background: #FAFAFA;
-  border: 1px solid #E6E6E3;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-}
-
-.prompt-box-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: #F4F4F5;
-  border-bottom: 1px solid #E4E4E7;
-}
-
-.prompt-box-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #3F3F46;
-}
-
-.btn-copy-prompt {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  background: #09090B;
-  color: #FFFFFF;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  transition: all 140ms ease;
-}
-
-.btn-copy-prompt:hover {
-  background: #27272A;
-}
-
-.btn-copy-prompt.copied {
-  background: #047857;
-}
-
-.prompt-content {
-  margin: 0;
-  padding: 12px 14px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: #18181B;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.standby-terminal-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.terminal-col {
+/* Center: Typography & Hairline Telemetry Track */
+.dock-info {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 10px 12px;
-  background: #F7F7F5;
-  border: 1px solid #E6E6E3;
-  border-radius: 8px;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.terminal-col-label {
-  font-size: 11px;
-  color: #71717A;
-  font-weight: 500;
-}
-
-.terminal-col-code {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #09090B;
-}
-
-.standby-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 4px;
-}
-
-.btn-dismiss-standby {
-  background: none;
-  border: none;
-  color: #52525B;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 0;
-  transition: color 140ms ease;
-}
-
-.btn-dismiss-standby:hover {
-  color: #09090B;
-}
-
-.standby-footer-status {
+.dock-title-line {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #A1A1AA;
 }
 
-.status-dot-subtle {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+.dock-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-subtitle-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock-subtitle {
+  font-size: 11px;
+  color: #A1A1AA;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-highlight {
+  color: #F4F4F5;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.dock-scrubber-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.dock-scrubber-track {
+  width: 90px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.dock-scrubber-bar {
+  width: 28%;
+  height: 100%;
+  background: linear-gradient(90deg, #10B981 0%, #34D399 100%);
+  border-radius: 9999px;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  animation: scrubber-breathe 3s infinite ease-in-out;
+}
+
+@keyframes scrubber-breathe {
+  0%, 100% { width: 22%; opacity: 0.8; }
+  50% { width: 44%; opacity: 1; }
+}
+
+.dock-scrubber-status {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: #71717A;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+/* Right: Actions */
+.dock-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Tactile Terminal Command Chip */
+.dock-cmd-chip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #F4F4F5;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 140ms ease;
+  user-select: none;
+}
+
+.dock-cmd-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+.dock-cmd-chip:active {
+  transform: scale(0.97);
+}
+
+.dock-cmd-chip.copied {
+  background: #065F46;
+  border-color: #10B981;
+  color: #A7F3D0;
+}
+
+.dock-cmd-prefix {
+  color: #10B981;
+  font-weight: 700;
+}
+
+.dock-chip-icon {
+  opacity: 0.7;
+}
+
+/* Round White Play Button (Music Player Vibe) */
+.dock-play-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  border: none;
+  color: #09090B;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: all 140ms ease;
+  user-select: none;
+}
+
+.dock-play-btn:hover {
+  background: #F4F4F5;
+  transform: scale(1.03);
+}
+
+.dock-play-btn:active {
+  transform: scale(0.97);
+}
+
+.dock-play-btn.copied {
   background: #10B981;
+  color: #FFFFFF;
+}
+
+/* Dismiss / Close Icon Button */
+.dock-dismiss-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: #71717A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 140ms ease;
+  padding: 0;
+}
+
+.dock-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #FAFAFA;
 }
 
 /* Phase 5.2: Slimmed-Down Centered Floating Dock */
@@ -697,6 +739,14 @@ code, pre, .font-mono {
   gap: 12px;
   font-size: 11px;
   white-space: nowrap;
+  transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.graph-floating-dock.dock-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(20px);
 }
 
 .graph-legend {

@@ -1511,15 +1511,21 @@ function highlightCypherSyntax(rawQuery) {
   html = html.replace(/('[^']*')/g, '<span class="cypher-str">$1</span>');
 
   return `<code>${html}</code>`;
+}
+
 // ── Standby Flight Deck Overlay Helpers ────────────────────
 function dismissStandby() {
-  const overlay = document.getElementById('standby-overlay');
-  if (overlay) overlay.classList.add('dismissed');
+  const dock = document.getElementById('standby-dock') || document.getElementById('standby-overlay');
+  if (dock) dock.classList.add('dismissed');
+  const legDock = document.querySelector('.graph-floating-dock');
+  if (legDock) legDock.classList.remove('dock-hidden');
 }
 
 function showStandby() {
-  const overlay = document.getElementById('standby-overlay');
-  if (overlay) overlay.classList.remove('dismissed');
+  const dock = document.getElementById('standby-dock') || document.getElementById('standby-overlay');
+  if (dock) dock.classList.remove('dismissed');
+  const legDock = document.querySelector('.graph-floating-dock');
+  if (legDock) legDock.classList.add('dock-hidden');
 }
 
 function checkStandbyState(modules) {
@@ -1541,6 +1547,11 @@ function setupStandbyDeck() {
   const promptText = document.getElementById('agent-prompt-text');
   const btnDismiss = document.getElementById('btn-dismiss-standby');
   const btnShow = document.getElementById('btn-show-standby');
+  const btnCopyCmd = document.getElementById('btn-copy-dock-cmd');
+  const cmdRun = document.getElementById('cmd-run-code');
+  const chipStatus = document.getElementById('dock-chip-status');
+  const chipPrefix = document.getElementById('dock-chip-prefix');
+  const chipIcon = document.getElementById('dock-chip-icon');
 
   btnCopy?.addEventListener('click', async () => {
     if (!promptText) return;
@@ -1549,7 +1560,7 @@ function setupStandbyDeck() {
       if (copyText) copyText.textContent = 'Copied! ✓';
       btnCopy.classList.add('copied');
       setTimeout(() => {
-        if (copyText) copyText.textContent = 'Copy Prompt';
+        if (copyText) copyText.textContent = 'Prompt';
         btnCopy.classList.remove('copied');
       }, 2000);
     } catch {
@@ -1559,6 +1570,27 @@ function setupStandbyDeck() {
       sel.removeAllRanges();
       sel.addRange(range);
       if (copyText) copyText.textContent = 'Press ⌘+C / Ctrl+C';
+    }
+  });
+
+  btnCopyCmd?.addEventListener('click', async () => {
+    const textToCopy = cmdRun ? cmdRun.textContent.trim() : 'bkb run';
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      btnCopyCmd.classList.add('copied');
+      if (chipPrefix) chipPrefix.style.display = 'none';
+      if (cmdRun) cmdRun.style.display = 'none';
+      if (chipIcon) chipIcon.style.display = 'none';
+      if (chipStatus) chipStatus.style.display = 'inline';
+      setTimeout(() => {
+        btnCopyCmd.classList.remove('copied');
+        if (chipPrefix) chipPrefix.style.display = 'inline';
+        if (cmdRun) cmdRun.style.display = 'inline';
+        if (chipIcon) chipIcon.style.display = 'inline';
+        if (chipStatus) chipStatus.style.display = 'none';
+      }, 1800);
+    } catch {
+      // fallback
     }
   });
 
