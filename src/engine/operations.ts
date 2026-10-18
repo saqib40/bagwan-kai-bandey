@@ -659,7 +659,7 @@ export class MigrationOps {
       checkpointResult = await this.runCheckpointGate();
     }
 
-    // ── Update Git-Native .bkb/manifest.json ──
+    // ── Update the Git-native migration manifest ──
     try {
       recordStepInManifest(this.repoPath, {
         step: stepNum,
@@ -668,13 +668,14 @@ export class MigrationOps {
         status: newStatus as 'SHIMMED' | 'VERIFIED',
         action: agentSummary || `Committed ${modulePaths.join(', ')} to ${newStatus}`,
         verifiedBy: 'BKB Verification Gate',
+        packId: this.pack.id,
         invariants: {
           compilerErrors: 0,
           checkpointTriggered,
         },
       });
     } catch (err) {
-      console.error('[bkb] Warning: Failed to update .bkb/manifest.json:', err);
+      console.error('[bkb] Warning: Failed to update the migration manifest:', err);
     }
 
     broadcastLiveEvent({

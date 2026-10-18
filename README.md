@@ -152,7 +152,7 @@ Protocol:
 4. VERIFY & ADVANCE:
    Call `advance_migration` with `edits: [{ path: "<path>", content: "<full new code>" }]` and an `agentSummary`.
    - The engine writes the file, runs AST re-parsing, executes compiler typechecks (tsc/mypy), and verifies invariant snapshots.
-   - If verification passes: The engine commits the node in FalkorDB, updates .bkb/manifest.json, and returns the next batch.
+   - If verification passes: The engine commits the node in FalkorDB, updates `.bkb/manifests/<packId>.json`, and returns the next batch.
    - If verification fails: Inspect the compiler error returned, fix the types, and re-call `advance_migration`.
 
 5. COMMIT MILESTONES:
@@ -223,22 +223,23 @@ Bagwan Kai Bandey includes four production-ready packs spanning **TypeScript/Jav
 
 ## Phased Multi-Sprint Migrations & Team Handoff
 
-Real enterprise migrations span weeks across distributed teams. BKB enables phased migrations with **Git-Native Manifests (`.bkb/manifest.json`)**:
+Real enterprise migrations span weeks across distributed teams. BKB enables phased migrations with **Git-Native Manifests (`.bkb/manifests/<packId>.json`)** — one manifest per migration pack, so concurrent packs never clobber each other:
 
 ```text
 your-repo/
 ├── .bkb/
-│   ├── manifest.json       # Committed directly to Git at each milestone
-│   └── checkpoints/        # Local disk checkpoints for instant rollback
+│   ├── manifests/
+│   │   └── <packId>.json    # Committed directly to Git at each milestone
+│   └── checkpoints/         # Local disk checkpoints for instant rollback
 ```
 
 ### Why This Matters:
 1. **Pre-Migration Baseline Invariance**:  
-   When engineer Alice initializes the migration, BKB records the pure pre-migration route, export, or test baseline into `.bkb/manifest.json`. When engineer Bob clones the repository weeks later (with 40% of modules already shimmed), BKB reuses the committed baseline snapshot rather than re-capturing against a half-migrated codebase.
+   When engineer Alice initializes the migration, BKB records the pure pre-migration route, export, or test baseline into `.bkb/manifests/<packId>.json`. When engineer Bob clones the repository weeks later (with 40% of modules already shimmed), BKB reuses the committed baseline snapshot rather than re-capturing against a half-migrated codebase.
 2. **Instant Graph Reconciliation**:  
-   Running `bkb init` on any developer machine or CI container automatically reads `.bkb/manifest.json`, restores all completed `SHIMMED` and `VERIFIED` node states in FalkorDB, and recomputes unblocked leaves in milliseconds.
+   Running `bkb init` on any developer machine or CI container automatically reads `.bkb/manifests/<packId>.json`, restores all completed `SHIMMED` and `VERIFIED` node states in FalkorDB, and recomputes unblocked leaves in milliseconds.
 3. **Native MCP Milestone Commits**:  
-   AI agents call `bkb_commit_milestone` to atomically stage modified code and `.bkb/manifest.json`, commit with structured audit notes, and embed the new Git commit SHA into the manifest history.
+   AI agents call `bkb_commit_milestone` to atomically stage modified code and `.bkb/manifests/<packId>.json`, commit with structured audit notes, and embed the new Git commit SHA into the manifest history.
 4. **Flight Deck Status**:  
    ```bash
    bkb status --repo /path/to/your-repo
@@ -320,7 +321,7 @@ For in-depth architectural details, custom framework extensions, and benchmark r
 | Guide | Description |
 |---|---|
 | **[Architecture & Universal Laws](docs/architecture.md)** | The 3-Layer engine design, The 5 Universal Laws of Topological Migration, and the FalkorDB openCypher graph schema. |
-| **[Phased Migrations & Team Handoff](docs/phased-migrations-and-team-handoff.md)** | The Git-native `.bkb/manifest.json` schema, baseline snapshot invariance, and MCP milestone commits across multi-sprint lifecycles. |
+| **[Phased Migrations & Team Handoff](docs/phased-migrations-and-team-handoff.md)** | The Git-native `.bkb/manifests/<packId>.json` schema, baseline snapshot invariance, and MCP milestone commits across multi-sprint lifecycles. |
 | **[Extensibility: Custom Packs & Adapters](docs/extensibility.md)** | How to build custom Migration Packs (`defineMigrationPack`), custom Language Adapters (`BaseLanguageAdapter`), and `bkb.config.ts`. |
 | **[MCP Server & AI Agent Guide](docs/mcp-guide.md)** | Detailed reference for the 11 MCP tools, manual JSON-RPC configs, and optimal agent prompts. |
 | **[Benchmarks & Performance](docs/benchmarks.md)** | 150-Module scale evaluation ($< 25\text{ms}$ SLA) and Naive Grep vs. BKB MCP comparison (81% token reduction). |

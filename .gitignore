@@ -8,6 +8,8 @@ __pycache__/
 # The Git-native migration manifest is committed; only local rollback
 # checkpoints (and any other transient state) stay ignored.
 **/.bkb/checkpoints/
+**/.bkb/manifest.lock
+**/.bkb/**/*.tmp
 .vscode/
 .cursor/
 *.log

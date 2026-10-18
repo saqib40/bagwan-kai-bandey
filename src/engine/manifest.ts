@@ -21,8 +21,9 @@ import {
   renameSync,
   rmSync,
   statSync,
+  readdirSync,
 } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import type { FalkorClient } from './falkorClient';
 import * as Q from './queries';
 
@@ -109,22 +110,50 @@ export interface RecordStepInput {
   verifiedBy?: string;
   commitSha?: string;
   invariants?: Record<string, unknown>;
+  /** Pack whose manifest should be updated. Omit to fall back to the sole manifest. */
+  packId?: string;
+}
+
+const MANIFESTS_DIR = 'manifests';
+const LEGACY_MANIFEST_FILE = 'manifest.json';
+
+/** Filesystem-safe filename for a pack id. */
+function sanitizePackId(packId: string): string {
+  return packId.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
 /**
- * Returns the path to the repository-local `.bkb/manifest.json`.
+ * Returns the repository-local manifest path. With a pack id this is the
+ * per-pack file `.bkb/manifests/<packId>.json`; without one it is the legacy
+ * single-tenant path `.bkb/manifest.json`.
  */
-export function getManifestPath(repoPath: string): string {
-  return join(resolve(repoPath), '.bkb', 'manifest.json');
+export function getManifestPath(repoPath: string, packId?: string): string {
+  const root = resolve(repoPath);
+  if (packId) {
+    return join(root, '.bkb', MANIFESTS_DIR, `${sanitizePackId(packId)}.json`);
+  }
+  return join(root, '.bkb', LEGACY_MANIFEST_FILE);
 }
 
-/**
- * Loads the `.bkb/manifest.json` from disk, or returns null if it does not exist.
- */
-export function loadManifest(repoPath: string): MigrationManifest | null {
-  const filePath = getManifestPath(repoPath);
+function getManifestsDir(repoPath: string): string {
+  return join(resolve(repoPath), '.bkb', MANIFESTS_DIR);
+}
+
+/** All per-pack manifest files present on disk (empty if none). */
+export function listManifestPaths(repoPath: string): string[] {
+  const dir = getManifestsDir(repoPath);
+  if (!existsSync(dir)) return [];
+  try {
+    return readdirSync(dir)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => join(dir, f));
+  } catch {
+    return [];
+  }
+}
+
+function readManifestFile(filePath: string): MigrationManifest | null {
   if (!existsSync(filePath)) return null;
-
   try {
     const raw = readFileSync(filePath, 'utf8');
     const parsed = JSON.parse(raw);
@@ -139,13 +168,43 @@ export function loadManifest(repoPath: string): MigrationManifest | null {
 }
 
 /**
+ * Loads a migration manifest from disk, or returns null if none exists.
+ *
+ * Resolution order:
+ *  - With a `packId`: the per-pack file, then the legacy file (only if it
+ *    belongs to the same pack).
+ *  - Without a `packId`: a sole per-pack file, then the legacy file. When
+ *    multiple packs are present the result is ambiguous and null is returned,
+ *    so callers should pass a packId.
+ */
+export function loadManifest(repoPath: string, packId?: string): MigrationManifest | null {
+  const candidates: string[] = [];
+  if (packId) {
+    candidates.push(getManifestPath(repoPath, packId));
+    candidates.push(getManifestPath(repoPath));
+  } else {
+    const perPack = listManifestPaths(repoPath);
+    if (perPack.length === 1) candidates.push(perPack[0]);
+    if (perPack.length !== 1) candidates.push(getManifestPath(repoPath));
+  }
+
+  for (const filePath of candidates) {
+    const manifest = readManifestFile(filePath);
+    if (!manifest) continue;
+    if (packId && manifest.packId !== packId) continue;
+    return manifest;
+  }
+  return null;
+}
+
+/**
  * Writes the manifest to `<repoPath>/.bkb/manifest.json` atomically: the
  * payload is written to a sibling temp file and then renamed into place, so a
  * crash mid-write can never leave a truncated/corrupt manifest behind.
  */
 export function saveManifest(repoPath: string, manifest: MigrationManifest): void {
-  const filePath = getManifestPath(repoPath);
-  const dir = resolve(repoPath, '.bkb');
+  const filePath = getManifestPath(repoPath, manifest.packId);
+  const dir = dirname(filePath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -220,7 +279,7 @@ export function initOrUpdateManifest(options: InitOrUpdateManifestOptions): Migr
 }
 
 function initOrUpdateManifestUnlocked(options: InitOrUpdateManifestOptions): MigrationManifest {
-  const existing = loadManifest(options.repoPath);
+  const existing = loadManifest(options.repoPath, options.packId);
 
   if (!options.reset && existing && existing.packId === options.packId) {
     // Preserve baseline and completed module states from existing manifest
@@ -304,7 +363,7 @@ function recordStepInManifestUnlocked(
   repoPath: string,
   record: RecordStepInput,
 ): MigrationManifest | null {
-  const manifest = loadManifest(repoPath);
+  const manifest = loadManifest(repoPath, record.packId);
   if (!manifest) return null;
 
   const now = new Date().toISOString();

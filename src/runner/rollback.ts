@@ -191,7 +191,7 @@ export async function rollbackToCheckpoint(
   // Capture the committed manifest before re-ingesting. initMigrationGraph with
   // reset:true rebuilds the manifest from the restored disk state, which would
   // discard the pristine pre-migration baseline and the team's commit history.
-  const priorManifest = loadManifest(absRepo);
+  const priorManifest = loadManifest(absRepo, packId);
 
   // Re-synchronize FalkorDB graph from the restored disk state
   try {
@@ -212,7 +212,7 @@ export async function rollbackToCheckpoint(
   // Restore the preserved baseline/history/epoch/phase onto the rebuilt manifest
   // so rollback is not treated as a fresh migration.
   if (priorManifest) {
-    const rebuilt = loadManifest(absRepo);
+    const rebuilt = loadManifest(absRepo, packId);
     if (rebuilt) {
       rebuilt.baseline = priorManifest.baseline;
       rebuilt.history = priorManifest.history;

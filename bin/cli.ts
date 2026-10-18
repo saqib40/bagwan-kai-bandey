@@ -340,7 +340,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
     const packId = String(flags.pack ?? activeConfig?.defaultPack ?? 'express-to-fastify');
     const isJson = Boolean(flags.json);
 
-    const manifest = loadManifest(repoPath);
+    const manifest = loadManifest(repoPath, packId);
 
     // Attempt to query FalkorDB if running, but do not crash if offline
     let falkorStats: {
@@ -468,7 +468,7 @@ export default ${lang.charAt(0).toUpperCase() + lang.slice(1)}Adapter;
 Repository:         ${repoPath}
 Migration Pack:     ${statusObj.packId}
 Current Phase:      ${statusObj.phase}
-Manifest:           ${manifest ? '.bkb/manifest.json (Synchronized with Git)' : 'Not yet initialized (Run "bkb init")'}
+Manifest:           ${manifest ? `.bkb/manifests/${statusObj.packId}.json (Synchronized with Git)` : 'Not yet initialized (Run "bkb init")'}
 FalkorDB Engine:    ${falkorStats ? 'Connected & Synced' : 'Offline / Idle'}
 
 --- Migration Progress [${bar}] ${percentStr} ---

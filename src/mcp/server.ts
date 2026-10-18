@@ -12,7 +12,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ensureFalkorDB } from '../engine/docker';
 import { MigrationGraphManager, getGraphNameForRepo } from '../engine/graphManager';
@@ -415,7 +415,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
   }) => {
     try {
       const ops = await getOps(repoPath, packId);
-      const manifest = loadManifest(ops.repoPath);
+      const manifest = loadManifest(ops.repoPath, ops.pack.id);
 
       const statusCounts = await ops.db.roQuery<{ status: string; cnt: number }>(
         `MATCH (m:Module) RETURN m.status AS status, count(m) AS cnt`,
@@ -529,7 +529,8 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
 
       // Milestone commits are a pure Git operation and must not require
       // FalkorDB to be running.
-      let manifest = loadManifest(resolvedRepo);
+      let manifest = loadManifest(resolvedRepo, packId ?? activePackId);
+      if (!manifest) manifest = loadManifest(resolvedRepo);
       const resolvedPackId = manifest?.packId ?? packId ?? activePackId;
 
       const git = (args: string[]): string =>
@@ -570,7 +571,6 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         }
       }
 
-      const manifestPath = getManifestPath(resolvedRepo);
       const requestedPaths = targetPaths ?? modulePaths;
       const stagedFiles: string[] = [];
 
@@ -583,7 +583,9 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         }
       };
 
-      manifest = loadManifest(resolvedRepo);
+      manifest = loadManifest(resolvedRepo, resolvedPackId);
+      const manifestPath = getManifestPath(resolvedRepo, manifest?.packId ?? resolvedPackId);
+      const manifestRelPath = relative(resolvedRepo, manifestPath).split(sep).join('/');
       const lastHistory = manifest?.history?.length
         ? manifest.history[manifest.history.length - 1]
         : null;
@@ -598,7 +600,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         '',
         `- Migration Pack: ${resolvedPackId}`,
         `- Verified Status: 100% Invariants Preserved`,
-        `- Manifest: .bkb/manifest.json updated`,
+        `- Manifest: ${manifestRelPath} updated`,
       ];
       if (lastHistory) {
         bodyLines.push(`- Step: ${lastHistory.step} [${lastHistory.phase}]`);
@@ -616,7 +618,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         git(['add', '-u']);
       }
       try {
-        git(['reset', '-q', '--', '.bkb/manifest.json']);
+        git(['reset', '-q', '--', manifestRelPath]);
       } catch {
         // Manifest is not tracked yet; nothing to unstage.
       }
@@ -636,13 +638,13 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         saveManifest(resolvedRepo, manifest);
         // Force-add so the manifest is committed even when the target repo
         // ignores `.bkb/`.
-        git(['add', '-f', '--', '.bkb/manifest.json']);
-        stagedFiles.push('.bkb/manifest.json');
+        git(['add', '-f', '--', manifestRelPath]);
+        stagedFiles.push(manifestRelPath);
         if (hasStagedChanges()) {
           git([
             'commit',
             '-m',
-            `chore(migration): record milestone ${commitSha.slice(0, 7)}\n\n- Manifest: .bkb/manifest.json\n- Records verified commit: ${commitSha}`,
+            `chore(migration): record milestone ${commitSha.slice(0, 7)}\n\n- Manifest: ${manifestRelPath}\n- Records verified commit: ${commitSha}`,
           ]);
           manifestCommit = git(['rev-parse', 'HEAD']);
         }
@@ -699,14 +701,14 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
 
   server.tool(
     'commit_milestone',
-    'Create an atomic Git commit for the current verified milestone, staging target files and .bkb/manifest.json with structured audit metadata.',
+    'Create an atomic Git commit for the current verified milestone, staging target files and the migration manifest with structured audit metadata.',
     commitSchema,
     commitMilestoneHandler,
   );
 
   server.tool(
     'bkb_commit_milestone',
-    'Create an atomic Git commit for the current verified milestone, staging target files and .bkb/manifest.json with structured audit metadata.',
+    'Create an atomic Git commit for the current verified milestone, staging target files and the migration manifest with structured audit metadata.',
     commitSchema,
     commitMilestoneHandler,
   );

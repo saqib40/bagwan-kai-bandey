@@ -36,7 +36,7 @@ describe('Git-Native Migration Manifest Subsystem', () => {
     }
   });
 
-  test('initOrUpdateManifest creates a new .bkb/manifest.json with baseline and modules', () => {
+  test('initOrUpdateManifest creates a per-pack manifest with baseline and modules', () => {
     const manifest = initOrUpdateManifest({
       repoPath: tempRepo,
       packId: 'express-to-fastify',
@@ -62,11 +62,50 @@ describe('Git-Native Migration Manifest Subsystem', () => {
     assert.equal(manifest.history.length, 1);
     assert.equal(manifest.history[0].phase, 'INIT');
 
-    const manifestPath = getManifestPath(tempRepo);
+    const manifestPath = getManifestPath(tempRepo, 'express-to-fastify');
     assert.ok(existsSync(manifestPath));
-    const loaded = loadManifest(tempRepo);
+    assert.ok(manifestPath.endsWith(join('.bkb', 'manifests', 'express-to-fastify.json')));
+    const loaded = loadManifest(tempRepo, 'express-to-fastify');
     assert.ok(loaded);
     assert.equal(loaded.packId, 'express-to-fastify');
+    // No pack id is fine when only one manifest exists.
+    assert.equal(loadManifest(tempRepo)?.packId, 'express-to-fastify');
+  });
+
+  test('per-pack manifests are isolated (a second pack does not clobber the first)', () => {
+    initOrUpdateManifest({
+      repoPath: tempRepo,
+      packId: 'express-to-fastify',
+      baselineSnapshot: { snapshotType: 'route-surface', entryCount: 2, entries: ['GET /a', 'GET /b'] },
+      modules: [{ path: 'src/a.ts', status: 'PENDING' }],
+    });
+    recordStepInManifest(tempRepo, {
+      packId: 'express-to-fastify',
+      step: 1,
+      phase: 'SHIM',
+      modules: ['src/a.ts'],
+      status: 'SHIMMED',
+      action: 'shim a',
+    });
+
+    initOrUpdateManifest({
+      repoPath: tempRepo,
+      packId: 'jest-to-vitest',
+      baselineSnapshot: { snapshotType: 'test-counts', entryCount: 10, entries: ['10 tests'] },
+      modules: [{ path: 'test/a.test.ts', status: 'PENDING' }],
+    });
+
+    // Both manifests coexist on disk.
+    const express = loadManifest(tempRepo, 'express-to-fastify');
+    const jest = loadManifest(tempRepo, 'jest-to-vitest');
+    assert.equal(express?.packId, 'express-to-fastify');
+    assert.equal(express?.modules['src/a.ts'].status, 'SHIMMED');
+    assert.equal(express?.baseline.entryCount, 2);
+    assert.equal(jest?.packId, 'jest-to-vitest');
+    assert.equal(jest?.baseline.entryCount, 10);
+
+    // Without a pack id the result is ambiguous, so it must not guess.
+    assert.equal(loadManifest(tempRepo), null);
   });
 
   test('recordStepInManifest records progress, invariants, and updates module status', () => {
@@ -186,6 +225,7 @@ describe('Git-Native Migration Manifest Subsystem', () => {
 
     for (let i = 0; i < 20; i++) {
       recordStepInManifest(tempRepo, {
+        packId: 'express-to-fastify',
         step: i + 1,
         phase: 'SHIM',
         modules: ['src/a.ts'],
@@ -195,7 +235,9 @@ describe('Git-Native Migration Manifest Subsystem', () => {
     }
 
     const bkbDir = join(tempRepo, '.bkb');
-    const leftovers = readdirSync(bkbDir).filter((f) => f.endsWith('.tmp') || f.endsWith('.lock'));
+    const leftovers = (readdirSync(bkbDir, { recursive: true }) as string[]).filter(
+      (f) => f.endsWith('.tmp') || f.endsWith('.lock'),
+    );
     assert.deepEqual(leftovers, []);
 
     const manifest = loadManifest(tempRepo);

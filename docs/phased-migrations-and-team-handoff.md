@@ -76,12 +76,12 @@ Between these sprints, **the codebase must remain deployable to production**. Te
 
 ---
 
-## 4. Git-Native Persistence: The `.bkb/manifest.json` Specification
+## 4. Git-Native Persistence: The `.bkb/manifests/<packId>.json` Specification
 
-Currently, graph states exist inside FalkorDB (`falkor://127.0.0.1:6379`). To enable **asynchronous, multi-team, distributed migration workflows**, BKB introduces the committed **Migration Manifest** (`.bkb/manifest.json`).
+Currently, graph states exist inside FalkorDB (`falkor://127.0.0.1:6379`). To enable **asynchronous, multi-team, distributed migration workflows**, BKB introduces the committed **Migration Manifest** (`.bkb/manifests/<packId>.json`), one file per migration pack.
 
 ### File Location & Git Lifecycle
-- Stored at `<repoRoot>/.bkb/manifest.json`.
+- Stored at `<repoRoot>/.bkb/manifests/<packId>.json` (the pack id is slugified into the filename).
 - **Committed to Git** alongside each migration milestone.
 - When any engineer or CI runner clones the repo or checks out a branch, BKB synchronizes FalkorDB directly from this committed manifest.
 

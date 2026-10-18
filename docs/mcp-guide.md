@@ -179,7 +179,7 @@ Protocol:
 4. VERIFY & ADVANCE:
    Call `advance_migration` with `edits: [{ path: "<path>", content: "<full new code>" }]` and an `agentSummary`.
    - The engine writes the file, runs AST re-parsing, executes compiler typechecks (tsc/mypy), and verifies invariant snapshots.
-   - If verification passes: The engine commits the node in FalkorDB, updates .bkb/manifest.json, and returns the next batch.
+   - If verification passes: The engine commits the node in FalkorDB, updates `.bkb/manifests/<packId>.json`, and returns the next batch.
    - If verification fails: Inspect the compiler error returned, fix the types, and re-call `advance_migration`.
 
 5. COMMIT MILESTONES:
@@ -195,4 +195,4 @@ If you need finer control than the single-turn `advance_migration` loop:
 - Call `simulate_blast_radius` to see reverse upstream callers.
 - Call `verify_and_commit_node` to validate compilation and commit.
 - Call `get_migration_audit_trail` to run checkpoint test suites and route diffs.
-- Call `bkb_commit_milestone` to create the Git commit and update `.bkb/manifest.json`.
+- Call `bkb_commit_milestone` to create the Git commit and update `.bkb/manifests/<packId>.json`.

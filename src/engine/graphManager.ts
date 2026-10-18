@@ -103,7 +103,7 @@ export class MigrationGraphManager {
       }
 
       // 2. Capture baseline snapshots using the pack's declared commands
-      const existingManifest = loadManifest(absRepoPath);
+      const existingManifest = loadManifest(absRepoPath, pack.id);
       const snapshots = getPackSnapshots(pack);
       const baselineSnapshots: Record<string, string> = {};
 
@@ -136,7 +136,7 @@ export class MigrationGraphManager {
         existingManifest.baseline?.entries
       ) {
         console.error(
-          `[bkb] Reusing committed baseline snapshots from .bkb/manifest.json (${existingManifest.baseline.entryCount} entries)...`,
+          `[bkb] Reusing committed baseline snapshots from .bkb/manifests/${pack.id}.json (${existingManifest.baseline.entryCount} entries)...`,
         );
         const savedSnapshots = existingManifest.baseline.snapshots ?? {};
         for (const snap of snapshots) {
@@ -314,7 +314,7 @@ export class MigrationGraphManager {
         legacyCallers: [...Q.LEGACY_CALLER_STATUSES],
       });
 
-      // 11. Sync with Git-native .bkb/manifest.json
+      // 11. Sync with the Git-native migration manifest
       const baselineEntries =
         primarySnap && baselineSnapshots[primarySnap.id]
           ? (() => {
@@ -376,7 +376,7 @@ export class MigrationGraphManager {
         verifiedModules: countMap.get('VERIFIED') ?? 0,
         baselineRoutesCount: baselineRoutes.length,
         sccCount: sccResult.members.size,
-        manifestPath: getManifestPath(absRepoPath),
+        manifestPath: getManifestPath(absRepoPath, pack.id),
       };
     } finally {
       if (ownClient) {
