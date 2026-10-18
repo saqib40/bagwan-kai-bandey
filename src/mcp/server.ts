@@ -569,19 +569,14 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
       const requestedPaths = targetPaths ?? modulePaths;
       const stagedFiles: string[] = [];
 
-      if (requestedPaths && requestedPaths.length) {
-        // `--` terminates option parsing so a path cannot be read as a flag.
-        git(['add', '--', ...requestedPaths]);
-        stagedFiles.push(...requestedPaths);
-      } else {
-        git(['add', '-u']);
-      }
-      if (existsSync(manifestPath)) {
-        // Force-add so the Git-native manifest is committed even when the
-        // target repository ignores `.bkb/`.
-        git(['add', '-f', '--', '.bkb/manifest.json']);
-        stagedFiles.push('.bkb/manifest.json');
-      }
+      const hasStagedChanges = (): boolean => {
+        try {
+          git(['diff', '--cached', '--quiet']);
+          return false;
+        } catch {
+          return true;
+        }
+      };
 
       manifest = loadManifest(resolvedRepo);
       const lastHistory = manifest?.history?.length
@@ -605,22 +600,46 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
         bodyLines.push(`- Action: ${lastHistory.action}`);
       }
 
-      const fullMessage = `${subject}\n${bodyLines.join('\n')}`;
+      // 1. Commit the migration code. The manifest is excluded from this commit
+      //    so that it can later record this commit's SHA without a
+      //    self-referential (and therefore impossible) hash.
+      if (requestedPaths && requestedPaths.length) {
+        // `--` terminates option parsing so a path cannot be read as a flag.
+        git(['add', '--', ...requestedPaths]);
+        stagedFiles.push(...requestedPaths);
+      } else {
+        git(['add', '-u']);
+      }
+      try {
+        git(['reset', '-q', '--', '.bkb/manifest.json']);
+      } catch {
+        // Manifest is not tracked yet; nothing to unstage.
+      }
 
-      git(['commit', '-m', fullMessage]);
-
-      let commitSha = git(['rev-parse', 'HEAD']);
+      if (hasStagedChanges()) {
+        git(['commit', '-m', `${subject}\n${bodyLines.join('\n')}`]);
+      }
+      const commitSha = git(['rev-parse', 'HEAD']);
       const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
 
-      if (manifest && lastHistory) {
+      // 2. Record the code commit SHA in the manifest and commit the manifest on
+      //    top. The recorded SHA now resolves to a real, permanent commit
+      //    (no history rewrite / --amend involved).
+      let manifestCommit: string | null = null;
+      if (manifest && lastHistory && existsSync(manifestPath)) {
         lastHistory.commitSha = commitSha;
         saveManifest(resolvedRepo, manifest);
-        try {
-          git(['add', '-f', '--', '.bkb/manifest.json']);
-          git(['commit', '--amend', '--no-edit']);
-          commitSha = git(['rev-parse', 'HEAD']);
-        } catch {
-          // Keep commitSha from previous commit if amend is not needed
+        // Force-add so the manifest is committed even when the target repo
+        // ignores `.bkb/`.
+        git(['add', '-f', '--', '.bkb/manifest.json']);
+        stagedFiles.push('.bkb/manifest.json');
+        if (hasStagedChanges()) {
+          git([
+            'commit',
+            '-m',
+            `chore(migration): record milestone ${commitSha.slice(0, 7)}\n\n- Manifest: .bkb/manifest.json\n- Records verified commit: ${commitSha}`,
+          ]);
+          manifestCommit = git(['rev-parse', 'HEAD']);
         }
       }
 
@@ -632,6 +651,7 @@ export function createBkbMcpServer(options: BkbServerOptions = {}): McpServer {
               {
                 ok: true,
                 commitSha,
+                manifestCommit,
                 branch,
                 commitSubject: subject,
                 stagedFiles,
